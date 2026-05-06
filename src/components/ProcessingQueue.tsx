@@ -1,30 +1,38 @@
 import React, { useContext } from 'react';
-import { BarChart3, X } from 'lucide-react';
-import { ProcessingItem } from '../types';
+import { BarChart3, X, Ban } from 'lucide-react';
+import { ProcessingItem, TranscriptionStage } from '../types';
 import { ServiceContext } from '../contexts/ServiceContext';
 
 interface ProcessingQueueProps {
   items: ProcessingItem[];
 }
 
-export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
-  const { removeFromProcessingQueue } = useContext(ServiceContext);
+const STAGE_LABEL: Record<TranscriptionStage, string> = {
+  queued: 'Waiting…',
+  analyzing_media: 'Reading file…',
+  extracting: 'Extracting audio…',
+  loading_model: 'Loading model…',
+  transcribing: 'Transcribing…',
+  diarising: 'Identifying speakers…',
+  validating: 'Validating text…',
+  analyzing: 'Analysing…',
+  embedding: 'Indexing…',
+  saving: 'Saving…',
+};
 
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'queued':
-        return 'Waiting...';
-      case 'transcribing':
-        return 'Transcribing...';
-      case 'analyzing':
-        return 'Analyzing...';
-      case 'completed':
-        return 'Complete';
-      case 'error':
-        return 'Error';
-      default:
-        return status;
-    }
+export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
+  const { removeFromProcessingQueue, cancelProcessingItem } = useContext(ServiceContext);
+
+  const getStatusText = (item: ProcessingItem) => {
+    if (item.status === 'completed') return 'Complete';
+    if (item.status === 'error') return 'Error';
+    if (item.status === 'cancelled') return item.error_message === 'Cancelling…' ? 'Cancelling…' : 'Cancelled';
+    if (item.stage) return STAGE_LABEL[item.stage] ?? item.stage;
+    // Fallback for the brief moment before the first stage event arrives.
+    if (item.status === 'queued') return 'Waiting…';
+    if (item.status === 'transcribing') return 'Transcribing…';
+    if (item.status === 'analyzing') return 'Analysing…';
+    return item.status;
   };
 
   const getProgressBarColor = (status: string) => {
@@ -33,10 +41,15 @@ export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
         return 'bg-error';
       case 'completed':
         return 'bg-success';
+      case 'cancelled':
+        return 'bg-surface-300';
       default:
         return 'bg-primary-500';
     }
   };
+
+  const isInProgress = (status: ProcessingItem['status']) =>
+    status === 'queued' || status === 'transcribing' || status === 'analyzing';
 
   if (items.length === 0) {
     return null;
@@ -65,7 +78,7 @@ export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
                     {fileName}
                   </span>
                   <span className="text-xs text-surface-500 whitespace-nowrap flex-shrink-0">
-                    {item.progress}% {getStatusText(item.status)}
+                    {item.progress}% {getStatusText(item)}
                   </span>
                 </div>
 
@@ -76,7 +89,7 @@ export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
                   />
                 </div>
 
-                {item.error_message && (
+                {item.error_message && item.status !== 'cancelled' && (
                   <p
                     className="text-xs text-error mt-1 truncate"
                     title={item.error_message}
@@ -86,10 +99,23 @@ export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
                 )}
               </div>
 
-              {(item.status === 'completed' || item.status === 'error') && (
+              {isInProgress(item.status) && (
+                <button
+                  onClick={() => cancelProcessingItem(item.id)}
+                  className="text-surface-400 hover:text-error transition-colors flex-shrink-0"
+                  title="Cancel"
+                  aria-label={`Cancel processing of ${fileName}`}
+                >
+                  <Ban size={14} />
+                </button>
+              )}
+
+              {(item.status === 'completed' || item.status === 'error' || item.status === 'cancelled') && (
                 <button
                   onClick={() => removeFromProcessingQueue(item.id)}
                   className="text-surface-400 hover:text-surface-600 transition-colors flex-shrink-0"
+                  title="Dismiss"
+                  aria-label={`Dismiss ${fileName}`}
                 >
                   <X size={14} />
                 </button>

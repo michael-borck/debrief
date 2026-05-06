@@ -92,11 +92,28 @@ export interface SegmentationStats {
   versionsCount: Record<string, number>;
 }
 
+// Stages reported by fileProcessor.processFile, in roughly the order they fire.
+// UI maps these to human-readable labels in ProcessingQueue.
+export type TranscriptionStage =
+  | 'queued'
+  | 'analyzing_media'
+  | 'extracting'
+  | 'loading_model'
+  | 'transcribing'
+  | 'diarising'
+  | 'validating'
+  | 'analyzing'
+  | 'embedding'
+  | 'saving';
+
 export interface ProcessingItem {
   id: string;
   transcript_id: string;
   file_path: string;
-  status: 'queued' | 'transcribing' | 'analyzing' | 'completed' | 'error';
+  // 'cancelled' means user aborted before completion. Distinct from 'error'
+  // so we can suppress error toasts and style the queue row differently.
+  status: 'queued' | 'transcribing' | 'analyzing' | 'completed' | 'error' | 'cancelled';
+  stage?: TranscriptionStage;
   progress: number;
   error_message?: string;
   created_at: string;

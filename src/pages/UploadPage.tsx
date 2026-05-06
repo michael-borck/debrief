@@ -111,16 +111,33 @@ export const UploadPage: React.FC = () => {
     }
   };
 
-  const startProcessing = async (processingItemId: string, transcriptId: string, filePath: string) => {
+  const startProcessing = async (
+    processingItemId: string,
+    transcriptId: string,
+    filePath: string,
+    signal: AbortSignal
+  ) => {
     const fileName = filePath.split('/').pop() || filePath;
     try {
-      updateProcessingItem(processingItemId, { status: 'transcribing' });
+      updateProcessingItem(processingItemId, { status: 'transcribing', stage: 'analyzing_media' });
 
       await fileProcessor.processFile(filePath, transcriptId, {
-        onProgress: (stage: string, percent: number) => {
+        signal,
+        onProgress: (stage, percent) => {
+          // Map stage to coarse status for back-compat with the existing UI.
+          // ProcessingQueue can render the finer-grained `stage` directly.
+          const coarseStatus =
+            stage === 'analyzing_media' ||
+            stage === 'extracting' ||
+            stage === 'loading_model' ||
+            stage === 'transcribing' ||
+            stage === 'diarising'
+              ? 'transcribing'
+              : 'analyzing';
           updateProcessingItem(processingItemId, {
             progress: percent,
-            status: stage === 'transcribing' ? 'transcribing' : 'analyzing'
+            status: coarseStatus,
+            stage,
           });
         },
         onError: async (error: Error) => {
@@ -133,7 +150,20 @@ export const UploadPage: React.FC = () => {
             kind: 'error',
             title: 'Processing failed',
             body: `${fileName}: ${error.message}`,
-            duration: 0, // sticky — user should see what went wrong
+            duration: 0,
+          });
+          await loadTranscripts();
+        },
+        onCancelled: async () => {
+          updateProcessingItem(processingItemId, {
+            status: 'cancelled',
+            error_message: 'Cancelled by user',
+          });
+          showToast({
+            kind: 'info',
+            title: 'Cancelled',
+            body: fileName,
+            duration: 4000,
           });
           await loadTranscripts();
         },
@@ -211,16 +241,18 @@ export const UploadPage: React.FC = () => {
         );
 
         const processingItemId = generateId();
+        const controller = new AbortController();
         addToProcessingQueue({
           id: processingItemId,
           transcript_id: transcriptId,
           file_path: filePath,
           status: 'queued',
+          stage: 'queued',
           progress: 0,
           created_at: timestamp
-        });
+        }, controller);
 
-        await startProcessing(processingItemId, transcriptId, filePath);
+        await startProcessing(processingItemId, transcriptId, filePath, controller.signal);
 
       } catch (error) {
         console.error('Error creating transcript:', error);

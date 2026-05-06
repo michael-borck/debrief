@@ -63,22 +63,44 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
     }
   };
 
-  const startProcessing = async (processingItemId: string, transcriptId: string, filePath: string) => {
+  const startProcessing = async (
+    processingItemId: string,
+    transcriptId: string,
+    filePath: string,
+    signal: AbortSignal
+  ) => {
     try {
-      updateProcessingItem(processingItemId, { status: 'transcribing' });
-      
+      updateProcessingItem(processingItemId, { status: 'transcribing', stage: 'analyzing_media' });
+
       await fileProcessor.processFile(filePath, transcriptId, {
-        onProgress: (stage: string, percent: number) => {
-          updateProcessingItem(processingItemId, { 
+        signal,
+        onProgress: (stage, percent) => {
+          const coarseStatus =
+            stage === 'analyzing_media' ||
+            stage === 'extracting' ||
+            stage === 'loading_model' ||
+            stage === 'transcribing' ||
+            stage === 'diarising'
+              ? 'transcribing'
+              : 'analyzing';
+          updateProcessingItem(processingItemId, {
             progress: percent,
-            status: stage === 'transcribing' ? 'transcribing' : 'analyzing'
+            status: coarseStatus,
+            stage,
           });
         },
         onError: async (error: Error) => {
           console.error('Processing error:', error);
-          updateProcessingItem(processingItemId, { 
+          updateProcessingItem(processingItemId, {
             status: 'error',
             error_message: error.message
+          });
+          await loadTranscripts();
+        },
+        onCancelled: async () => {
+          updateProcessingItem(processingItemId, {
+            status: 'cancelled',
+            error_message: 'Cancelled by user',
           });
           await loadTranscripts();
         },
@@ -149,17 +171,19 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
 
         // Add to processing queue
         const processingItemId = generateId();
+        const controller = new AbortController();
         addToProcessingQueue({
           id: processingItemId,
           transcript_id: transcriptId,
           file_path: filePath,
           status: 'queued',
+          stage: 'queued',
           progress: 0,
           created_at: timestamp
-        });
+        }, controller);
 
         // Start processing
-        await startProcessing(processingItemId, transcriptId, filePath);
+        await startProcessing(processingItemId, transcriptId, filePath, controller.signal);
         
       } catch (error) {
         console.error('Error creating transcript:', error);

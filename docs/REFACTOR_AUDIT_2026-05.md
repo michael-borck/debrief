@@ -125,7 +125,7 @@ No user-visible change. Unblocks everything else.
 
 ### Sprint 2 — UX Visible (~1 week)
 
-- [ ] Progress + cancellation for transcription (IPC events, AbortController)
+- [x] **Progress + cancellation for transcription** — Renderer-side `AbortController`, threaded through `fileProcessor.processFile` and all LLM HTTP calls. Stage union (`analyzing_media` → `extracting` → `loading_model` → `transcribing` → `diarising` → `validating` → `analyzing` → `embedding` → `saving`). `ProcessingItem.status` gains `'cancelled'`. `ProcessingQueue` shows the live stage label and a Cancel button while in progress. Cancellation rejects with `CancelledError`; LLM `fetch` calls accept `signal`. Whisper/diarise inference itself isn't abortable mid-IPC — `abortable()` returns control to the renderer immediately and the orphaned IPC completes harmlessly in main. Cancelled transcripts are persisted as `status='error', error_message='Cancelled by user'` (no schema change).
 - [ ] Modal stack manager
 - [ ] Surface diarisation tuning per-transcript
 - [ ] Lazy-mount audio player bar

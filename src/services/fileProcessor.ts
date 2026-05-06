@@ -2,11 +2,15 @@
 
 import { promptService } from './promptService';
 import { sentenceSegmentsService } from './sentenceSegmentsService';
+import type { TranscriptionStage } from '../types';
+import { abortable, checkCancelled, isCancelled } from '../utils/cancellation';
 
 interface ProcessingCallbacks {
-  onProgress?: (stage: string, percent: number) => void;
+  onProgress?: (stage: TranscriptionStage, percent: number) => void;
   onError?: (error: Error) => void;
   onComplete?: () => void;
+  onCancelled?: () => void;
+  signal?: AbortSignal;
 }
 
 export class FileProcessor {
@@ -15,55 +19,63 @@ export class FileProcessor {
     transcriptId: string,
     callbacks: ProcessingCallbacks = {}
   ): Promise<void> {
+    const { signal } = callbacks;
     try {
       // Step 1: Get media info
-      callbacks.onProgress?.('analyzing', 0);
-      const mediaInfo = await window.electronAPI.audio.getMediaInfo(filePath);
-      
+      callbacks.onProgress?.('analyzing_media', 0);
+      checkCancelled(signal);
+      const mediaInfo = await abortable(window.electronAPI.audio.getMediaInfo(filePath), signal);
+
       if (!mediaInfo.success) {
         throw new Error(mediaInfo.error || 'Failed to get media info');
       }
 
       let audioPath = filePath;
-      
+
       // Step 2: Extract audio if it's a video file
       if (mediaInfo.hasVideo) {
         callbacks.onProgress?.('extracting', 0);
-        
+        checkCancelled(signal);
+
         // Create temp audio file path
         const tempDir = await window.electronAPI.fs.getAppPath('temp');
         const audioFileName = `${transcriptId}_audio.wav`;
         audioPath = await window.electronAPI.fs.joinPath(tempDir, audioFileName);
-        
-        const extractResult = await window.electronAPI.audio.extractAudio(filePath, audioPath);
-        
+
+        const extractResult = await abortable(
+          window.electronAPI.audio.extractAudio(filePath, audioPath),
+          signal
+        );
+
         if (!extractResult.success) {
           throw new Error(extractResult.error || 'Failed to extract audio');
         }
-        
+
         callbacks.onProgress?.('extracting', 100);
       }
 
       // Step 3: Send to STT service
       callbacks.onProgress?.('transcribing', 0);
-      
-      const transcriptResult = await this.transcribeAudio(audioPath, callbacks.onProgress);
-      
+      checkCancelled(signal);
+
+      const transcriptResult = await this.transcribeAudio(audioPath, callbacks.onProgress, signal);
+
       console.log('Transcription result:', transcriptResult);
-      
+
       if (!transcriptResult.success) {
         throw new Error(transcriptResult.error || 'Failed to transcribe audio');
       }
-      
+
       if (!transcriptResult.text || transcriptResult.text.trim() === '') {
         console.warn('Warning: Empty transcript text received');
       }
-      
+
       callbacks.onProgress?.('transcribing', 100);
 
       // Step 3.5: Validate transcript (if enabled)
       callbacks.onProgress?.('validating', 0);
-      const validationResult = await this.validateTranscript(transcriptResult.text || '');
+      checkCancelled(signal);
+      const validationResult = await this.validateTranscript(transcriptResult.text || '', signal);
       callbacks.onProgress?.('validating', 100);
       
       // Determine which text to use for analysis
@@ -77,17 +89,19 @@ export class FileProcessor {
 
       // Step 4: AI Analysis
       callbacks.onProgress?.('analyzing', 0);
-      
-      const analysisResult = await this.analyzeTranscript(textForAnalysis, callbacks.onProgress);
-      
+      checkCancelled(signal);
+
+      const analysisResult = await this.analyzeTranscript(textForAnalysis, callbacks.onProgress, signal);
+
       callbacks.onProgress?.('analyzing', 50);
-      
+      checkCancelled(signal);
+
       // Step 4.5: Advanced Analysis (sentiment, speakers, emotions)
       // Use validated text if available and setting is enabled
-      const textForAdvancedAnalysis = (analyzeValidatedSetting?.value === 'true' && validationResult.validatedText) 
-        ? validationResult.validatedText 
+      const textForAdvancedAnalysis = (analyzeValidatedSetting?.value === 'true' && validationResult.validatedText)
+        ? validationResult.validatedText
         : transcriptResult.text || '';
-      const advancedAnalysisResult = await this.performAdvancedAnalysis(textForAdvancedAnalysis, callbacks.onProgress);
+      const advancedAnalysisResult = await this.performAdvancedAnalysis(textForAdvancedAnalysis, callbacks.onProgress, signal);
 
       // If the local diarisation pipeline produced real speaker turns,
       // they override anything the LLM speaker-tagging path produced.
@@ -110,11 +124,13 @@ export class FileProcessor {
       }
 
       callbacks.onProgress?.('analyzing', 75);
-      
+      checkCancelled(signal);
+
       // Step 4.6: Research Analysis (quotes, themes, Q&A, concepts)
-      const researchAnalysisResult = await this.performResearchAnalysis(transcriptResult.text || '', callbacks.onProgress);
-      
+      const researchAnalysisResult = await this.performResearchAnalysis(transcriptResult.text || '', callbacks.onProgress, signal);
+
       callbacks.onProgress?.('analyzing', 100);
+      checkCancelled(signal);
 
       // Step 5: Save to database
       callbacks.onProgress?.('saving', 0);
@@ -203,21 +219,44 @@ export class FileProcessor {
 
       callbacks.onComplete?.();
     } catch (error) {
+      if (isCancelled(error)) {
+        console.log('Processing cancelled by user:', transcriptId);
+        // Persist cancellation as 'error' with a clear marker so the row
+        // doesn't stay stuck in 'processing'. ProcessingItem.status uses
+        // a separate 'cancelled' so the UI can distinguish.
+        try {
+          await window.electronAPI.database.run(
+            `UPDATE transcripts
+             SET status = ?, error_message = ?
+             WHERE id = ?`,
+            ['error', 'Cancelled by user', transcriptId]
+          );
+        } catch (dbErr) {
+          console.error('Failed to mark transcript cancelled:', dbErr);
+        }
+        callbacks.onCancelled?.();
+        return;
+      }
+
       console.error('Processing error:', error);
-      
+
       // Update transcript with error
       await window.electronAPI.database.run(
-        `UPDATE transcripts 
+        `UPDATE transcripts
          SET status = ?, error_message = ?
          WHERE id = ?`,
         ['error', (error as Error).message, transcriptId]
       );
-      
+
       callbacks.onError?.(error as Error);
     }
   }
 
-  async transcribeAudio(audioPath: string, onProgress?: (stage: string, percent: number) => void): Promise<{
+  async transcribeAudio(
+    audioPath: string,
+    onProgress?: (stage: TranscriptionStage, percent: number) => void,
+    signal?: AbortSignal
+  ): Promise<{
     success: boolean;
     text?: string;
     error?: string;
@@ -248,13 +287,19 @@ export class FileProcessor {
 
       onProgress?.('transcribing', 25);
 
-      // Run Whisper + (optional) diarisation entirely in the main process
-      const result = await window.electronAPI.audio.transcribe(audioPath, modelName, enableDiarisation);
-      
+      // Run Whisper + (optional) diarisation entirely in the main process.
+      // Wrap in abortable so cancel returns control to the renderer
+      // immediately even though the IPC keeps running in main.
+      const result = await abortable(
+        window.electronAPI.audio.transcribe(audioPath, modelName, enableDiarisation),
+        signal
+      );
+
       onProgress?.('transcribing', 75);
-      
+
       return result;
     } catch (error) {
+      if (isCancelled(error)) throw error;
       console.error('Transcription error:', error);
       return {
         success: false,
@@ -263,7 +308,11 @@ export class FileProcessor {
     }
   }
 
-  async analyzeTranscript(transcriptText: string, onProgress?: (stage: string, percent: number) => void): Promise<{
+  async analyzeTranscript(
+    transcriptText: string,
+    onProgress?: (stage: TranscriptionStage, percent: number) => void,
+    signal?: AbortSignal
+  ): Promise<{
     summary: string;
     keyTopics: string[];
     actionItems: string[];
@@ -279,25 +328,26 @@ export class FileProcessor {
         'SELECT value FROM settings WHERE key = ?',
         ['aiAnalysisUrl']
       );
-      
+
       const aiModelSetting = await window.electronAPI.database.get(
         'SELECT value FROM settings WHERE key = ?',
         ['aiModel']
       );
-      
+
       const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
       const aiModel = aiModelSetting?.value || 'llama2';
-      
+
       onProgress?.('analyzing', 25);
-      
+
       // Get configurable analysis prompt
       const analysisPrompt = await promptService.getProcessedPrompt('analysis', 'basic_analysis', {
         transcript: transcriptText
       });
 
       onProgress?.('analyzing', 50);
-      
-      // Make request to AI service (Ollama)
+      checkCancelled(signal);
+
+      // Make request to AI service (Ollama). signal lets us cancel mid-flight.
       const response = await fetch(`${aiUrl}/api/generate`, {
         method: 'POST',
         headers: {
@@ -308,9 +358,10 @@ export class FileProcessor {
           prompt: analysisPrompt,
           stream: false,
           format: 'json'
-        })
+        }),
+        signal,
       });
-      
+
       onProgress?.('analyzing', 75);
       
       if (!response.ok) {
@@ -338,6 +389,7 @@ export class FileProcessor {
       };
       
     } catch (error) {
+      if (isCancelled(error)) throw error;
       console.error('Analysis error:', error);
       // Return empty analysis rather than failing the entire process
       return { summary: '', keyTopics: [], actionItems: [] };
@@ -386,7 +438,13 @@ export class FileProcessor {
     return aiModelSetting?.value || 'llama2';
   }
 
-  async callAI(aiUrl: string, aiModel: string, prompt: string, expectJson: boolean = true): Promise<any> {
+  async callAI(
+    aiUrl: string,
+    aiModel: string,
+    prompt: string,
+    expectJson: boolean = true,
+    signal?: AbortSignal
+  ): Promise<any> {
     try {
       const response = await fetch(`${aiUrl}/api/generate`, {
         method: 'POST',
@@ -398,15 +456,16 @@ export class FileProcessor {
           prompt: prompt,
           stream: false,
           format: expectJson ? 'json' : undefined
-        })
+        }),
+        signal,
       });
-      
+
       if (!response.ok) {
         throw new Error(`AI service error: ${response.status} ${response.statusText}`);
       }
-      
+
       const result = await response.json();
-      
+
       if (expectJson) {
         try {
           return { parsed: JSON.parse(result.response), raw: result.response };
@@ -418,47 +477,50 @@ export class FileProcessor {
         return result.response;
       }
     } catch (error) {
+      if (isCancelled(error)) throw error;
       console.error('AI call error:', error);
       return expectJson ? { parsed: null, raw: '' } : '';
     }
   }
 
-  async performSentimentAnalysis(transcriptText: string): Promise<{
+  async performSentimentAnalysis(transcriptText: string, signal?: AbortSignal): Promise<{
     sentiment: string;
     sentimentScore: number;
   }> {
     try {
       const aiUrl = await this.getAiUrl();
       const aiModel = await this.getAiModel();
-      
+
       const prompt = await promptService.getProcessedPrompt('analysis', 'sentiment_analysis', {
         transcript: transcriptText
       });
 
-      const aiResponse = await this.callAI(aiUrl, aiModel, prompt);
+      const aiResponse = await this.callAI(aiUrl, aiModel, prompt, true, signal);
       const result = aiResponse.parsed || {};
       return {
         sentiment: result.sentiment || 'neutral',
         sentimentScore: typeof result.sentimentScore === 'number' ? result.sentimentScore : 0
       };
     } catch (error) {
+      if (isCancelled(error)) throw error;
       console.error('Sentiment analysis error:', error);
       return { sentiment: 'neutral', sentimentScore: 0 };
     }
   }
 
-  async performEmotionAnalysis(transcriptText: string): Promise<Record<string, number>> {
+  async performEmotionAnalysis(transcriptText: string, signal?: AbortSignal): Promise<Record<string, number>> {
     try {
       const aiUrl = await this.getAiUrl();
       const aiModel = await this.getAiModel();
-      
+
       const prompt = await promptService.getProcessedPrompt('analysis', 'emotion_analysis', {
         transcript: transcriptText
       });
 
-      const aiResponse = await this.callAI(aiUrl, aiModel, prompt);
+      const aiResponse = await this.callAI(aiUrl, aiModel, prompt, true, signal);
       return aiResponse.parsed || {};
     } catch (error) {
+      if (isCancelled(error)) throw error;
       console.error('Emotion analysis error:', error);
       return {};
     }
@@ -479,7 +541,11 @@ export class FileProcessor {
    * its speaker output was being discarded anyway. Both paths have been
    * collapsed into the one-task approach.
    */
-  async performAdvancedAnalysis(transcriptText: string, onProgress?: (stage: string, percent: number) => void): Promise<{
+  async performAdvancedAnalysis(
+    transcriptText: string,
+    onProgress?: (stage: TranscriptionStage, percent: number) => void,
+    signal?: AbortSignal
+  ): Promise<{
     sentiment: string;
     sentimentScore: number;
     emotions: Record<string, number>;
@@ -494,9 +560,9 @@ export class FileProcessor {
       }
 
       onProgress?.('analyzing', 60);
-      const sentimentResult = await this.performSentimentAnalysis(transcriptText);
+      const sentimentResult = await this.performSentimentAnalysis(transcriptText, signal);
       onProgress?.('analyzing', 70);
-      const emotionResult = await this.performEmotionAnalysis(transcriptText);
+      const emotionResult = await this.performEmotionAnalysis(transcriptText, signal);
       onProgress?.('analyzing', 85);
 
       return {
@@ -508,19 +574,20 @@ export class FileProcessor {
         processedText: transcriptText,
       };
     } catch (error) {
+      if (isCancelled(error)) throw error;
       console.error('Advanced analysis error:', error);
       return { sentiment: 'neutral', sentimentScore: 0, emotions: {}, speakerCount: 1, speakers: [], processedText: transcriptText };
     }
   }
 
-  async validateTranscript(transcriptText: string): Promise<{
+  async validateTranscript(transcriptText: string, signal?: AbortSignal): Promise<{
     validatedText: string;
     changes: Array<{ type: string; original: string; corrected: string; position: number }>;
   }> {
     // Initialize variables outside try block for catch block access
     let processedText = transcriptText;
     let duplicateRemovalChanges: any[] = [];
-    
+
     try {
       // Get validation settings
       const validationEnabledSetting = await window.electronAPI.database.get(
@@ -546,7 +613,7 @@ export class FileProcessor {
       );
       
       if (duplicateRemovalSetting?.value !== 'false') {
-        const duplicateResult = await this.removeDuplicateSentences(transcriptText);
+        const duplicateResult = await this.removeDuplicateSentences(transcriptText, signal);
         processedText = duplicateResult.cleanedText;
         
         if (duplicateResult.removedCount > 0) {
@@ -592,7 +659,7 @@ export class FileProcessor {
       // For very long transcripts, use chunked validation
       if (processedText.length > 4000) {
         console.log('Using chunked validation for long transcript');
-        const chunkResult = await this.performChunkedValidation(processedText, options, aiUrl, aiModel);
+        const chunkResult = await this.performChunkedValidation(processedText, options, aiUrl, aiModel, signal);
         return {
           validatedText: chunkResult.validatedText,
           changes: [...duplicateRemovalChanges, ...chunkResult.changes]
@@ -610,7 +677,8 @@ export class FileProcessor {
           prompt: validationPrompt,
           stream: false,
           format: 'json'
-        })
+        }),
+        signal,
       });
       
       if (!response.ok) {
@@ -655,16 +723,23 @@ export class FileProcessor {
       };
       
     } catch (error) {
+      if (isCancelled(error)) throw error;
       console.error('Validation error:', error);
       // Return duplicate-cleaned text if validation fails, or original if duplicate removal also failed
-      return { 
-        validatedText: processedText || transcriptText, 
-        changes: duplicateRemovalChanges || [] 
+      return {
+        validatedText: processedText || transcriptText,
+        changes: duplicateRemovalChanges || []
       };
     }
   }
 
-  async performChunkedValidation(text: string, options: any, aiUrl: string, aiModel: string): Promise<{
+  async performChunkedValidation(
+    text: string,
+    options: any,
+    aiUrl: string,
+    aiModel: string,
+    signal?: AbortSignal
+  ): Promise<{
     validatedText: string;
     changes: Array<{ type: string; original: string; corrected: string; position: number }>;
   }> {
@@ -703,9 +778,10 @@ export class FileProcessor {
     const allChanges: Array<{ type: string; original: string; corrected: string; position: number }> = [];
     
     for (let i = 0; i < chunks.length; i++) {
+      checkCancelled(signal);
       const chunk = chunks[i];
       console.log(`Validating chunk ${i + 1}/${chunks.length} (${chunk.length} chars)`);
-      
+
       try {
         const validationPrompt = `Please validate and correct the following text segment. Focus on:
 ${options.spelling !== false ? '- Spelling errors' : ''}
@@ -744,14 +820,15 @@ Please format your response as JSON:
             prompt: validationPrompt,
             stream: false,
             format: 'json'
-          })
+          }),
+          signal,
         });
 
         if (response.ok) {
           const result = await response.json();
           const chunkData = JSON.parse(result.response);
           validatedChunks.push(chunkData.validatedText || chunk);
-          
+
           if (Array.isArray(chunkData.changes)) {
             // Adjust positions for the full text
             const adjustedChanges = chunkData.changes.map((change: any) => ({
@@ -765,6 +842,7 @@ Please format your response as JSON:
           validatedChunks.push(chunk);
         }
       } catch (error) {
+        if (isCancelled(error)) throw error;
         console.warn(`Error validating chunk ${i + 1}:`, error);
         validatedChunks.push(chunk);
       }
@@ -781,8 +859,8 @@ Please format your response as JSON:
     };
   }
 
-  async removeDuplicateSentences(transcriptText: string): Promise<{ 
-    cleanedText: string; 
+  async removeDuplicateSentences(transcriptText: string, _signal?: AbortSignal): Promise<{
+    cleanedText: string;
     removedCount: number;
     removedSentences: string[];
   }> {
@@ -896,7 +974,11 @@ Please format your response as JSON:
     return matrix[str2.length][str1.length];
   }
 
-  async performResearchAnalysis(transcriptText: string, onProgress?: (stage: string, percent: number) => void): Promise<{
+  async performResearchAnalysis(
+    transcriptText: string,
+    onProgress?: (stage: TranscriptionStage, percent: number) => void,
+    signal?: AbortSignal
+  ): Promise<{
     notableQuotes: Array<{ text: string; speaker?: string; timestamp?: number; relevance: number }>;
     researchThemes: Array<{ theme: string; confidence: number; examples: string[] }>;
     qaPairs: Array<{ question: string; answer: string; speaker?: string; timestamp?: number }>;
@@ -942,9 +1024,10 @@ Please format your response as JSON:
           prompt: researchPrompt,
           stream: false,
           format: 'json'
-        })
+        }),
+        signal,
       });
-      
+
       onProgress?.('analyzing', 95);
       
       if (!response.ok) {
@@ -972,6 +1055,7 @@ Please format your response as JSON:
       };
       
     } catch (error) {
+      if (isCancelled(error)) throw error;
       console.error('Research analysis error:', error);
       // Return empty analysis rather than failing the entire process
       return { notableQuotes: [], researchThemes: [], qaPairs: [], conceptFrequency: {} };
