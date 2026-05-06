@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Download, FileText, CheckCircle, Edit3, Users } from 'lucide-react';
 import { Transcript } from '../types';
 import { buildDocx, buildPdf } from '../services/exportService';
+import { Modal } from './Modal';
 
 interface ExportModalProps {
   transcript: Transcript;
@@ -23,8 +24,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [includeMetadata, setIncludeMetadata] = useState(true);
   const [includeAnalysis, setIncludeAnalysis] = useState(true);
   const [timestampFormat, setTimestampFormat] = useState<TimestampFormat>('preserve');
-
-  if (!isOpen) return null;
 
   const processTimestamps = (text: string): string => {
     if (!text) return text;
@@ -259,8 +258,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-elevated w-full max-w-md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Export Transcript"
+      contentClassName="bg-white rounded-lg shadow-elevated w-full max-w-md"
+    >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-semibold text-surface-900">Export Transcript</h2>
@@ -404,7 +407,6 @@ export const ExportModal: React.FC<ExportModalProps> = ({
             <span>Export</span>
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

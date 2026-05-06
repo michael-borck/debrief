@@ -1,5 +1,6 @@
 import React from 'react';
 import { URLS } from '../constants/urls';
+import { Modal } from './Modal';
 
 interface AboutDialogProps {
   isOpen: boolean;
@@ -8,11 +9,13 @@ interface AboutDialogProps {
 }
 
 export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose, onShowLicenses }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-900/40 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-elevated max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="About DeepTalk"
+      contentClassName="bg-white rounded-lg shadow-elevated max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+    >
         {/* Header */}
         <div className="border-b border-surface-200 p-6">
           <div className="flex items-center justify-between">
@@ -141,7 +144,6 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose, onSho
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

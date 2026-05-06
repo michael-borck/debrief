@@ -3,6 +3,7 @@ import { Search, Filter, Calendar, Clock, Palette, CheckSquare, Square, X } from
 import { TranscriptContext } from '../contexts/TranscriptContext';
 import { Transcript } from '../types';
 import { formatDate, formatDuration } from '../utils/helpers';
+import { Modal } from './Modal';
 
 interface AddExistingModalProps {
   isOpen: boolean;
@@ -148,11 +149,13 @@ export const AddExistingModal: React.FC<AddExistingModalProps> = ({
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-elevated w-full max-w-4xl max-h-[90vh] flex flex-col">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Add Existing Transcripts"
+      contentClassName="bg-white rounded-lg shadow-elevated w-full max-w-4xl max-h-[90vh] flex flex-col"
+    >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <h2 className="text-xl font-semibold text-surface-900">Add Existing Transcripts</h2>
@@ -419,7 +422,6 @@ export const AddExistingModal: React.FC<AddExistingModalProps> = ({
             Add {selectedItems.size} Transcript{selectedItems.size !== 1 ? 's' : ''}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

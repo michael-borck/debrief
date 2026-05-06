@@ -19,26 +19,24 @@ import { ServiceProvider } from './contexts/ServiceContext';
 import { TranscriptProvider } from './contexts/TranscriptContext';
 import { ProjectProvider } from './contexts/ProjectContext';
 import { ToastProvider } from './contexts/ToastContext';
+import { ModalStackProvider } from './components/Modal';
 
 const App: React.FC = () => {
   const [showShortcuts, setShowShortcuts] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Ctrl+? or Cmd+? to open shortcuts modal
+      // Ctrl+? or Cmd+? to open shortcuts modal. Escape is handled by the
+      // <Modal> wrapper itself.
       if ((event.ctrlKey || event.metaKey) && event.key === '?') {
         event.preventDefault();
         setShowShortcuts(true);
-      }
-      // Escape to close shortcuts modal
-      if (event.key === 'Escape' && showShortcuts) {
-        setShowShortcuts(false);
       }
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [showShortcuts]);
+  }, []);
 
   return (
     <ErrorBoundary>
@@ -46,6 +44,7 @@ const App: React.FC = () => {
       <ServiceProvider>
         <TranscriptProvider>
           <ProjectProvider>
+            <ModalStackProvider>
             <Router>
               <AppShell>
                 <Routes>
@@ -70,6 +69,7 @@ const App: React.FC = () => {
                 onClose={() => setShowShortcuts(false)}
               />
             </Router>
+            </ModalStackProvider>
           </ProjectProvider>
         </TranscriptProvider>
       </ServiceProvider>

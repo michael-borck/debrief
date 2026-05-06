@@ -3,6 +3,7 @@ import { X, AlertTriangle, Trash2, FolderMinus } from 'lucide-react';
 import { Transcript, Project } from '../types';
 import { useProjects } from '../contexts/ProjectContext';
 import { formatDate } from '../utils/helpers';
+import { Modal } from './Modal';
 
 interface EnhancedDeleteModalProps {
   isOpen: boolean;
@@ -136,11 +137,16 @@ export const EnhancedDeleteModal: React.FC<EnhancedDeleteModalProps> = ({
     return false;
   };
 
-  if (!isOpen || !item) return null;
+  if (!item) return null;
 
   return (
-    <div className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-elevated w-full max-w-md">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={`Delete ${itemType === 'transcript' ? 'Transcript' : 'Project'}`}
+      closeOnBackdrop={false}
+      contentClassName="bg-white rounded-lg shadow-elevated w-full max-w-md"
+    >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
           <div className="flex items-center space-x-3">
@@ -336,7 +342,6 @@ export const EnhancedDeleteModal: React.FC<EnhancedDeleteModalProps> = ({
             {getActionButtonText()}
           </button>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

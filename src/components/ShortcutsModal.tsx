@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Search, Keyboard } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface ShortcutsModalProps {
   isOpen: boolean;
@@ -119,11 +120,13 @@ const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
     </div>
   );
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-elevated max-w-4xl w-full max-h-[90vh] overflow-hidden">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Keyboard shortcuts"
+      contentClassName="bg-white rounded-lg shadow-elevated max-w-4xl w-full max-h-[90vh] overflow-hidden"
+    >
         {/* Header */}
         <div className="px-6 py-4 border-b border-surface-200 bg-surface-50">
           <div className="flex items-center justify-between">
@@ -196,8 +199,7 @@ const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </Modal>
   );
 };
 

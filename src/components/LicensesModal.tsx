@@ -1,4 +1,5 @@
 import React from 'react';
+import { Modal } from './Modal';
 
 interface LicensesModalProps {
   isOpen: boolean;
@@ -6,8 +7,6 @@ interface LicensesModalProps {
 }
 
 export const LicensesModal: React.FC<LicensesModalProps> = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
-
   const licenses = [
     {
       name: 'DeepTalk',
@@ -104,8 +103,12 @@ SOFTWARE.`
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-surface-900/40 backdrop-blur-sm">
-      <div className="bg-white rounded-lg shadow-elevated max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Open Source Licenses"
+      contentClassName="bg-white rounded-lg shadow-elevated max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden flex flex-col"
+    >
         {/* Header */}
         <div className="border-b border-surface-200 p-6">
           <div className="flex items-center justify-between">
@@ -215,7 +218,6 @@ SOFTWARE.`
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

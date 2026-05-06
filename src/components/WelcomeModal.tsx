@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, Mic, BrainCircuit, Lock, BookOpen } from 'lucide-react';
+import { Modal } from './Modal';
 
 interface WelcomeModalProps {
   isOpen: boolean;
@@ -34,8 +35,6 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) =
   const navigate = useNavigate();
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
-  if (!isOpen) return null;
-
   const handleSkip = () => onClose(dontShowAgain);
   const handleGetStarted = () => {
     onClose(dontShowAgain);
@@ -43,8 +42,12 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) =
   };
 
   return (
-    <div className="modal-backdrop">
-      <div className="modal-content max-w-2xl">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleSkip}
+      ariaLabel="Welcome to DeepTalk"
+      contentClassName="modal-content max-w-2xl"
+    >
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
           <div>
@@ -106,7 +109,6 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) =
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
