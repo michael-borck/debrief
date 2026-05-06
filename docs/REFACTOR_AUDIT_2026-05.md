@@ -50,7 +50,7 @@ Maintaining a JS reimplementation of pyannote's pipeline. Will always lag pyanno
 | **B. Keep JS, improve alignment** | Low | Med | Steal speech-analyser's overlap-matching (`audio_lens.py:_assign_speakers`). Add `num_speakers` hint. |
 | **C. Optional external service** | Low | Hi if running | Treat speech-analyser (or any HTTP diariser) as an optional backend; degrade gracefully if absent. Matches existing AI-provider pattern. |
 
-**Recommendation:** B now (low risk), then C as the upgrade path. A is overkill for an Electron app marketed as zero-setup.
+**Recommendation (revised 2026-05-07):** A — pyannote 3.1 via Python sidecar bundling `lens/speech-analyser`. Original "B then C" plan was wrong: the "zero-setup Electron app" framing prioritised installer size over accuracy, but for an analytical tool the user opens a few times a week, a one-time ~500MB model download is a non-issue — an inaccurate transcript is a deal-breaker. The JS reimplementation is also a duplication smell: `lens/speech-analyser` already wraps pyannote + faster-whisper + deterministic metrics, and deep-talk reinvents both halves badly. See revised Sprint 3 below. **No JS fallback** — two pipelines means two bug surfaces; the answer is robust sidecar restart, not graceful degrade.
 
 **Either way, surface the tuning UI properly.** A small "Diarisation quality" panel on the transcript page (one slider for cluster threshold + "rerun" button) would do more for users than four hidden numeric inputs.
 
@@ -130,14 +130,19 @@ No user-visible change. Unblocks everything else.
 - [x] **Surface diarisation tuning per-transcript** — New `<DiarisationPanel>` on the transcript detail page with a cluster-threshold slider (0.30–0.75), current speaker count, and "Rerun" button. Clicking rerun calls a new `audio.rediarise(audioPath, overrides)` IPC that re-decodes the audio and runs ONLY the diarisation pipeline (no whisper). The renderer pulls existing original segments from the DB, calls IPC, re-aligns chunks via the renderer-side `alignSpeakersToChunks` mirror, replaces `speaker_tagged` segments, and updates `transcripts.speakers`/`speaker_count`. Reuses Sprint 2.A's `AbortController`/`abortable` pattern so the rerun is cancellable. `loadDiarisationSettings()` in `public/electron/diarise.js` now accepts per-call overrides without touching the user's saved global settings.
 - [x] **Lazy-mount audio player bar** — Already met by current code. `AudioPlayerBar` is only rendered inside `TranscriptDetailPage`, and only when `transcript.file_path` exists (`TranscriptDetailPage.tsx:611`). The `<audio>` element starts in `loadState='idle'` with no `src`, so no audio is fetched until the user clicks "Load audio". The originally-feared "always rendered" cost is negligible — the audit was conservative. No change required; closing as verified.
 
-### Sprint 3 — Analytical Depth (~1 week)
+### Sprint 3 — Sidecar architecture (revised 2026-05-07, ~1–2 weeks)
 
-- [ ] Port speech-analyser's metrics (WPM, fillers, silence, balance)
-- [ ] Composite quality score with insights engine
-- [ ] Embedding-based theme clusters using existing LanceDB
-- [ ] Per-operation token cost display
+Original Sprint 3 (port metrics into JS) and Sprint 4 (maybe-sidecar) are merged. Driver: code duplication across the lens family. `lens/speech-analyser` already wraps pyannote + faster-whisper + the deterministic metrics. Reimplementing them in Electron-JS produces drift and worse accuracy. The lens becomes the canonical analysis backend; deep-talk becomes a thin UI over it.
 
-### Sprint 4 — Diarisation Upgrade (Optional)
+- [ ] **3.1 Bundle speech-analyser as a Python sidecar.** Ship a Python runtime via `python-build-standalone` inside the .app bundle, install `speech-analyser` into a managed venv on first launch (or pre-bake into the build). Main process owns lifecycle: spawn on app start, health-check via `GET /healthz` on a chosen local port, restart on crash with backoff (1s → 2s → 5s → 30s), surface persistent failures in UI with a "retry" affordance and diagnostic copy. **No JS-pipeline fallback.** First-run model download (~500MB) shown as an explicit progress UI, not a silent stall — same pattern speech-analyser already uses for missing models. Lifecycle is fiddly; budget ~2–3 days for it alone.
+- [ ] **3.2 Route diarisation through the sidecar.** Replace `public/electron/diarise.js` calls with HTTP calls into the sidecar. Pass `num_speakers` hint from UI when known. Per-transcript tuning panel (Sprint 2.C) re-wires to the new endpoint without UI changes. Existing transcripts remain valid; the rerun action upgrades them in-place.
+- [ ] **3.3 Expose deterministic metrics over the sidecar.** WPM, filler rate + which words, silence ratio, talk-time balance, composite quality score (clarity/depth/balance/pace), rule-based strengths/observations — all already implemented in `speech_analyser/speech_analyzer.py`. Add `POST /metrics` to FastAPI taking a transcript JSON, returning `{score, factors, ratings, insights}`. deep-talk renderer fetches once per transcript, stores on `transcripts.metrics_json`, displays in a quality dashboard panel.
+- [ ] **3.4 Embedding-based theme clusters using existing LanceDB.** Renderer-side, unchanged from original Sprint 3. Triangulates the LLM theme pass with k-means/HDBSCAN over segment embeddings, one LLM call per cluster to label.
+- [ ] **3.5 Per-operation token cost display.** Renderer-side, unchanged from original Sprint 3.
 
-- [ ] Either Python sidecar or external-service backend
-- [ ] Only if accuracy remains a complaint after Sprint 2's UI work + Sprint 3's `num_speakers` hint
+### Sprint 4 — Removal & unification (~3–5 days)
+
+Done after 3.1–3.3 has soaked for one release. Goal: delete the duplicated JS code paths now that the sidecar is canonical.
+
+- [ ] Delete `public/electron/diarise.js` and the JS Xenova/transformers diarisation deps from package.json. Remove the renderer-side `alignSpeakersToChunks` mirror used by Sprint 2.C's rerun (sidecar does alignment).
+- [ ] **Optional:** route whisper transcription through the sidecar too — `speech-analyser` already exposes faster-whisper. Removes another large dep from the renderer bundle and unifies the pipeline end-to-end. Defer if 3.1–3.3 is enough win for now.
