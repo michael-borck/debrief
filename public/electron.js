@@ -1556,6 +1556,50 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
   }
 });
 
+// Rerun ONLY diarisation on an already-transcribed audio file with
+// per-call tunable overrides. Used by the per-transcript Diarisation
+// panel so the user can tweak cluster threshold without re-running
+// whisper. Returns updated speakerTurns; the renderer is responsible
+// for re-aligning to existing chunk timings and persisting.
+ipcMain.handle('local-transcription-rediarise', async (event, { audioPath, overrides }) => {
+  try {
+    if (!fs.existsSync(audioPath)) {
+      throw new Error(`Audio file not found: ${audioPath}`);
+    }
+    console.log('[local-transcription] rediarise:', audioPath, 'overrides:', overrides);
+
+    const sendProgress = (data) => {
+      try {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('local-transcription-progress', data);
+        }
+      } catch (_) { /* ignore */ }
+    };
+
+    const audio = await decodeAudioToFloat32(audioPath);
+    if (audio.length === 0) {
+      throw new Error('Audio decoded to an empty buffer');
+    }
+
+    diarise.loadDiarisationSettings(overrides || {});
+    const t0 = Date.now();
+    const speakerTurns = await diarise.diariseAudio(audio, sendProgress);
+    console.log(`[local-transcription] rediarise: ${speakerTurns.length} turns in ${Date.now() - t0} ms`);
+
+    return {
+      success: true,
+      speakerTurns,
+      audioDurationSeconds: audio.length / 16000,
+    };
+  } catch (error) {
+    console.error('[local-transcription] rediarise error:', error);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+});
+
 
 // App event handlers
 app.whenReady().then(() => {

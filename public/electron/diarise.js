@@ -61,22 +61,43 @@ function init(deps) {
   _getDb = deps.getDb;
 }
 
-function loadDiarisationSettings() {
+// Loads tunables from the settings DB, then applies optional overrides
+// on top. Per-transcript reruns from the renderer pass overrides without
+// touching the user's saved global settings.
+function loadDiarisationSettings(overrides = {}) {
   try {
     const db = _getDb && _getDb();
-    if (!db) return;
-    const read = (key, fallback) => {
-      const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
-      const n = row?.value != null ? Number(row.value) : NaN;
-      return Number.isFinite(n) ? n : fallback;
-    };
-    DIA_MEDIAN_FILTER_FRAMES = Math.max(1, Math.round(read('diaMedianFilterFrames', DIA_DEFAULTS.medianFilterFrames)));
-    DIA_MIN_DURATION_ON = read('diaMinDurationOn', DIA_DEFAULTS.minDurationOn);
-    DIA_MIN_DURATION_OFF = read('diaMinDurationOff', DIA_DEFAULTS.minDurationOff);
-    DIA_CLUSTER_THRESHOLD = read('diaClusterThreshold', DIA_DEFAULTS.clusterThreshold);
-    DIA_NOISE_MIN_TOTAL_SECONDS = read('diaNoiseMinTotalSeconds', DIA_DEFAULTS.noiseMinTotalSeconds);
+    if (db) {
+      const read = (key, fallback) => {
+        const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
+        const n = row?.value != null ? Number(row.value) : NaN;
+        return Number.isFinite(n) ? n : fallback;
+      };
+      DIA_MEDIAN_FILTER_FRAMES = Math.max(1, Math.round(read('diaMedianFilterFrames', DIA_DEFAULTS.medianFilterFrames)));
+      DIA_MIN_DURATION_ON = read('diaMinDurationOn', DIA_DEFAULTS.minDurationOn);
+      DIA_MIN_DURATION_OFF = read('diaMinDurationOff', DIA_DEFAULTS.minDurationOff);
+      DIA_CLUSTER_THRESHOLD = read('diaClusterThreshold', DIA_DEFAULTS.clusterThreshold);
+      DIA_NOISE_MIN_TOTAL_SECONDS = read('diaNoiseMinTotalSeconds', DIA_DEFAULTS.noiseMinTotalSeconds);
+    }
   } catch (err) {
     console.warn('[diarise] failed to load tunables, using defaults:', err.message);
+  }
+  if (overrides && typeof overrides === 'object') {
+    if (Number.isFinite(overrides.clusterThreshold)) {
+      DIA_CLUSTER_THRESHOLD = overrides.clusterThreshold;
+    }
+    if (Number.isFinite(overrides.medianFilterFrames)) {
+      DIA_MEDIAN_FILTER_FRAMES = Math.max(1, Math.round(overrides.medianFilterFrames));
+    }
+    if (Number.isFinite(overrides.minDurationOn)) {
+      DIA_MIN_DURATION_ON = overrides.minDurationOn;
+    }
+    if (Number.isFinite(overrides.minDurationOff)) {
+      DIA_MIN_DURATION_OFF = overrides.minDurationOff;
+    }
+    if (Number.isFinite(overrides.noiseMinTotalSeconds)) {
+      DIA_NOISE_MIN_TOTAL_SECONDS = overrides.noiseMinTotalSeconds;
+    }
   }
 }
 

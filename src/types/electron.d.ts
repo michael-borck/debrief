@@ -180,6 +180,21 @@ export interface ElectronAPI {
       chunkTimings?: Array<ChunkTimingInfo & { speaker?: string }>;
       speakerTurns?: Array<{ start: number; end: number; speaker: string }>;
     }>;
+    rediarise: (
+      audioPath: string,
+      overrides?: {
+        clusterThreshold?: number;
+        medianFilterFrames?: number;
+        minDurationOn?: number;
+        minDurationOff?: number;
+        noiseMinTotalSeconds?: number;
+      }
+    ) => Promise<{
+      success: boolean;
+      speakerTurns?: Array<{ start: number; end: number; speaker: string }>;
+      audioDurationSeconds?: number;
+      error?: string;
+    }>;
     loadTranscriptionModel: (modelName?: string) => Promise<{
       success: boolean;
       modelName?: string;

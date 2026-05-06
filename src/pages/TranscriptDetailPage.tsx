@@ -17,6 +17,7 @@ import { ConversationQualityCard } from '../components/ConversationQualityCard';
 import { FillerWordsCard } from '../components/FillerWordsCard';
 import { TalkTimeCard } from '../components/TalkTimeCard';
 import { AudioPlayerBar } from '../components/AudioPlayerBar';
+import { DiarisationPanel } from '../components/DiarisationPanel';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { analyzeConversation } from '../services/conversationMetricsService';
 import { sentenceSegmentsService } from '../services/sentenceSegmentsService';
@@ -884,6 +885,15 @@ export const TranscriptDetailPage: React.FC = () => {
         score={transcript.sentiment_score}
         emotions={transcript.emotions}
         variant="full"
+      />
+
+      {/* Diarisation tuning — re-run speaker detection with a different
+          cluster threshold without re-running whisper. */}
+      <DiarisationPanel
+        transcriptId={transcript.id}
+        filePath={transcript.file_path}
+        speakerCount={transcript.speaker_count || (transcript.speakers?.length ?? 1)}
+        onRerunComplete={loadTranscript}
       />
 
       {/* Speaker Analysis */}

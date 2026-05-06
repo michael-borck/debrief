@@ -107,6 +107,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       ipcRenderer.invoke('get-media-info', { filePath }),
     transcribe: (audioPath, modelName, enableDiarisation) =>
       ipcRenderer.invoke('local-transcription-transcribe', { audioPath, modelName, enableDiarisation }),
+    rediarise: (audioPath, overrides) =>
+      ipcRenderer.invoke('local-transcription-rediarise', { audioPath, overrides }),
     loadTranscriptionModel: (modelName) =>
       ipcRenderer.invoke('local-transcription-load-model', { modelName }),
     onTranscriptionProgress: (callback) => {
