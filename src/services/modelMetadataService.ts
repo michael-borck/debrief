@@ -181,7 +181,7 @@ export class ModelMetadataService {
       );
       const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
 
-      const response = await (window.electronAPI.services as any).getOllamaModels(aiUrl);
+      const response = await window.electronAPI.services.getOllamaModels(aiUrl);
       
       if (!response.success) {
         console.warn('Failed to get Ollama models:', response.error);
@@ -226,10 +226,9 @@ export class ModelMetadataService {
       );
       const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
 
-      // Use the new IPC handler we'll create for getting model info
-      const response = await (window.electronAPI as any).getModelInfo({ 
-        url: aiUrl, 
-        modelName 
+      const response = await window.electronAPI.getModelInfo({
+        url: aiUrl,
+        modelName
       });
       
       if (response.success && response.info) {

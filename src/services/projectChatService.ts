@@ -746,7 +746,7 @@ export class ProjectChatService {
         message: userMessage
       });
 
-      const response = await (window.electronAPI.services as any).chatWithOllama({
+      const response = await window.electronAPI.services.chatWithOllama({
         prompt: systemPrompt,
         message: userMessage,
         context: context

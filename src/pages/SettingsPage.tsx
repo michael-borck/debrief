@@ -129,13 +129,13 @@ export const SettingsPage: React.FC = () => {
       // IPC handles legacy plain-text values too (passes them through).
       const rawKey = settingsMap.aiApiKey || '';
       if (rawKey) {
-        const decryptResult = await (window.electronAPI as any).crypto.decrypt(rawKey);
+        const decryptResult = await window.electronAPI.crypto.decrypt(rawKey);
         const plainKey = decryptResult?.success ? (decryptResult.plain || '') : '';
         setAiApiKey(plainKey);
         // If the value was stored as plain text, re-save it encrypted
         // so the next time it lives encrypted in the database
         if (decryptResult?.wasPlain && plainKey) {
-          const encResult = await (window.electronAPI as any).crypto.encrypt(plainKey);
+          const encResult = await window.electronAPI.crypto.encrypt(plainKey);
           if (encResult?.success && encResult.encrypted) {
             await window.electronAPI.database.run(
               'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)',
@@ -185,7 +185,7 @@ export const SettingsPage: React.FC = () => {
 
   const loadDatabaseInfo = async () => {
     try {
-      const info = await (window.electronAPI as any).getDatabaseInfo();
+      const info = await window.electronAPI.getDatabaseInfo();
       setDatabaseInfo(info);
     } catch (error) {
       console.error('Error loading database info:', error);
@@ -225,7 +225,7 @@ export const SettingsPage: React.FC = () => {
         await saveSetting(key, '');
         return;
       }
-      const result = await (window.electronAPI as any).crypto.encrypt(plain);
+      const result = await window.electronAPI.crypto.encrypt(plain);
       if (result?.success && typeof result.encrypted === 'string') {
         await saveSetting(key, result.encrypted);
       } else {
@@ -358,7 +358,7 @@ export const SettingsPage: React.FC = () => {
     
     if (result) {
       const newPath = result.replace(/[^/\\]*$/, ''); // Get directory part
-      const changeResult = await (window.electronAPI as any).changeDatabaseLocation(newPath);
+      const changeResult = await window.electronAPI.changeDatabaseLocation(newPath);
       
       if (changeResult.success) {
         alert('Database location changed successfully. The app will reload.');
@@ -371,7 +371,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleOpenFolder = () => {
     if (databaseInfo?.path) {
-      (window.electronAPI as any).shell.showItemInFolder(databaseInfo.path);
+      window.electronAPI.shell.showItemInFolder(databaseInfo.path);
     }
   };
 
@@ -382,7 +382,7 @@ export const SettingsPage: React.FC = () => {
     });
     
     if (result) {
-      const backupResult = await (window.electronAPI as any).backupDatabase(result);
+      const backupResult = await window.electronAPI.backupDatabase(result);
       if (backupResult.success) {
         alert('Database backed up successfully!');
       } else {
@@ -398,7 +398,7 @@ export const SettingsPage: React.FC = () => {
     
     if (confirmed) {
       try {
-        const result = await (window.electronAPI as any).vectorStore.reset();
+        const result = await window.electronAPI.vectorStore.reset();
         if (result.success) {
           alert('Vector database reset successfully! You\'ll need to re-process transcripts for chat.');
           setVectorStats(null);
@@ -413,7 +413,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleGetVectorStats = async () => {
     try {
-      const stats = await (window.electronAPI as any).vectorStore.getStats();
+      const stats = await window.electronAPI.vectorStore.getStats();
       setVectorStats(stats);
     } catch (error) {
       alert(`Failed to get statistics: ${error}`);

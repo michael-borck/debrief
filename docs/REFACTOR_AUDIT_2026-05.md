@@ -121,7 +121,7 @@ No user-visible change. Unblocks everything else.
 - [x] **1.2 Split `public/electron.js`** (partial) — extracted `public/electron/diarise.js` (376 lines) and `public/electron/vector-store.js` (~290 lines). electron.js: 3017 → 2273 lines. Verified via `node --check`, `tsc`, webpack build. **Deferred (1.2b):** the remaining IPC handler clusters and createWindow/migrations.
 - [x] **1.4 Add `<ErrorBoundary>`** in `App.tsx` — `src/components/ErrorBoundary.tsx` with reload + copy-error-details buttons.
 - [x] **1.5 Test infrastructure** — Vitest + jsdom + @testing-library/react. `npm test` runs 6 smoke tests (4 on diarisation alignment, 2 on ErrorBoundary). Test files in `tests/`.
-- [ ] **1.3 Type the IPC bridge** — single source of truth for handlers, generated `.d.ts`. Pending.
+- [x] **1.3 Type the IPC bridge** — `src/types/electron.d.ts` is now the canonical declaration, mirroring `public/preload.js` 1:1. The competing inline declaration in `src/types/index.ts` is gone. All 29 `(window.electronAPI as any)` casts removed; typecheck passes. Cross-reference comments link the two files.
 
 ### Sprint 2 — UX Visible (~1 week)
 

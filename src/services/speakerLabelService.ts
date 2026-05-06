@@ -120,7 +120,7 @@ export async function suggestSpeakerImprovements(
   const prompt = buildPrompt(speakersWithSamples);
 
   try {
-    const result = await (window.electronAPI.services as any).chatWithOllama({
+    const result = await window.electronAPI.services.chatWithOllama({
       prompt,
       message: '',
       context: '',

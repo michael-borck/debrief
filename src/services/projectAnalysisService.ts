@@ -288,7 +288,7 @@ ${summaries}
 
 Create a comprehensive summary (200-300 words) that identifies main themes and overall project scope.`;
 
-      const response = await (window.electronAPI.services as any).chatWithOllama({
+      const response = await window.electronAPI.services.chatWithOllama({
         prompt: prompt,
         message: '',
         context: ''

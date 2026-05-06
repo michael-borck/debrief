@@ -561,7 +561,7 @@ export class ChatService {
         conversation: conversationText
       });
       
-      const response = await (window.electronAPI.services as any).chatWithOllama({
+      const response = await window.electronAPI.services.chatWithOllama({
         prompt: compactionPrompt,
         message: '',
         context: ''
@@ -649,7 +649,7 @@ export class ChatService {
       });
 
       // Call Ollama API through electron API
-      const response = await (window.electronAPI.services as any).chatWithOllama({
+      const response = await window.electronAPI.services.chatWithOllama({
         prompt: systemPrompt,
         message: userMessage,
         context: context
@@ -862,7 +862,7 @@ export class ChatService {
       });
 
       // Call LLM with optimized context
-      const response = await (window.electronAPI.services as any).chatWithOllama({
+      const response = await window.electronAPI.services.chatWithOllama({
         prompt: systemPrompt,
         message: userMessage,
         context: context

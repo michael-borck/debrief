@@ -43,30 +43,30 @@ export class VectorStoreService {
   }
 
   async initialize(dbPath?: string): Promise<void> {
-    return (window.electronAPI as any).vectorStore.initialize(dbPath);
+    return window.electronAPI.vectorStore.initialize(dbPath);
   }
 
   async storeChunks(chunks: any[], embeddings: any[]): Promise<void> {
-    return (window.electronAPI as any).vectorStore.storeChunks(chunks, embeddings);
+    return window.electronAPI.vectorStore.storeChunks(chunks, embeddings);
   }
 
   async searchSimilar(
-    queryEmbedding: number[], 
+    queryEmbedding: number[],
     options: SearchOptions = {}
   ): Promise<SearchResult[]> {
-    return (window.electronAPI as any).vectorStore.searchSimilar(queryEmbedding, options);
+    return window.electronAPI.vectorStore.searchSimilar(queryEmbedding, options);
   }
 
   async deleteTranscriptChunks(transcriptId: string): Promise<void> {
-    return (window.electronAPI as any).vectorStore.deleteTranscriptChunks(transcriptId);
+    return window.electronAPI.vectorStore.deleteTranscriptChunks(transcriptId);
   }
 
   async getTranscriptChunks(transcriptId: string): Promise<VectorChunk[]> {
-    return (window.electronAPI as any).vectorStore.getTranscriptChunks(transcriptId);
+    return window.electronAPI.vectorStore.getTranscriptChunks(transcriptId);
   }
 
   async updateChunks(chunks: any[], embeddings: any[]): Promise<void> {
-    return (window.electronAPI as any).vectorStore.updateChunks(chunks, embeddings);
+    return window.electronAPI.vectorStore.updateChunks(chunks, embeddings);
   }
 
   async getStats(): Promise<{
@@ -75,16 +75,15 @@ export class VectorStoreService {
     avgChunkSize: number;
     speakers: string[];
   }> {
-    return (window.electronAPI as any).vectorStore.getStats();
+    return window.electronAPI.vectorStore.getStats();
   }
 
   isInitialized(): boolean {
-    // Always return true since we're delegating to main process
     return true;
   }
 
   async close(): Promise<void> {
-    return (window.electronAPI as any).vectorStore.close();
+    return window.electronAPI.vectorStore.close();
   }
 }
 

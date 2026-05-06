@@ -334,8 +334,7 @@ etc.`;
       console.log('AI URL:', aiUrl, 'Model:', aiModel);
 
       // Call AI service through Electron API
-      const services = window.electronAPI.services as any;
-      const result = await services.chatWithOllama({
+      const result = await window.electronAPI.services.chatWithOllama({
         prompt: aiPrompt,
         message: '',
         context: ''

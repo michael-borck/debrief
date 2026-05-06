@@ -26,16 +26,16 @@ export class EmbeddingService {
   }
 
   async initialize(_onProgress?: (progress: { loaded: number; total: number; status: string }) => void): Promise<void> {
-    // Don't pass the callback through IPC as functions can't be serialized
-    return (window.electronAPI as any).embedding.initialize();
+    // Callback intentionally dropped — functions can't cross IPC.
+    return window.electronAPI.embedding.initialize();
   }
 
   async embedText(text: string, metadata?: Record<string, any>): Promise<EmbeddingResult> {
-    return (window.electronAPI as any).embedding.embedText(text, metadata);
+    return window.electronAPI.embedding.embedText(text, metadata);
   }
 
   async embedBatch(texts: string[], metadata?: Record<string, any>[]): Promise<EmbeddingResult[]> {
-    return (window.electronAPI as any).embedding.embedBatch(texts, metadata);
+    return window.electronAPI.embedding.embedBatch(texts, metadata);
   }
 
   getDimensions(): number {
@@ -44,12 +44,11 @@ export class EmbeddingService {
   }
 
   isInitialized(): boolean {
-    // Delegate to main process
     return true;
   }
 
   updateConfig(config: Partial<EmbeddingConfig>): void {
-    (window.electronAPI as any).embedding.updateConfig(config);
+    window.electronAPI.embedding.updateConfig(config);
   }
 
   getConfig(): EmbeddingConfig {

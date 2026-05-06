@@ -1,7 +1,11 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 // Expose protected methods that allow the renderer process to use
-// the ipcRenderer without exposing the entire object
+// the ipcRenderer without exposing the entire object.
+//
+// TYPE MIRROR: src/types/electron.d.ts must stay in sync with this file.
+// When you add, remove, or rename a method here, update electron.d.ts too —
+// it is the canonical type definition for window.electronAPI.
 contextBridge.exposeInMainWorld('electronAPI', {
   // Database operations
   database: {

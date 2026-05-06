@@ -38,7 +38,7 @@ SOFTWARE.`
     },
     {
       name: 'Electron',
-      version: (window as any).electronAPI?.versions?.electron || 'N/A',
+      version: window.electronAPI?.versions?.electron || 'N/A',
       license: 'MIT',
       description: 'Build cross-platform desktop apps with JavaScript, HTML, and CSS',
       url: 'https://github.com/electron/electron',

@@ -17,9 +17,9 @@ export class SentenceSegmentsService {
    */
   async getSegments(transcriptId: string, version?: 'original' | 'corrected' | 'speaker_tagged'): Promise<SentenceSegment[]> {
     try {
-      const segments = await (window.electronAPI as any).segments.getByTranscript({ 
-        transcriptId, 
-        version 
+      const segments = await window.electronAPI.segments.getByTranscript({
+        transcriptId,
+        version
       });
       return segments;
     } catch (error) {
@@ -49,7 +49,7 @@ export class SentenceSegmentsService {
         }))
       });
       
-      const result = await (window.electronAPI as any).segments.createFromChunks({
+      const result = await window.electronAPI.segments.createFromChunks({
         transcriptId,
         chunkTimings,
         version
@@ -73,7 +73,7 @@ export class SentenceSegmentsService {
    */
   async updateSegment(segmentId: string, updates: Partial<SentenceSegment>): Promise<boolean> {
     try {
-      const result = await (window.electronAPI as any).segments.update({
+      const result = await window.electronAPI.segments.update({
         segmentId,
         updates
       });
@@ -89,7 +89,7 @@ export class SentenceSegmentsService {
    */
   async deleteSegments(transcriptId: string, version?: 'original' | 'corrected' | 'speaker_tagged'): Promise<boolean> {
     try {
-      const result = await (window.electronAPI as any).segments.deleteByTranscript({
+      const result = await window.electronAPI.segments.deleteByTranscript({
         transcriptId,
         version
       });
@@ -204,7 +204,7 @@ export class SentenceSegmentsService {
       await this.deleteSegments(transcriptId, 'corrected');
 
       // Create new corrected segments
-      const result = await (window.electronAPI as any).segments.create({
+      const result = await window.electronAPI.segments.create({
         transcriptId,
         segments: correctedSegments
       });
@@ -311,7 +311,7 @@ export class SentenceSegmentsService {
       }
 
       // Create segments via IPC
-      const result = await (window.electronAPI as any).segments.create({
+      const result = await window.electronAPI.segments.create({
         transcriptId,
         segments: basicSegments
       });

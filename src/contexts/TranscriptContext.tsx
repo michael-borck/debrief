@@ -144,7 +144,7 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
       
       // Also delete chunks from vector store
       try {
-        await (window.electronAPI as any).vectorStore.deleteTranscriptChunks(id);
+        await window.electronAPI.vectorStore.deleteTranscriptChunks(id);
         console.log(`Deleted vector chunks for transcript: ${id}`);
       } catch (vectorError) {
         console.error('Error deleting vector chunks:', vectorError);
