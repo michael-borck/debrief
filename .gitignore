@@ -37,6 +37,15 @@ desktop.ini
 # FFmpeg binaries (downloaded separately)
 ffmpeg-binaries/
 
+# Local sample audio/transcripts (too large for GitHub, kept locally only)
+samples/*.mp3
+samples/*.m4a
+samples/*.wav
+samples/*.flac
+samples/*.ogg
+samples/*.mp4
+samples/*.txt
+
 # Database files
 *.db
 *.sqlite
