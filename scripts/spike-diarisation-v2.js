@@ -2,7 +2,7 @@
 /**
  * Improved diarisation pipeline.
  *
- * Fixes the over-segmentation problem from spike-diarisation-full.js:
+ * Fixes the over-segmentation problem from earlier iterations:
  *   1. Median filter on per-frame predictions to kill single-frame jitter.
  *   2. min_duration_on (drop turns shorter than threshold) and
  *      min_duration_off (merge gaps shorter than threshold).
