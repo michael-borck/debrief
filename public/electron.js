@@ -10,9 +10,12 @@ const aiProviders = require('./ai-providers');
 const URLS = require('./electron-urls');
 const diarise = require('./electron/diarise');
 const { MainVectorStore } = require('./electron/vector-store');
+const { SidecarManager } = require('./electron/sidecar-manager');
 
 // Wire diarise module to shared transformers loader and DB
 diarise.init({ getTransformers: () => getTransformers(), getDb: () => db });
+
+const sidecar = new SidecarManager();
 
 // ============================================
 // Custom protocol for streaming local audio/video files
@@ -1627,12 +1630,18 @@ app.whenReady().then(() => {
   initDatabase();
   createWindow();
   createMenu();
+  // Fire-and-forget; sidecar status is queryable via the sidecar:status IPC.
+  sidecar.start().catch((err) => console.error('[sidecar] start failed:', err));
 });
 
+ipcMain.handle('sidecar:status', () => sidecar.getStatus());
+ipcMain.handle('sidecar:restart', () => sidecar.restart());
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Closing the last window quits on every platform — including macOS, where
+  // convention is "stay in dock". Deep-talk runs a heavy Python sidecar with
+  // ML models in memory; no point keeping it warm with no windows open.
+  app.quit();
 });
 
 app.on('activate', () => {
@@ -2302,16 +2311,27 @@ ipcMain.handle('ai-prompts-reset-to-default', async (event, { category, type }) 
   }
 });
 
-// Cleanup on exit
-app.on('before-quit', async () => {
-  try {
-    if (vectorStore) {
-      await vectorStore.close();
+// Cleanup on exit. Electron does NOT await async before-quit handlers, so we
+// preventDefault, run cleanup, and re-quit explicitly — otherwise the sidecar
+// child process gets orphaned mid-shutdown.
+let cleanupRan = false;
+app.on('before-quit', (event) => {
+  if (cleanupRan) return;
+  event.preventDefault();
+  (async () => {
+    try {
+      await sidecar.stop();
+      if (vectorStore) {
+        await vectorStore.close();
+      }
+      if (db) {
+        db.close();
+      }
+    } catch (error) {
+      console.error('Error during cleanup:', error);
+    } finally {
+      cleanupRan = true;
+      app.quit();
     }
-    if (db) {
-      db.close();
-    }
-  } catch (error) {
-    console.error('Error during cleanup:', error);
-  }
+  })();
 });

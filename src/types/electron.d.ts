@@ -161,6 +161,19 @@ export interface ElectronAPI {
   onMenuAction: (callback: (action: string) => void) => void;
   removeAllListeners: (channel: string) => void;
 
+  sidecar: {
+    status: () => Promise<{
+      state: 'stopped' | 'starting' | 'ready' | 'failed';
+      port: number | null;
+      lastError: string | null;
+    }>;
+    restart: () => Promise<{
+      state: 'stopped' | 'starting' | 'ready' | 'failed';
+      port: number | null;
+      lastError: string | null;
+    }>;
+  };
+
   audio: {
     extractAudio: (inputPath: string, outputPath: string) => Promise<{
       success: boolean;

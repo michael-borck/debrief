@@ -75,3 +75,10 @@ lerna-debug.log*
 .parcel-cache/
 
 _notes
+
+# Embedded sidecar (Python)
+embedded-server/venv/
+embedded-server/dist/
+embedded-server/build/
+embedded-server/__pycache__/
+embedded-server/*.spec

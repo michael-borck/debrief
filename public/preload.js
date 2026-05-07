@@ -99,6 +99,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.removeAllListeners(channel);
   },
 
+  // Embedded Python sidecar (lens/speech-analyser)
+  sidecar: {
+    status: () => ipcRenderer.invoke('sidecar:status'),
+    restart: () => ipcRenderer.invoke('sidecar:restart'),
+  },
+
   // Audio + local Whisper transcription
   audio: {
     extractAudio: (inputPath, outputPath) =>
