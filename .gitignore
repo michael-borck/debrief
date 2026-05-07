@@ -82,3 +82,4 @@ embedded-server/dist/
 embedded-server/build/
 embedded-server/__pycache__/
 embedded-server/*.spec
+embedded-server/models/
