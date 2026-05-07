@@ -4,6 +4,15 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+# Load build-time secrets (HF_TOKEN, etc.) if .env exists. Gitignored;
+# see .env.example for the template.
+if [ -f .env ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . ./.env
+  set +a
+fi
+
 if [ ! -d venv ]; then
   echo "venv not found. Bootstrap with: python3 -m venv venv && venv/bin/pip install -r requirements.txt"
   exit 1
