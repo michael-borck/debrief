@@ -15,9 +15,14 @@
   ],
   "extraResources": [
     {
-      "from": "embedded-server/dist",
+      "from": "embedded-server",
       "to": "embedded-server",
-      "filter": ["**/*"]
+      "filter": [
+        "python/**/*",
+        "models/**/*",
+        "server.py",
+        "setup-venv.py"
+      ]
     }
   ],
   "files": [
