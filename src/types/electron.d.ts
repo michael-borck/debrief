@@ -163,14 +163,16 @@ export interface ElectronAPI {
 
   sidecar: {
     status: () => Promise<{
-      state: 'stopped' | 'starting' | 'ready' | 'failed';
+      state: 'stopped' | 'setting_up' | 'starting' | 'ready' | 'failed';
       port: number | null;
       lastError: string | null;
+      setupSteps: string[];
     }>;
     restart: () => Promise<{
-      state: 'stopped' | 'starting' | 'ready' | 'failed';
+      state: 'stopped' | 'setting_up' | 'starting' | 'ready' | 'failed';
       port: number | null;
       lastError: string | null;
+      setupSteps: string[];
     }>;
   };
 
