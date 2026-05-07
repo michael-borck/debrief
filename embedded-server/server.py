@@ -1,13 +1,16 @@
-"""deep-talk embedded sidecar — HTTP wrapper around lens/speech-analyser, spawned by Electron main."""
+"""deep-talk embedded sidecar — mounts lens/speech-analyser's FastAPI app."""
 import os
 import sys
 
 import uvicorn
-from fastapi import FastAPI
+
+# Set BEFORE importing speech_analyser.app — the module reads this at import
+# time to configure CORS for any localhost origin (the Electron renderer).
+os.environ.setdefault("AUDIO_LENS_MODE", "desktop")
+
+from speech_analyser.app import app
 
 VERSION = "0.0.1-spike"
-
-app = FastAPI(title="deep-talk sidecar", version=VERSION)
 
 
 @app.get("/healthz")
