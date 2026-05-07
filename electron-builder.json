@@ -13,6 +13,13 @@
     "node_modules/ffmpeg-static/**/*",
     "node_modules/@lancedb/**/*"
   ],
+  "extraResources": [
+    {
+      "from": "embedded-server/dist",
+      "to": "embedded-server",
+      "filter": ["**/*"]
+    }
+  ],
   "files": [
     "dist/**/*",
     "public/**/*",
