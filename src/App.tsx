@@ -14,6 +14,7 @@ import { ChatHistoryPage } from './pages/ChatHistoryPage';
 import { UploadPage } from './pages/UploadPage';
 import DocsPage from './pages/DocsPage';
 import ShortcutsModal from './components/ShortcutsModal';
+import { SidecarStatusPill } from './components/SidecarStatusPill';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ServiceProvider } from './contexts/ServiceContext';
 import { TranscriptProvider } from './contexts/TranscriptContext';
@@ -68,6 +69,7 @@ const App: React.FC = () => {
                 isOpen={showShortcuts}
                 onClose={() => setShowShortcuts(false)}
               />
+              <SidecarStatusPill />
             </Router>
             </ModalStackProvider>
           </ProjectProvider>
