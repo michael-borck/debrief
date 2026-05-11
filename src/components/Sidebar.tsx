@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, FolderOpen, Library, Settings, ChevronLeft, ChevronRight, Info, Upload, Search, Trash, Archive, MessageCircle, BookOpen, Keyboard, HelpCircle } from 'lucide-react';
+import { Home, FolderOpen, Library, Settings, ChevronLeft, ChevronRight, Info, Upload, Search, Trash, Archive, MessageCircle, BookOpen, HelpCircle } from 'lucide-react';
 import packageJson from '../../package.json';
 
 const APP_VERSION = packageJson.version;
@@ -31,7 +31,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onAbou
 
   const helpItems = [
     { path: '/docs', icon: BookOpen, label: 'Documentation' },
-    { path: '/shortcuts', icon: Keyboard, label: 'Keyboard Shortcuts' },
     { path: '/docs/troubleshooting/common-issues', icon: HelpCircle, label: 'Help & Support' },
   ];
 

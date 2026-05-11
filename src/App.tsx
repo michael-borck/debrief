@@ -62,7 +62,6 @@ const App: React.FC = () => {
                   <Route path="/settings" element={<SettingsPage />} />
                   <Route path="/docs" element={<DocsPage />} />
                   <Route path="/docs/:category/:page" element={<DocsPage />} />
-                  <Route path="/shortcuts" element={<DocsPage />} />
                 </Routes>
               </AppShell>
               <ShortcutsModal
