@@ -1410,10 +1410,16 @@ ipcMain.handle('local-transcription-load-model', async (_event, { modelName }) =
 
 ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, modelName, enableDiarisation }) => {
   try {
-    // Renderer historically passed Xenova/whisper-<size> for the JS pipeline;
-    // speech-analyser wants the bare size (tiny, base, small, medium, large-v3,
-    // *.en). Default to 'base' when nothing is passed.
-    const sidecarModel = String(modelName || 'base').replace(/^Xenova\/whisper-/i, '') || 'base';
+    // Only the 'base' faster-whisper model is bundled in the installer cache.
+    // Any other size would need an on-demand download, but HF_HUB_OFFLINE=1
+    // (set in server.py so pyannote loads its gated weights from the cache
+    // without a token) blocks that path. Force 'base' for now; lifting this
+    // requires either bundling more sizes or a more nuanced HF_HUB_OFFLINE
+    // toggle in the sidecar.
+    if (modelName && modelName !== 'base' && !/^Xenova\/whisper-base$/i.test(modelName)) {
+      console.warn(`[local-transcription] requested model '${modelName}' not bundled; using 'base'`);
+    }
+    const sidecarModel = 'base';
     const wantSpeakers = enableDiarisation !== false; // default ON
 
     if (!fs.existsSync(audioPath)) {
