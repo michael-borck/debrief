@@ -87,6 +87,28 @@ function migrateLegacyUserDataDir() {
   }
 }
 
+// Probe an audio file's duration in seconds via ffmpeg's stderr (no ffprobe
+// binding in our toolchain). Returns null if duration can't be parsed.
+async function getAudioDurationSec(audioPath) {
+  try {
+    const ffmpegPath = getFFmpegPath();
+    const cmd = `"${ffmpegPath}" -i "${audioPath}" -f null - 2>&1`;
+    const { stdout, stderr } = await execAsync(cmd).catch((e) => ({ stdout: '', stderr: e.stderr || e.message }));
+    const output = stdout + stderr;
+    const m = output.match(/Duration: (\d{2}):(\d{2}):(\d{2})\.(\d+)/);
+    if (m) {
+      const h = parseInt(m[1], 10);
+      const min = parseInt(m[2], 10);
+      const s = parseInt(m[3], 10);
+      const cs = parseInt(m[4], 10);
+      return h * 3600 + min * 60 + s + cs / 100;
+    }
+  } catch (_) {
+    // fall through
+  }
+  return null;
+}
+
 // Initialize database
 async function initDatabase() {
   // Check for custom database location in settings
@@ -1420,14 +1442,11 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
       console.warn(`[local-transcription] requested model '${modelName}' not bundled; using 'base'`);
     }
     const sidecarModel = 'base';
-    const wantSpeakers = enableDiarisation !== false; // default ON
+    let wantSpeakers = enableDiarisation !== false; // default ON
 
     if (!fs.existsSync(audioPath)) {
       throw new Error(`Audio file not found: ${audioPath}`);
     }
-
-    console.log('[local-transcription] starting:', audioPath, 'with', sidecarModel, '| diarisation:', wantSpeakers);
-    const totalStart = Date.now();
 
     const sendProgress = (data) => {
       try {
@@ -1436,6 +1455,26 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
         }
       } catch (_) { /* ignore */ }
     };
+
+    // pyannote's 10s analysis window means files shorter than that fail
+    // diarisation outright with a cryptic 'requested chunk … resulted in N
+    // samples instead of …' error. Skip diarisation for short clips and
+    // tell the renderer so the UI can surface a friendly notice.
+    if (wantSpeakers) {
+      const duration = await getAudioDurationSec(audioPath);
+      if (duration !== null && duration < 10) {
+        console.warn(`[local-transcription] audio is ${duration.toFixed(1)}s, shorter than pyannote's 10s minimum; running without diarisation`);
+        wantSpeakers = false;
+        sendProgress({
+          stage: 'transcribing',
+          percent: null,
+          note: `Audio is ${duration.toFixed(1)}s long — too short for speaker detection. Transcribing without speakers.`,
+        });
+      }
+    }
+
+    console.log('[local-transcription] starting:', audioPath, 'with', sidecarModel, '| diarisation:', wantSpeakers);
+    const totalStart = Date.now();
 
     // Coarse-grained stage progress only — speech-analyser's /analyse is a
     // single round-trip and doesn't surface per-chunk progress. SSE-based
