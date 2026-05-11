@@ -1,6 +1,6 @@
 # Uploading Files
 
-Three ways to get audio and video into DeepTalk: drag-and-drop, the file browser, or the menu bar (File → New Upload).
+Three ways to get audio and video into DeepDebrief: drag-and-drop, the file browser, or the menu bar (File → New Upload).
 
 ## The Upload page
 
@@ -18,7 +18,7 @@ The fastest way. Drag one or more files onto the dropzone and they appear in the
 
 You can drop files in batches — each new drop adds to the existing selection. Click **Clear all** to start over.
 
-Behind the scenes, DeepTalk uses Electron's `webUtils.getPathForFile()` to resolve the absolute path of each dropped file. This is the modern replacement for the deprecated `File.path` property and works on Electron 32+.
+Behind the scenes, DeepDebrief uses Electron's `webUtils.getPathForFile()` to resolve the absolute path of each dropped file. This is the modern replacement for the deprecated `File.path` property and works on Electron 32+.
 
 ## Click to browse
 
@@ -30,12 +30,12 @@ Click anywhere in the dropzone (or the "Click to browse" link). The system file 
 
 ## Supported formats
 
-DeepTalk uses the bundled `ffmpeg-static` to decode audio, which means **almost any audio or video format works**:
+DeepDebrief uses the bundled `ffmpeg-static` to decode audio, which means **almost any audio or video format works**:
 
 - **Audio**: MP3, WAV, M4A, AAC, OGG, FLAC, WMA, OPUS, AMR
 - **Video**: MP4, MOV, AVI, MKV, WebM, WMV, FLV, 3GP
 
-Whatever ffmpeg can read, DeepTalk can transcribe. Video files have their audio track extracted automatically.
+Whatever ffmpeg can read, DeepDebrief can transcribe. Video files have their audio track extracted automatically.
 
 There's no hard size limit. Long files take longer to process but won't fail because of length.
 
@@ -71,7 +71,7 @@ You have two options:
 
 ## Bulk uploads
 
-The Selected Files list supports multiple files. Drop a batch, click Upload & Process, and DeepTalk processes them one at a time in the queue. The success toast fires per file.
+The Selected Files list supports multiple files. Drop a batch, click Upload & Process, and DeepDebrief processes them one at a time in the queue. The success toast fires per file.
 
 If you've selected a project, every file in the batch gets added to that project automatically.
 
@@ -79,8 +79,8 @@ If you've selected a project, every file in the batch gets added to that project
 
 - **Don't close the app while files are in the queue.** Processing is in-memory; if you quit, the queued files won't resume.
 - **Long recordings (1+ hour)** can take a while with the larger Whisper models. If speed matters more than accuracy, switch to Tiny in Settings.
-- **First-time downloads.** The first time you transcribe with a new model, DeepTalk downloads it (~75-470 MB depending on choice). The first time you run diarisation, it downloads pyannote (~6 MB) and wespeaker (~25 MB). After that, all processing is fully local.
-- **Duplicate detection.** If you upload a file with the same name as an existing transcript, DeepTalk asks before adding it.
+- **First-time downloads.** The first time you transcribe with a new model, DeepDebrief downloads it (~75-470 MB depending on choice). The first time you run diarisation, it downloads pyannote (~6 MB) and wespeaker (~25 MB). After that, all processing is fully local.
+- **Duplicate detection.** If you upload a file with the same name as an existing transcript, DeepDebrief asks before adding it.
 
 ## Common issues
 

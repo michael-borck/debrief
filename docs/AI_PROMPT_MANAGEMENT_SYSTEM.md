@@ -2,7 +2,7 @@
 
 ## Overview
 
-DeepTalk implements a sophisticated AI Prompt Management System that enables dynamic customization of AI interactions across different processing stages. The system provides template-based prompts with variable substitution, category-based organization, model compatibility awareness, and robust fallback mechanisms.
+DeepDebrief implements a sophisticated AI Prompt Management System that enables dynamic customization of AI interactions across different processing stages. The system provides template-based prompts with variable substitution, category-based organization, model compatibility awareness, and robust fallback mechanisms.
 
 ## System Architecture
 

@@ -1,10 +1,10 @@
 # Common Issues
 
-Solutions to the problems users hit most often. If nothing here matches, check the [FAQ](faq.md) or file an issue on [GitHub](https://github.com/michael-borck/deep-talk/issues).
+Solutions to the problems users hit most often. If nothing here matches, check the [FAQ](faq.md) or file an issue on [GitHub](https://github.com/michael-borck/deep-debrief/issues).
 
 ## Installation and launch
 
-### "DeepTalk is damaged" on macOS
+### "DeepDebrief is damaged" on macOS
 
 You're running an unsigned nightly build, or Gatekeeper is being cautious. Right-click the app in Applications → **Open** → **Open** in the prompt. macOS remembers the exception after that.
 
@@ -19,8 +19,8 @@ Click **More info** → **Run anyway**. SmartScreen reputation builds over time;
 Mark it executable first:
 
 ```bash
-chmod +x DeepTalk-*.AppImage
-./DeepTalk-*.AppImage
+chmod +x DeepDebrief-*.AppImage
+./DeepDebrief-*.AppImage
 ```
 
 On some distros you also need FUSE installed:
@@ -31,19 +31,19 @@ sudo apt install libfuse2
 
 ### App launches then quits immediately
 
-Usually a corrupted user data folder. Try renaming it so DeepTalk creates a fresh one:
+Usually a corrupted user data folder. Try renaming it so DeepDebrief creates a fresh one:
 
-- macOS: `mv ~/Library/Application\ Support/deep-talk ~/Library/Application\ Support/deep-talk.bak`
-- Windows: rename `%APPDATA%\deep-talk` to `deep-talk.bak`
-- Linux: rename `~/.config/deep-talk` to `~/.config/deep-talk.bak`
+- macOS: `mv ~/Library/Application\ Support/deep-debrief ~/Library/Application\ Support/deep-debrief.bak`
+- Windows: rename `%APPDATA%\deep-debrief` to `deep-debrief.bak`
+- Linux: rename `~/.config/deep-debrief` to `~/.config/deep-debrief.bak`
 
-Launch again. If it works, your old data is still in the `.bak` folder — copy `deeptalk.db` out if you want to preserve your library.
+Launch again. If it works, your old data is still in the `.bak` folder — copy `deepdebrief.db` out if you want to preserve your library.
 
 ## Transcription
 
 ### Model download is stuck
 
-The first time you transcribe with a model, DeepTalk downloads it from Hugging Face. If the download stalls:
+The first time you transcribe with a model, DeepDebrief downloads it from Hugging Face. If the download stalls:
 
 1. Check your internet connection
 2. Check **Settings → Transcription** — does the download progress bar move?
@@ -120,7 +120,7 @@ Usually means the AI model is too small for the task. A 3B-parameter local model
 
 ### Analysis never completes
 
-Check the session logs (macOS: `~/Library/Logs/deep-talk/`, or look at the dev console if you launched with a debug build). Usually the AI provider threw an error that didn't surface as a toast. Common causes:
+Check the session logs (macOS: `~/Library/Logs/deep-debrief/`, or look at the dev console if you launched with a debug build). Usually the AI provider threw an error that didn't surface as a toast. Common causes:
 
 - Context length exceeded (the transcript is too long for the model's context window — try a smaller Whisper model so the transcript is shorter, or a model with a bigger context)
 - Rate limit hit (cloud providers throttle; wait and retry)
@@ -152,7 +152,7 @@ The dashboard's **Recent Transcripts** and the Library both show completed trans
 
 ### Transcript opens but audio won't play
 
-DeepTalk remembers the original file path but doesn't copy the audio into its own storage. If you moved or deleted the source file after upload, playback breaks.
+DeepDebrief remembers the original file path but doesn't copy the audio into its own storage. If you moved or deleted the source file after upload, playback breaks.
 
 Either move the file back to where it was, or re-upload and delete the broken transcript.
 
@@ -162,7 +162,7 @@ Either move the file back to where it was, or re-upload and delete the broken tr
 
 Another process is holding a lock on the SQLite file. Usually one of:
 
-- A second copy of DeepTalk is running (check Activity Monitor / Task Manager)
+- A second copy of DeepDebrief is running (check Activity Monitor / Task Manager)
 - A cloud sync client is locking the file mid-sync (iCloud, Dropbox)
 - An antivirus is scanning the file
 
@@ -170,7 +170,7 @@ Close the other process or wait for the sync to finish. If the file is in a sync
 
 ### Running out of disk space
 
-DeepTalk stores:
+DeepDebrief stores:
 
 - Transcripts in SQLite (small — KB per transcript)
 - Whisper/pyannote/wespeaker models in `models/` (~500 MB worst case)
@@ -181,5 +181,5 @@ Biggest space hog is usually the backups. Trim old ones from **Settings → Gene
 ## Still stuck?
 
 - [FAQ](faq.md) — common questions
-- [GitHub Issues](https://github.com/michael-borck/deep-talk/issues) — report bugs
-- [Discussions](https://github.com/michael-borck/deep-talk/discussions) — ask for help
+- [GitHub Issues](https://github.com/michael-borck/deep-debrief/issues) — report bugs
+- [Discussions](https://github.com/michael-borck/deep-debrief/discussions) — ask for help

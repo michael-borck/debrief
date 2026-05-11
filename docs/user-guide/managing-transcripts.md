@@ -93,7 +93,7 @@ Click **Export** on any transcript detail page. Formats:
 
 - **Markdown** — readable, good for version control and copy-paste
 - **Plain text** — just the transcript text, optionally with speaker tags and timestamps
-- **JSON** — structured data including analysis, segments, and metadata — useful if you're scripting around DeepTalk
+- **JSON** — structured data including analysis, segments, and metadata — useful if you're scripting around DeepDebrief
 - **PDF** — formatted document suitable for sharing
 
 The export modal lets you pick which pieces to include (transcript, summary, analysis, metadata, notes). Exports land wherever you choose in the save dialog.

@@ -1,6 +1,6 @@
 # System Requirements
 
-Hardware, OS, and runtime requirements for DeepTalk.
+Hardware, OS, and runtime requirements for DeepDebrief.
 
 ## Operating system
 
@@ -10,11 +10,11 @@ Hardware, OS, and runtime requirements for DeepTalk.
 | **Windows** | Windows 10 (64-bit) | Windows 11 |
 | **Linux** | Ubuntu 20.04 or equivalent (glibc 2.31+) | Recent mainstream distro |
 
-DeepTalk is built on Electron, so anything that runs recent Chrome and Node.js will run DeepTalk.
+DeepDebrief is built on Electron, so anything that runs recent Chrome and Node.js will run DeepDebrief.
 
 ## CPU
 
-DeepTalk runs all ML inference (Whisper, pyannote, wespeaker, embeddings) on the CPU. There's no GPU acceleration in the current build.
+DeepDebrief runs all ML inference (Whisper, pyannote, wespeaker, embeddings) on the CPU. There's no GPU acceleration in the current build.
 
 | Hardware class | Performance |
 |---|---|
@@ -29,7 +29,7 @@ On Apple Silicon you can comfortably run the Small.en model and diarisation toge
 
 | Use case | Minimum | Recommended |
 |---|---|---|
-| **Idle DeepTalk** | 500 MB | — |
+| **Idle DeepDebrief** | 500 MB | — |
 | **Tiny.en transcription** | 1 GB free | 2 GB free |
 | **Base.en transcription** | 1.5 GB free | 2 GB free |
 | **Small.en transcription** | 2 GB free | 3 GB free |
@@ -38,13 +38,13 @@ On Apple Silicon you can comfortably run the Small.en model and diarisation toge
 
 If you're running local Ollama in parallel, that model needs its own memory — a 3B model needs ~2-4 GB, an 8B model needs ~5-8 GB, a 14B model needs ~10-14 GB. Plan accordingly.
 
-Minimum total system RAM to run DeepTalk comfortably: **4 GB**. Recommended: **8 GB+**. If you want cloud-class AI locally (bigger Ollama models): **16 GB+**.
+Minimum total system RAM to run DeepDebrief comfortably: **4 GB**. Recommended: **8 GB+**. If you want cloud-class AI locally (bigger Ollama models): **16 GB+**.
 
 ## Disk space
 
 | Component | Size |
 |---|---|
-| DeepTalk application | ~300 MB |
+| DeepDebrief application | ~300 MB |
 | Whisper Tiny.en model | ~75 MB |
 | Whisper Base.en model | ~140 MB |
 | Whisper Small.en model | ~470 MB |
@@ -58,14 +58,14 @@ Minimum total system RAM to run DeepTalk comfortably: **4 GB**. Recommended: **8
 
 ## Network
 
-DeepTalk needs network access for:
+DeepDebrief needs network access for:
 
 - Downloading Whisper / pyannote / wespeaker models the first time you use each (one-time)
 - Talking to cloud AI providers if you pick one (OpenAI, Anthropic, etc.)
 - Talking to a local Ollama server if it's running on a different host
 - Checking for updates (manual, not automatic in the current build)
 
-Once models are cached and you're using local Ollama, DeepTalk can run fully offline.
+Once models are cached and you're using local Ollama, DeepDebrief can run fully offline.
 
 ## Display
 
@@ -77,11 +77,11 @@ The transcript detail page benefits from wider screens because of the tab layout
 
 ## Audio hardware
 
-Not required to run DeepTalk — it only processes files you've already recorded. For playback in the transcript detail page, any working audio output works.
+Not required to run DeepDebrief — it only processes files you've already recorded. For playback in the transcript detail page, any working audio output works.
 
 ## Optional dependencies
 
-These aren't bundled with DeepTalk but enable specific features:
+These aren't bundled with DeepDebrief but enable specific features:
 
 ### Ollama (for local AI)
 
@@ -91,7 +91,7 @@ Install separately from [ollama.com](https://ollama.com). Pull at least one mode
 ollama pull llama3.2:3b
 ```
 
-Runs as a background service on `localhost:11434` by default. DeepTalk auto-detects it.
+Runs as a background service on `localhost:11434` by default. DeepDebrief auto-detects it.
 
 ### Linux keyring service
 
@@ -101,15 +101,15 @@ For encrypted API key storage on Linux, install one of:
 - KWallet (default on KDE)
 - Any other `libsecret` provider
 
-Without a keyring, DeepTalk falls back to plain-text key storage with a warning.
+Without a keyring, DeepDebrief falls back to plain-text key storage with a warning.
 
 ### FFmpeg
 
-Bundled with DeepTalk. You don't need a separate install.
+Bundled with DeepDebrief. You don't need a separate install.
 
 ## Not required
 
-- **No account or sign-in.** DeepTalk has no cloud component.
+- **No account or sign-in.** DeepDebrief has no cloud component.
 - **No GPU.** All inference runs on CPU in the current build.
 - **No Python.** Whisper runs via `@huggingface/transformers` (JavaScript/ONNX).
 - **No Docker.** Just install the app.

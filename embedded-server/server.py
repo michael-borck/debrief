@@ -1,4 +1,4 @@
-"""deep-talk embedded sidecar — mounts lens/speech-analyser's FastAPI app."""
+"""deep-debrief embedded sidecar — mounts lens/speech-analyser's FastAPI app."""
 import os
 import sys
 from pathlib import Path

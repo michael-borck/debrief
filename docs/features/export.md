@@ -1,6 +1,6 @@
 # Export
 
-DeepTalk exports transcripts and projects to several formats. You pick what to include each time, so the same transcript can become a clean Markdown doc, a structured JSON record, or a polished PDF depending on what you need.
+DeepDebrief exports transcripts and projects to several formats. You pick what to include each time, so the same transcript can become a clean Markdown doc, a structured JSON record, or a polished PDF depending on what you need.
 
 ## Exporting a single transcript
 
@@ -12,8 +12,8 @@ From the transcript detail page, click **Export**. The export modal lets you cho
 |---|---|---|
 | **Markdown** | `.md` | Readable text with headings and tables. Version control. Copy-paste into notes apps. |
 | **Plain text** | `.txt` | Raw content for scripts, archival, email. |
-| **JSON** | `.json` | Structured data — transcript, analysis, metadata, segments. Use this when scripting around DeepTalk. |
-| **PDF** | `.pdf` | Formatted document for sharing with people who don't use DeepTalk. |
+| **JSON** | `.json` | Structured data — transcript, analysis, metadata, segments. Use this when scripting around DeepDebrief. |
+| **PDF** | `.pdf` | Formatted document for sharing with people who don't use DeepDebrief. |
 
 ### What to include
 
@@ -53,11 +53,11 @@ From the project detail page, open the **Export** tab. Project exports bundle:
 - Each **member transcript** with your chosen level of detail (text only, text + analysis, or just the analysis)
 - **Cross-transcript analysis** results
 
-Output formats match transcript exports. A project PDF is a reasonable format to hand to someone who needs the whole study without installing DeepTalk.
+Output formats match transcript exports. A project PDF is a reasonable format to hand to someone who needs the whole study without installing DeepDebrief.
 
 ## JSON export schema
 
-If you're processing DeepTalk data in other tools, JSON is your best bet. The top-level shape looks like:
+If you're processing DeepDebrief data in other tools, JSON is your best bet. The top-level shape looks like:
 
 ```json
 {
@@ -100,8 +100,8 @@ Several views offer a quick copy button (top-right corner): the summary, a notab
 ## Privacy considerations
 
 - **Local processing, local export.** Nothing is uploaded during export — the file is written directly to the path you choose.
-- **Cloud provider metadata.** If the transcript was analysed with a cloud provider, the AI-generated content came from that provider's servers. The raw transcript text itself was only sent for analysis, not stored externally by DeepTalk.
-- **Audio files are not embedded.** Exports contain text, not audio. If you need the original audio, reach for the source file — DeepTalk tracks its path but doesn't re-export it.
+- **Cloud provider metadata.** If the transcript was analysed with a cloud provider, the AI-generated content came from that provider's servers. The raw transcript text itself was only sent for analysis, not stored externally by DeepDebrief.
+- **Audio files are not embedded.** Exports contain text, not audio. If you need the original audio, reach for the source file — DeepDebrief tracks its path but doesn't re-export it.
 
 ## Tips
 

@@ -1,6 +1,6 @@
 // Spawn lens/speech-analyser as a child sidecar.
 // First launch: bundled python-build-standalone runs setup-venv.py to create
-// ~/Library/Application Support/deep-talk/venv/ with speech-analyser + deps
+// ~/Library/Application Support/deep-debrief/venv/ with speech-analyser + deps
 // installed via pip. Subsequent launches spawn server.py from that venv.
 
 const { app } = require('electron');
@@ -97,7 +97,7 @@ class SidecarManager {
       console.log('[sidecar] running first-launch setup');
 
       this.setupProc = spawn(paths.bundledPython, [paths.setupScript], {
-        env: { ...process.env, DEEP_TALK_VENV: paths.userVenv },
+        env: { ...process.env, DEEP_DEBRIEF_VENV: paths.userVenv },
         stdio: ['ignore', 'pipe', 'pipe'],
       });
 

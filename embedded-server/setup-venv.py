@@ -17,10 +17,10 @@ def user_data_dir() -> Path:
     """Mirror Electron's app.getPath('userData') across platforms."""
     home = Path.home()
     if sys.platform == "darwin":
-        return home / "Library" / "Application Support" / "deep-talk"
+        return home / "Library" / "Application Support" / "deep-debrief"
     if sys.platform == "win32":
-        return Path(os.environ.get("APPDATA", str(home / "AppData" / "Roaming"))) / "deep-talk"
-    return Path(os.environ.get("XDG_CONFIG_HOME", str(home / ".config"))) / "deep-talk"
+        return Path(os.environ.get("APPDATA", str(home / "AppData" / "Roaming"))) / "deep-debrief"
+    return Path(os.environ.get("XDG_CONFIG_HOME", str(home / ".config"))) / "deep-debrief"
 
 
 def venv_python(venv: Path) -> Path:
@@ -42,7 +42,7 @@ def fail(message: str, code: int = 1) -> "None":
 
 def main() -> int:
     # Allow the SidecarManager (and tests) to override the target via env.
-    target = Path(os.environ["DEEP_TALK_VENV"]) if "DEEP_TALK_VENV" in os.environ \
+    target = Path(os.environ["DEEP_DEBRIEF_VENV"]) if "DEEP_DEBRIEF_VENV" in os.environ \
         else user_data_dir() / "venv"
 
     if target.exists() and venv_python(target).exists():

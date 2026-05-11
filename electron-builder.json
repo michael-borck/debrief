@@ -1,6 +1,6 @@
 {
-  "appId": "com.yourinstitution.deeptalk",
-  "productName": "DeepTalk",
+  "appId": "com.yourinstitution.deepdebrief",
+  "productName": "DeepDebrief",
   "directories": {
     "output": "release"
   },

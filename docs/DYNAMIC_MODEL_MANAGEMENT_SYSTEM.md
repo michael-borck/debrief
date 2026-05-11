@@ -2,7 +2,7 @@
 
 ## Overview
 
-DeepTalk implements a sophisticated **Dynamic Model Management System** that provides intelligent model detection, context optimization, and resource management capabilities. The system automatically discovers available AI models, detects their capabilities, optimizes context usage, and manages resource allocation across different model providers while maintaining performance and reliability.
+DeepDebrief implements a sophisticated **Dynamic Model Management System** that provides intelligent model detection, context optimization, and resource management capabilities. The system automatically discovers available AI models, detects their capabilities, optimizes context usage, and manages resource allocation across different model providers while maintaining performance and reliability.
 
 ## System Architecture
 

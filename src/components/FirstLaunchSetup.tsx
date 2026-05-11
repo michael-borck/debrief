@@ -80,7 +80,7 @@ export const FirstLaunchSetup: React.FC = () => {
         First-time setup
       </h2>
       <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        deep-talk is downloading and installing the speech analysis engine.
+        deep-debrief is downloading and installing the speech analysis engine.
         This is a one-time process, ~1 GB on disk, that takes 3–10 minutes
         depending on your connection. You can keep using the app — features
         that need transcription will become available once setup completes.

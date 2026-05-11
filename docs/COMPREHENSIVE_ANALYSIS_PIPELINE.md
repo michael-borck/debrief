@@ -2,7 +2,7 @@
 
 ## Overview
 
-DeepTalk implements a sophisticated **7-stage comprehensive analysis pipeline** that processes audio/video files into structured, analyzed, and searchable transcripts. The pipeline combines multiple AI technologies with robust engineering practices to deliver reliable, feature-rich transcript analysis capabilities.
+DeepDebrief implements a sophisticated **7-stage comprehensive analysis pipeline** that processes audio/video files into structured, analyzed, and searchable transcripts. The pipeline combines multiple AI technologies with robust engineering practices to deliver reliable, feature-rich transcript analysis capabilities.
 
 ## Pipeline Architecture
 

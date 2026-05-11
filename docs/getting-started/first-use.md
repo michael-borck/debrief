@@ -1,10 +1,10 @@
 # First Use
 
-Welcome to DeepTalk. This page walks you through what you'll see the first time you launch the app and the small amount of configuration that's worth doing up front.
+Welcome to DeepDebrief. This page walks you through what you'll see the first time you launch the app and the small amount of configuration that's worth doing up front.
 
 ## Your first launch
 
-When DeepTalk opens, you'll land on the **Dashboard**. Everything is local to your machine — no account, no sign-in, no cloud sync.
+When DeepDebrief opens, you'll land on the **Dashboard**. Everything is local to your machine — no account, no sign-in, no cloud sync.
 
 The sidebar on the left gives you everything you need:
 
@@ -24,12 +24,12 @@ At the bottom of the window you'll see a status bar reporting whether the AI ana
 
 ## Privacy story (read this once, never worry again)
 
-DeepTalk's pitch is "privacy-first local desktop". Here's exactly what that means:
+DeepDebrief's pitch is "privacy-first local desktop". Here's exactly what that means:
 
-- **Transcription runs on your computer.** DeepTalk uses Whisper through `@huggingface/transformers`. The model downloads once on first use (~75 MB for the default `tiny.en` model) and is cached locally. After that, transcribing a file makes **zero network calls**.
+- **Transcription runs on your computer.** DeepDebrief uses Whisper through `@huggingface/transformers`. The model downloads once on first use (~75 MB for the default `tiny.en` model) and is cached locally. After that, transcribing a file makes **zero network calls**.
 - **Speaker identification runs on your computer.** Pyannote segmentation and wespeaker embedding are also local models, downloaded on first use and cached.
-- **AI analysis is configurable.** By default, DeepTalk talks to a local Ollama instance — also on your machine. You can switch to a cloud provider (OpenAI, Anthropic, Groq, Gemini, OpenRouter, or any custom endpoint) in Settings if you want access to more powerful models. When you do, transcripts are sent to that provider for analysis. The app warns you with a "☁ Cloud" badge so you always know which mode you're in.
-- **Storage is a local SQLite database.** Everything you produce — transcripts, analysis, projects, chat history — lives on disk in your user data folder. Never uploaded anywhere by DeepTalk.
+- **AI analysis is configurable.** By default, DeepDebrief talks to a local Ollama instance — also on your machine. You can switch to a cloud provider (OpenAI, Anthropic, Groq, Gemini, OpenRouter, or any custom endpoint) in Settings if you want access to more powerful models. When you do, transcripts are sent to that provider for analysis. The app warns you with a "☁ Cloud" badge so you always know which mode you're in.
+- **Storage is a local SQLite database.** Everything you produce — transcripts, analysis, projects, chat history — lives on disk in your user data folder. Never uploaded anywhere by DeepDebrief.
 
 ## A 5-minute first-time setup
 
@@ -49,11 +49,11 @@ Click **Download** to fetch the model immediately. Otherwise it'll download auto
 
 ### 2. Decide on speaker detection (Settings → Processing)
 
-The **Detect speakers from audio** toggle controls whether DeepTalk runs the diarisation pipeline (pyannote + wespeaker). It's on by default. Adds about 1× the audio length to processing time — turn it off for single-speaker recordings to save time.
+The **Detect speakers from audio** toggle controls whether DeepDebrief runs the diarisation pipeline (pyannote + wespeaker). It's on by default. Adds about 1× the audio length to processing time — turn it off for single-speaker recordings to save time.
 
 ### 3. Connect an AI analysis service (Settings → Processing → AI Analysis Service)
 
-This is the one piece that's not local by default. DeepTalk needs an LLM to produce summaries, sentiment, themes, and to power AI Chat. Pick a provider:
+This is the one piece that's not local by default. DeepDebrief needs an LLM to produce summaries, sentiment, themes, and to power AI Chat. Pick a provider:
 
 - **Ollama (local)** — install [Ollama](https://ollama.com/) separately and run something like `ollama pull llama3.2:3b`. Stays on your machine. Recommended if privacy matters.
 - **OpenAI / Anthropic / Groq / Gemini / OpenRouter** — paste an API key. Faster, smarter, but transcripts get sent to the provider's servers.
@@ -70,7 +70,7 @@ Once the basics are set:
 3. Optionally pick a project to assign it to (you can also assign later).
 4. Click **Upload & Process**.
 
-DeepTalk will:
+DeepDebrief will:
 
 1. Decode the audio (any common format works — MP3, WAV, MP4, MOV, M4A, WebM, OGG, and more)
 2. Run Whisper for transcription

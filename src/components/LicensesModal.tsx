@@ -9,13 +9,13 @@ interface LicensesModalProps {
 export const LicensesModal: React.FC<LicensesModalProps> = ({ isOpen, onClose }) => {
   const licenses = [
     {
-      name: 'DeepTalk',
+      name: 'DeepDebrief',
       version: '1.0.0',
       license: 'MIT',
       description: 'AI-Powered Transcription & Analysis Application',
       licenseText: `MIT License
 
-Copyright (c) 2024 DeepTalk Project
+Copyright (c) 2024 DeepDebrief Project
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -123,7 +123,7 @@ SOFTWARE.`
             </button>
           </div>
           <p className="text-surface-600 mt-2">
-            DeepTalk is built with open source software. Here are the licenses for the components we use:
+            DeepDebrief is built with open source software. Here are the licenses for the components we use:
           </p>
         </div>
 
@@ -198,7 +198,7 @@ SOFTWARE.`
                 respective licenses and are properly attributed.
               </p>
               <p>
-                • <strong>Source Code:</strong> DeepTalk source code is available under MIT license on GitHub.
+                • <strong>Source Code:</strong> DeepDebrief source code is available under MIT license on GitHub.
               </p>
             </div>
           </div>

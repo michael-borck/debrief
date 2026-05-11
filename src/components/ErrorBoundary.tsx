@@ -54,7 +54,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
             Something went wrong
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Deep-Talk hit an unexpected error and couldn't render this view. Your data is safe — reloading should restore the app.
+            Deep-Debrief hit an unexpected error and couldn't render this view. Your data is safe — reloading should restore the app.
           </p>
 
           <div className="bg-gray-100 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-4 mb-4">

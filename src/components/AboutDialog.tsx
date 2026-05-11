@@ -13,13 +13,13 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose, onSho
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      ariaLabel="About DeepTalk"
+      ariaLabel="About DeepDebrief"
       contentClassName="bg-white rounded-lg shadow-elevated max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
     >
         {/* Header */}
         <div className="border-b border-surface-200 p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-2xl font-semibold text-surface-900">About DeepTalk</h2>
+            <h2 className="text-2xl font-semibold text-surface-900">About DeepDebrief</h2>
             <button
               onClick={onClose}
               className="text-surface-400 hover:text-surface-600 transition-colors"
@@ -36,7 +36,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose, onSho
           {/* App Info */}
           <div className="text-center">
             <div className="text-6xl mb-4">🎤</div>
-            <h3 className="text-3xl font-display text-surface-900">DeepTalk</h3>
+            <h3 className="text-3xl font-display text-surface-900">DeepDebrief</h3>
             <p className="text-xl text-surface-600 mt-2">Version 1.0.0</p>
             <p className="text-surface-500 mt-1">AI-Powered Conversation Analysis & Insight Discovery</p>
           </div>
@@ -130,7 +130,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose, onSho
           {/* Footer */}
           <div className="text-center pt-4 border-t border-surface-200">
             <p className="text-surface-600 text-sm">
-              © 2024 DeepTalk Project
+              © 2024 DeepDebrief Project
             </p>
             <p className="text-surface-500 text-xs mt-1">
               Built with ❤️ for Conversation Analysis & Research

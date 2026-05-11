@@ -1,6 +1,6 @@
 # Projects
 
-Projects group related transcripts so DeepTalk can analyse them together. A single interview is a transcript. A batch of twelve interviews for the same study is a project.
+Projects group related transcripts so DeepDebrief can analyse them together. A single interview is a transcript. A batch of twelve interviews for the same study is a project.
 
 ## When to use a project
 
@@ -71,7 +71,7 @@ The specific panels depend on how your transcripts are structured. Single-speake
 The Cross-transcript Search tab lets you query across every member transcript at once. Three modes:
 
 - **Keyword** — fast literal match
-- **Semantic** — vector-based similarity using the embeddings DeepTalk builds for chat
+- **Semantic** — vector-based similarity using the embeddings DeepDebrief builds for chat
 - **Hybrid** — both, ranked together
 
 Results show which transcript each match came from, the surrounding context, and a jump link to open the transcript at that point.

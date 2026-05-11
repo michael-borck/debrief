@@ -1,6 +1,6 @@
 # Tutorial: Basic Workflow
 
-A walkthrough of the end-to-end DeepTalk workflow using a single recording. Follow along with any 2-5 minute audio file you have handy.
+A walkthrough of the end-to-end DeepDebrief workflow using a single recording. Follow along with any 2-5 minute audio file you have handy.
 
 **Time needed:** 15 minutes on a reasonably fast machine.
 
@@ -26,7 +26,7 @@ Leave the project unset for now. Click **Upload & Process**.
 
 ## 3. Watch the pipeline
 
-DeepTalk runs a series of steps:
+DeepDebrief runs a series of steps:
 
 1. **Decoding audio** — ffmpeg extracts a 16 kHz mono PCM stream
 2. **Transcribing** — Whisper runs on the audio
@@ -113,7 +113,7 @@ The **Analyze corrected transcript** setting (in Processing) makes re-analysis u
 
 Click **Export** (top right). Pick a format — Markdown is a good default for human reading. Tick what to include (transcript, summary, analysis). Click Export, pick a save location.
 
-Open the exported file in your editor. You now have a self-contained document that doesn't need DeepTalk to read.
+Open the exported file in your editor. You now have a self-contained document that doesn't need DeepDebrief to read.
 
 ## Where to go from here
 

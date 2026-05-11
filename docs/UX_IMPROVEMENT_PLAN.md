@@ -1,11 +1,11 @@
-# DeepTalk UX Improvement Plan
+# DeepDebrief UX Improvement Plan
 
 **Created:** 2026-04-13
-**Status:** Tier 1 + Tier 2 + Tier 3 complete. Tier 4 Phase 1 + Phase 2 complete — DeepTalk now runs Whisper transcription AND speaker diarisation entirely in-process. No external server, no LLM guessing speakers from text. Build verified clean.
+**Status:** Tier 1 + Tier 2 + Tier 3 complete. Tier 4 Phase 1 + Phase 2 complete — DeepDebrief now runs Whisper transcription AND speaker diarisation entirely in-process. No external server, no LLM guessing speakers from text. Build verified clean.
 
 ## Background
 
-DeepTalk computes substantial analysis (sentiment, 6 emotion dimensions, speaker tagging, notable quotes, Q&A pairs, concept frequency, research themes) but most of it never renders on screen. The gap between "what's in the database" and "what a user sees" is the single biggest UX problem.
+DeepDebrief computes substantial analysis (sentiment, 6 emotion dimensions, speaker tagging, notable quotes, Q&A pairs, concept frequency, research themes) but most of it never renders on screen. The gap between "what's in the database" and "what a user sees" is the single biggest UX problem.
 
 This plan addresses that gap in tiers, from highest-impact / lowest-effort first.
 
@@ -137,7 +137,7 @@ Pure algorithmic, no LLM calls, high perceived value. Reference: `/Users/michael
 
 ### 4.0 Drop Speaches, run Whisper locally
 - **Status:** Phase 1 done (2026-04-14). Phase 2 (diarisation) still pending.
-- **Why:** DeepTalk pitched itself as "privacy-first local desktop" but required users to run a separate Speaches server. Bundling makes the marketing literally true and removes a whole category of bugs (CORS, auth, network).
+- **Why:** DeepDebrief pitched itself as "privacy-first local desktop" but required users to run a separate Speaches server. Bundling makes the marketing literally true and removes a whole category of bugs (CORS, auth, network).
 - **Phase 1 — Local Whisper transcription (done):**
   - New spike script `scripts/spike-whisper.js` validated `@xenova/transformers` Whisper running entirely in-process: ~75 MB tiny.en model, 1.5x realtime, correct output, no network after first download.
   - `public/electron.js` — added `getWhisperPipeline()` (lazy singleton, cache in `app.getPath('userData')/models`), `decodeAudioToFloat32()` via bundled ffmpeg, two new IPC handlers: `local-transcription-load-model` and `local-transcription-transcribe`.
@@ -203,7 +203,7 @@ Pure algorithmic, no LLM calls, high perceived value. Reference: `/Users/michael
 ## Progress log
 
 - **2026-04-13** — Plan created. Tier 1 complete: SentimentCard + ValidationChangesCard + HighlightedText components added; in-transcript search wired up; inline speaker labels in TimestampedTranscript; emoji icons replaced with Lucide throughout TranscriptDetailPage. Build verified.
-- **2026-04-13** — Tier 2 complete: ported talk-buddy's algorithmic conversation analysis, reframed for DeepTalk's audience. New `conversationMetricsService.ts` (pure, no LLM). Three new cards: ConversationQualityCard, FillerWordsCard, TalkTimeCard. Surfaces appear on both Overview and Analysis tabs. Build verified.
+- **2026-04-13** — Tier 2 complete: ported talk-buddy's algorithmic conversation analysis, reframed for DeepDebrief's audience. New `conversationMetricsService.ts` (pure, no LLM). Three new cards: ConversationQualityCard, FillerWordsCard, TalkTimeCard. Surfaces appear on both Overview and Analysis tabs. Build verified.
 - **2026-04-14** — Tier 3 complete: audio playback synced to transcript (useAudioPlayer hook + AudioPlayerBar component, click segments to seek, auto-scroll playing segment), DOCX/PDF export (new exportService using docx + jspdf), advanced settings collapsed under reusable Collapsible component. Build verified.
 - **2026-04-14** — Tier 4 Phase 1 complete: dropped the Speaches dependency entirely. Whisper now runs in-process via @xenova/transformers (already installed). Validated end-to-end with the spike script — `hello.mp3` transcribed correctly in ~700 ms at 1.5x realtime with the tiny.en model. Settings page rewritten with a simple model picker (tiny.en/base.en/small.en) and a "Download now" button. ~400 lines of legacy Speaches code deleted from electron.js. Build verified clean. Spike script kept in `scripts/spike-whisper.js` as a reproducible validation tool.
 - **2026-04-14** — Tier 4 Phase 2 complete: real audio-level speaker diarisation. Pyannote-segmentation-3.0 + wespeaker-voxceleb-resnet34-LM running in-process via @huggingface/transformers v4 (had to upgrade from @xenova v2 because v2 lacked the PyAnnoteFeatureExtractor). Validated on a real 30-second 2-speaker file — pipeline correctly identified both speakers and produced 10 turns including overlap detection. Algorithm: pyannote per 5s window → frame-level powerset classes → per-turn 256-d wespeaker embedding → agglomerative cosine clustering at threshold 0.5 → align by timestamp with whisper segments. Spike kept in `scripts/spike-diarisation-full.js`. LLM speaker tagging is now a dead-code no-op in the default path; will be deleted in a focused cleanup commit. Settings now has a single "Detect speakers from audio" toggle in plain language. Build verified clean.
@@ -219,7 +219,7 @@ Pure algorithmic, no LLM calls, high perceived value. Reference: `/Users/michael
   - **Bulk operations:** Library page now supports multi-select. TranscriptCard accepts `selectable`/`selected`/`onToggleSelect` props and renders a small checkbox at the top when selectable. Selected cards get an accent ring. The Library header has a Select All / Deselect All toggle. When ≥1 transcript is selected, a sticky bulk action bar slides in with: "+ Add to project..." dropdown, Archive, Delete (move to trash). Each operation processes the selection sequentially with try/catch per item, then fires a toast with N-of-M counts. After each bulk op, the selection clears and the transcript list reloads.
   - **STT confidence (dropped):** transformers.js' whisper pipeline doesn't expose per-chunk logprobs/confidence in its standard output. Surfacing it would require dropping to a lower-level API and computing logprobs manually — cost > value for now. Noted for future work.
   - **Three-way diff view (deferred):** real work, needs a diff library or hand-rolled algorithm + side-by-side viewer. Better as a focused session.
-- **2026-04-14** — In-app docs (Option B chosen). The user discovered that clicking docs links in DeepTalk was opening **child Electron BrowserWindows** (not the system browser as I'd previously claimed) and showing 404s on stale Jekyll pages. Both broken. Fixed by:
+- **2026-04-14** — In-app docs (Option B chosen). The user discovered that clicking docs links in DeepDebrief was opening **child Electron BrowserWindows** (not the system browser as I'd previously claimed) and showing 404s on stale Jekyll pages. Both broken. Fixed by:
   - Installing `react-markdown` + `remark-gfm`
   - Adding webpack rule `test: /\.md$/, type: 'asset/source'` so markdown files become raw string imports
   - Adding `src/declarations.d.ts` so TS understands `*.md` imports

@@ -377,7 +377,7 @@ export const SettingsPage: React.FC = () => {
 
   const handleBackupNow = async () => {
     const result = await window.electronAPI.dialog.saveFile({
-      defaultPath: `deeptalk-backup-${new Date().toISOString().split('T')[0]}.db`,
+      defaultPath: `deepdebrief-backup-${new Date().toISOString().split('T')[0]}.db`,
       filters: [{ name: 'Database', extensions: ['db'] }]
     });
     
@@ -603,7 +603,7 @@ export const SettingsPage: React.FC = () => {
             <div className="panel">
               <h3 className="section-title mb-2">AI Analysis Service</h3>
               <p className="text-sm text-surface-600 mb-5">
-                Choose where DeepTalk sends transcripts for summarisation, sentiment, and other AI analysis. Local Ollama keeps everything on your machine; cloud providers give you access to more powerful models in exchange for sending transcripts to their servers.
+                Choose where DeepDebrief sends transcripts for summarisation, sentiment, and other AI analysis. Local Ollama keeps everything on your machine; cloud providers give you access to more powerful models in exchange for sending transcripts to their servers.
               </p>
 
               <div className="space-y-4">
@@ -809,7 +809,7 @@ export const SettingsPage: React.FC = () => {
                           usageStats?.session,
                           'session',
                           () => resetUsageStats('session'),
-                          'No AI requests yet this session. Resets when DeepTalk restarts.'
+                          'No AI requests yet this session. Resets when DeepDebrief restarts.'
                         )}
                         {renderBlock(
                           'Lifetime',
@@ -1533,7 +1533,7 @@ export const SettingsPage: React.FC = () => {
                   type="button"
                   onClick={() => {
                     try {
-                      localStorage.removeItem('deeptalk:welcomeSeenV1');
+                      localStorage.removeItem('deepdebrief:welcomeSeenV1');
                       alert('Welcome screen will show on next launch.');
                     } catch (err) {
                       console.error('Failed to reset welcome screen:', err);
@@ -1553,7 +1553,7 @@ export const SettingsPage: React.FC = () => {
               </h3>
               <div className="text-sm text-surface-600 space-y-2">
                 <p>
-                  DeepTalk stores all data locally on your computer in a SQLite database.
+                  DeepDebrief stores all data locally on your computer in a SQLite database.
                   Transcription and speaker detection run entirely on your machine via
                   Whisper, pyannote, and wespeaker — no network calls after the first
                   model download.
@@ -1569,7 +1569,7 @@ export const SettingsPage: React.FC = () => {
                 <p>
                   API keys are encrypted at rest via your OS keychain (macOS Keychain,
                   Windows DPAPI, libsecret on Linux). On Linux without a keyring service,
-                  DeepTalk falls back to plain text and warns you.
+                  DeepDebrief falls back to plain text and warns you.
                 </p>
               </div>
             </div>

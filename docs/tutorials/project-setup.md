@@ -49,7 +49,7 @@ For the interviewer specifically, use the same name across every recording — t
 
 ## 4. Run project analysis
 
-Back on the project page, click the **Overview** tab. If it's empty, click **Run Analysis**. DeepTalk will:
+Back on the project page, click the **Overview** tab. If it's empty, click **Run Analysis**. DeepDebrief will:
 
 1. Pull the text of every member transcript
 2. Send it to your AI provider with the project-level prompt
@@ -97,7 +97,7 @@ Chat answers pull from the relevant transcripts and tell you which ones they cam
 
 ## 8. Export the project
 
-Click the **Export** tab. Pick a format — PDF is a reasonable format to hand to stakeholders who don't use DeepTalk.
+Click the **Export** tab. Pick a format — PDF is a reasonable format to hand to stakeholders who don't use DeepDebrief.
 
 Include:
 
