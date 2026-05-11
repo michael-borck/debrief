@@ -54,34 +54,36 @@ let db;
 //   });
 // }
 
-// One-time migration: rename the userData dir from the legacy deep-talk
-// product name to deep-debrief. Existing installs have their database +
-// model cache + sidecar venv under ~/Library/Application Support/deep-talk/
-// (or platform equivalent); Electron now looks at .../deep-debrief/. Move
-// the data so the upgrade is transparent.
+// One-time migration: rename the userData dir from any legacy product name
+// to the current one. legacyNames lists every previous product slug; path
+// literals are built with string concatenation so the bulk-rename script
+// doesn't rewrite them away when we drop the next product name in.
 function migrateLegacyUserDataDir() {
   const newDir = app.getPath('userData');
   const home = require('os').homedir();
-  let oldDir;
-  if (process.platform === 'darwin') {
-    oldDir = path.join(home, 'Library', 'Application Support', 'deep-talk');
-  } else if (process.platform === 'win32') {
-    oldDir = path.join(process.env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'deep-talk');
-  } else {
-    oldDir = path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'deep-talk');
-  }
-  if (oldDir === newDir) return;
-  if (!fs.existsSync(oldDir)) return;
-  if (fs.existsSync(newDir) && fs.readdirSync(newDir).length > 0) {
-    console.warn(`[migration] both ${oldDir} and ${newDir} exist with content; skipping rename to avoid clobber.`);
-    return;
-  }
-  try {
-    if (fs.existsSync(newDir)) fs.rmdirSync(newDir);
-    fs.renameSync(oldDir, newDir);
-    console.log(`[migration] renamed user-data dir ${oldDir} -> ${newDir}`);
-  } catch (err) {
-    console.error('[migration] rename failed:', err);
+  const legacyNames = ['deep' + '-talk', 'deep' + '-debrief'];
+  const platformBase = process.platform === 'darwin'
+    ? path.join(home, 'Library', 'Application Support')
+    : process.platform === 'win32'
+      ? (process.env.APPDATA || path.join(home, 'AppData', 'Roaming'))
+      : (process.env.XDG_CONFIG_HOME || path.join(home, '.config'));
+
+  for (const legacy of legacyNames) {
+    const oldDir = path.join(platformBase, legacy);
+    if (oldDir === newDir) continue;
+    if (!fs.existsSync(oldDir)) continue;
+    if (fs.existsSync(newDir) && fs.readdirSync(newDir).length > 0) {
+      console.warn(`[migration] both ${oldDir} and ${newDir} exist with content; skipping rename to avoid clobber.`);
+      continue;
+    }
+    try {
+      if (fs.existsSync(newDir)) fs.rmdirSync(newDir);
+      fs.renameSync(oldDir, newDir);
+      console.log(`[migration] renamed user-data dir ${oldDir} -> ${newDir}`);
+      return;
+    } catch (err) {
+      console.error(`[migration] rename ${oldDir} -> ${newDir} failed:`, err);
+    }
   }
 }
 
@@ -716,7 +718,7 @@ function createMenu() {
       label: 'Help',
       submenu: [
         {
-          label: 'About DeepDebrief',
+          label: 'About Debrief',
           click: () => {
             mainWindow.webContents.send('menu-action', 'show-about');
           }

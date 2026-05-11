@@ -2,7 +2,7 @@
  * Conversation metrics — pure algorithmic analysis of a transcript.
  *
  * No LLM calls, no network. Adapted from talk-buddy's analysis.ts but
- * reframed for DeepDebrief's audience: people analysing OTHER people's
+ * reframed for Debrief's audience: people analysing OTHER people's
  * conversations (interviews, meetings, classes), not their own practice.
  *
  * Vocabulary is intentionally observational, not judgemental.

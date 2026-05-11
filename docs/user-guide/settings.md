@@ -16,7 +16,7 @@ Three model options. All English-only. All run entirely on your machine — no n
 | **Base (English)** | ~140 MB | Balanced | Most users, most recordings |
 | **Small (English)** | ~470 MB | Slower | Highest accuracy in this set |
 
-The first time you transcribe with a model, DeepDebrief downloads it to your user data folder (`~/Library/Application Support/deep-debrief/models/` on macOS, equivalents on Windows/Linux) and caches it forever. Subsequent transcriptions just use the cached model — no download, no network.
+The first time you transcribe with a model, Debrief downloads it to your user data folder (`~/Library/Application Support/debrief/models/` on macOS, equivalents on Windows/Linux) and caches it forever. Subsequent transcriptions just use the cached model — no download, no network.
 
 ### Download model now
 
@@ -28,7 +28,7 @@ Settings for everything that happens after transcription: speaker detection, AI 
 
 ### AI Analysis Service
 
-The one piece that's not local by default. DeepDebrief needs an LLM for summaries, sentiment analysis, themes, action items, and AI Chat.
+The one piece that's not local by default. Debrief needs an LLM for summaries, sentiment analysis, themes, action items, and AI Chat.
 
 **Provider** dropdown — pick from:
 
@@ -46,7 +46,7 @@ A coloured banner under the dropdown reminds you which mode you're in (green for
 
 **Server URL** auto-fills with the provider's default but stays editable for custom Ollama ports, WSL setups, enterprise proxies, etc.
 
-**API Key** field appears only for cloud providers. Stored encrypted via your OS keychain (macOS Keychain, Windows DPAPI, libsecret on Linux). Never logged. On Linux machines without a keyring service, DeepDebrief falls back to plain text and warns you.
+**API Key** field appears only for cloud providers. Stored encrypted via your OS keychain (macOS Keychain, Windows DPAPI, libsecret on Linux). Never logged. On Linux machines without a keyring service, Debrief falls back to plain text and warns you.
 
 **Test Connection** runs a cheap probe (lists models) to verify the URL and key work.
 
@@ -56,7 +56,7 @@ A coloured banner under the dropdown reminds you which mode you're in (green for
 
 Toggle for the diarisation pipeline. On by default.
 
-When on, after Whisper finishes, DeepDebrief runs:
+When on, after Whisper finishes, Debrief runs:
 
 1. **Pyannote segmentation** to find speech regions and local speaker activity in 5-second windows
 2. **Wespeaker** to compute a 256-dimensional voice fingerprint for each turn
@@ -70,7 +70,7 @@ Adds about 1× the audio length to processing time. Turn it off for single-speak
 
 Two counters of how many tokens your AI provider has consumed, both broken down by provider and model:
 
-- **This session** — resets when DeepDebrief restarts, or manually via the Reset session button
+- **This session** — resets when Debrief restarts, or manually via the Reset session button
 - **Lifetime** — persisted across restarts; reset only when you explicitly click Reset lifetime (with a confirmation)
 
 Local providers (Ollama) report tokens but no cost. Hosted providers may charge per token — check your provider's pricing page.
@@ -109,7 +109,7 @@ Click to expand. Most users never need to touch these:
 
 ## AI Prompts
 
-Customise the prompts DeepDebrief sends to the AI for each analysis task (summaries, sentiment, themes, etc.). Each prompt has a default that's restored if you delete your customisation.
+Customise the prompts Debrief sends to the AI for each analysis task (summaries, sentiment, themes, etc.). Each prompt has a default that's restored if you delete your customisation.
 
 You can edit a prompt's text directly. Variables like `{transcript}` get filled in at runtime. Useful if you want the AI to focus on specific aspects of your recordings (e.g. "always look for action items related to project deadlines").
 
@@ -117,14 +117,14 @@ You can edit a prompt's text directly. Variables like `{transcript}` get filled 
 
 ### Storage & Backup
 
-- **Database location** — where DeepDebrief stores its SQLite database. You can change it (move to an external drive, sync folder, etc.) and the app will move the file for you.
+- **Database location** — where Debrief stores its SQLite database. You can change it (move to an external drive, sync folder, etc.) and the app will move the file for you.
 - **Open Folder** — opens the database directory in Finder/Explorer.
 - **Backup Now** — creates an immediate backup.
 - **Auto-backup** — periodic backups on a schedule (daily/weekly/monthly).
 
 ### Chat Search Index (collapsed)
 
-The vector embeddings DeepDebrief uses to power chat search. Reset only if you experience chat issues. Most users never need this.
+The vector embeddings Debrief uses to power chat search. Reset only if you experience chat issues. Most users never need this.
 
 - **Reset Search Index** — clears all embeddings. The next chat will re-index.
 - **View Statistics** — shows index size and per-transcript chunk counts.
@@ -137,7 +137,7 @@ The vector embeddings DeepDebrief uses to power chat search. Reset only if you e
 
 A reminder of what stays local and what doesn't:
 
-> DeepDebrief stores all data locally on your computer. No data is sent to external services except for transcription and analysis processing through your configured services.
+> Debrief stores all data locally on your computer. No data is sent to external services except for transcription and analysis processing through your configured services.
 
 (Transcription is now always local — that line predates the local Whisper migration. It'll be updated in a future release.)
 
@@ -145,5 +145,5 @@ A reminder of what stays local and what doesn't:
 
 - **Start with defaults.** Tiny.en + Ollama local + speaker detection on works well for most cases.
 - **If you upgrade your AI**, also try a better Whisper model — the bottleneck for "good summaries" is sometimes transcript quality, not the LLM.
-- **API keys are encrypted at rest** via your OS keychain. On Linux without a keyring service DeepDebrief falls back to plain text — use Ollama on shared machines if that matters.
+- **API keys are encrypted at rest** via your OS keychain. On Linux without a keyring service Debrief falls back to plain text — use Ollama on shared machines if that matters.
 - **Settings save immediately.** No "Save" button — every toggle and dropdown writes to the database as you change it.

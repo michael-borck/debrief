@@ -1,10 +1,10 @@
 # File Formats
 
-Reference for the input formats DeepDebrief accepts and the output formats it can export.
+Reference for the input formats Debrief accepts and the output formats it can export.
 
 ## Input: audio and video
 
-DeepDebrief uses the bundled `ffmpeg` to decode input files, so anything `ffmpeg` can read works. In practice that includes every common audio and video format.
+Debrief uses the bundled `ffmpeg` to decode input files, so anything `ffmpeg` can read works. In practice that includes every common audio and video format.
 
 ### Audio
 
@@ -21,7 +21,7 @@ DeepDebrief uses the bundled `ffmpeg` to decode input files, so anything `ffmpeg
 
 ### Video
 
-DeepDebrief extracts the audio track from video files before transcribing.
+Debrief extracts the audio track from video files before transcribing.
 
 | Format | Extension | Notes |
 |---|---|---|
@@ -32,7 +32,7 @@ DeepDebrief extracts the audio track from video files before transcribing.
 | AVI | `.avi` | Older format |
 | Flash Video | `.flv` | Legacy |
 
-If a format isn't listed but `ffmpeg` supports it, DeepDebrief will probably accept it too. Try the upload — if it fails, the error tells you what went wrong.
+If a format isn't listed but `ffmpeg` supports it, Debrief will probably accept it too. Try the upload — if it fails, the error tells you what went wrong.
 
 ### What makes a good input file
 
@@ -67,7 +67,7 @@ Stripped-down version of the Markdown export — just the transcript content. Op
 
 ### JSON (`.json`)
 
-Structured data covering everything DeepDebrief knows about the transcript:
+Structured data covering everything Debrief knows about the transcript:
 
 - Transcript text (original, corrected, speaker-tagged versions)
 - Segments with timestamps and speaker labels
@@ -82,7 +82,7 @@ See the [Export schema](../features/export.md#json-export-schema) for the shape.
 
 ### PDF (`.pdf`)
 
-Formatted document suitable for sharing with people who don't use DeepDebrief. Good for:
+Formatted document suitable for sharing with people who don't use Debrief. Good for:
 
 - Research reports
 - Meeting summaries for stakeholders
@@ -94,7 +94,7 @@ PDFs are rendered from the Markdown template, so the structure matches the Markd
 
 For reference — you rarely need to interact with this directly.
 
-- **Database**: SQLite (`deepdebrief.db`). Regular SQL tables for transcripts, segments, projects, chat history, settings, and AI prompts.
+- **Database**: SQLite (`debrief.db`). Regular SQL tables for transcripts, segments, projects, chat history, settings, and AI prompts.
 - **Vector store**: SQLite with a vector extension, used for chat and semantic search embeddings. Lives in the same user data folder.
 - **Models**: ONNX format for Whisper, pyannote, and wespeaker. Cached in `models/` under the user data folder.
 
@@ -102,7 +102,7 @@ Database location and backup controls live in **Settings → General → Storage
 
 ## Supported AI model formats
 
-DeepDebrief doesn't load AI models itself (beyond the local transcription / diarisation / embedding models). For analysis and chat it talks to whichever AI provider you've configured:
+Debrief doesn't load AI models itself (beyond the local transcription / diarisation / embedding models). For analysis and chat it talks to whichever AI provider you've configured:
 
 - **Ollama** — any Ollama-hosted model via the `/v1/chat/completions` endpoint
 - **OpenAI-compatible** — OpenAI, Groq, Gemini (via OpenAI-compat endpoint), OpenRouter, custom

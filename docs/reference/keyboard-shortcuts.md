@@ -1,6 +1,6 @@
 # Keyboard Shortcuts
 
-Press **`Cmd/Ctrl + ?`** anywhere in DeepDebrief to open the interactive shortcuts dialog with a search box. This page is the same list in reference form.
+Press **`Cmd/Ctrl + ?`** anywhere in Debrief to open the interactive shortcuts dialog with a search box. This page is the same list in reference form.
 
 On macOS, use **`Cmd`**. On Windows and Linux, use **`Ctrl`**.
 

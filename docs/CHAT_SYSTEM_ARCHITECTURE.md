@@ -1,4 +1,4 @@
-# DeepDebrief Chat System Architecture
+# Debrief Chat System Architecture
 
 ## Table of Contents
 1. [Overview](#overview)
@@ -18,7 +18,7 @@
 
 ## Overview
 
-DeepDebrief implements a sophisticated **Retrieval-Augmented Generation (RAG)** chat system that enables intelligent interaction with transcribed audio content. The system features:
+Debrief implements a sophisticated **Retrieval-Augmented Generation (RAG)** chat system that enables intelligent interaction with transcribed audio content. The system features:
 
 - **Multi-modal conversation support** (Vector-Only, RAG, Direct LLM)
 - **Dynamic context management** based on model capabilities

@@ -6,6 +6,6 @@
  */
 
 module.exports = {
-  REPO: 'https://github.com/michael-borck/deep-debrief',
-  ISSUES: 'https://github.com/michael-borck/deep-debrief/issues',
+  REPO: 'https://github.com/michael-borck/debrief',
+  ISSUES: 'https://github.com/michael-borck/debrief/issues',
 };

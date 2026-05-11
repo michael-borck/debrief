@@ -1,6 +1,6 @@
 # Quick Start
 
-The speed-run version of getting productive with DeepDebrief. If you've already read [First Use](first-use.md), skip straight to Step 1.
+The speed-run version of getting productive with Debrief. If you've already read [First Use](first-use.md), skip straight to Step 1.
 
 **Time needed:** about 10 minutes, most of which is waiting for the first model download.
 
@@ -14,9 +14,9 @@ Open **Settings → Transcription**. Three choices:
 | **Base (English)** | ~140 MB | Recommended balance of speed and accuracy. |
 | **Small (English)** | ~470 MB | Best accuracy. Pick on a fast machine. |
 
-Click **Download model now** to pre-fetch it, or just move on — DeepDebrief will download it the first time you hit Transcribe.
+Click **Download model now** to pre-fetch it, or just move on — Debrief will download it the first time you hit Transcribe.
 
-## Step 2 — Point DeepDebrief at an LLM
+## Step 2 — Point Debrief at an LLM
 
 Open **Settings → Processing → AI Analysis Service**. Everything after transcription (summary, themes, action items, chat) needs a language model.
 
@@ -29,7 +29,7 @@ Click **Test Connection**, then **Refresh Models** and pick one. That's it.
 
 Click **Upload & Process** in the sidebar. Drag an audio or video file into the dropzone (MP3, WAV, M4A, OGG, MP4, MOV, WebM, FLAC — most formats work). Optionally assign it to a project. Click **Upload & Process**.
 
-DeepDebrief will:
+Debrief will:
 
 1. Decode the audio
 2. Transcribe with Whisper (local)

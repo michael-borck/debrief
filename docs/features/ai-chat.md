@@ -10,9 +10,9 @@ Talk to your transcripts. Ask questions, get summaries, find specific moments, r
 
 ## How it works
 
-DeepDebrief uses your configured AI provider (Settings → Processing → AI Analysis Service) for chat. The same provider/model that produces summaries also handles chat — there's only one AI to configure.
+Debrief uses your configured AI provider (Settings → Processing → AI Analysis Service) for chat. The same provider/model that produces summaries also handles chat — there's only one AI to configure.
 
-When you ask a question, DeepDebrief:
+When you ask a question, Debrief:
 
 1. Embeds your question into a vector
 2. Searches the local vector index for relevant transcript chunks
@@ -78,7 +78,7 @@ The context is retrieved using the same vector search, just over a wider pool of
 
 ## Conversation memory
 
-DeepDebrief remembers the last 20 messages in a conversation by default. After that, older messages get summarised to keep the context window manageable. You can adjust the memory limit in Settings → Chat → Advanced Chat Settings → Conversation Memory Limit.
+Debrief remembers the last 20 messages in a conversation by default. After that, older messages get summarised to keep the context window manageable. You can adjust the memory limit in Settings → Chat → Advanced Chat Settings → Conversation Memory Limit.
 
 ## Saved conversations
 

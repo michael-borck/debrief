@@ -45,13 +45,13 @@ export const WelcomeModal: React.FC<WelcomeModalProps> = ({ isOpen, onClose }) =
     <Modal
       isOpen={isOpen}
       onClose={handleSkip}
-      ariaLabel="Welcome to DeepDebrief"
+      ariaLabel="Welcome to Debrief"
       contentClassName="modal-content max-w-2xl"
     >
         {/* Header */}
         <div className="flex items-start justify-between mb-2">
           <div>
-            <h2 className="text-2xl font-display font-bold text-surface-900">Welcome to DeepDebrief</h2>
+            <h2 className="text-2xl font-display font-bold text-surface-900">Welcome to Debrief</h2>
             <p className="text-sm text-surface-600 mt-1">
               A privacy-first desktop app for transcribing and analysing conversations.
             </p>

@@ -1,6 +1,6 @@
 # Analysis
 
-After a transcript finishes transcribing, DeepDebrief sends the text to your configured AI provider and runs a suite of analyses. This page explains what each analysis means and how to read the results.
+After a transcript finishes transcribing, Debrief sends the text to your configured AI provider and runs a suite of analyses. This page explains what each analysis means and how to read the results.
 
 ## What gets analysed
 
@@ -22,7 +22,7 @@ You'll find them on the transcript detail page under **Overview** and **Analysis
 
 Analysis quality is bounded by the LLM you're using. A 3B-parameter local model will produce decent summaries and basic themes. GPT-4-class models produce noticeably richer analysis, especially for nuanced topics like sentiment and research themes.
 
-Check **Settings → Processing → AI Analysis Service** to pick your provider. DeepDebrief supports Ollama, OpenAI, Anthropic, Groq, Gemini, OpenRouter, and any OpenAI-compatible custom endpoint.
+Check **Settings → Processing → AI Analysis Service** to pick your provider. Debrief supports Ollama, OpenAI, Anthropic, Groq, Gemini, OpenRouter, and any OpenAI-compatible custom endpoint.
 
 Switching providers doesn't retroactively re-run analysis on existing transcripts — re-analyse from the transcript detail page if you want to refresh.
 
@@ -53,7 +53,7 @@ Useful for qualitative research and interview coding. The AI looks for recurring
 
 ### Q&A pairs
 
-When the transcript is a conversation or interview, DeepDebrief extracts explicit question-answer pairs. Each pair shows:
+When the transcript is a conversation or interview, Debrief extracts explicit question-answer pairs. Each pair shows:
 
 - The **question** with speaker and timestamp
 - The **answer** with speaker and timestamp
@@ -108,7 +108,7 @@ Use this to bias the AI toward specific aspects ("always look for action items r
 
 ## Token usage
 
-Each analysis call consumes tokens on your AI provider. DeepDebrief tracks session-level usage in **Settings → Processing → Session token usage** so you can see roughly how much you're spending on hosted providers. Totals reset when the app restarts.
+Each analysis call consumes tokens on your AI provider. Debrief tracks session-level usage in **Settings → Processing → Session token usage** so you can see roughly how much you're spending on hosted providers. Totals reset when the app restarts.
 
 ## Next steps
 

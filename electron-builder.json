@@ -1,6 +1,6 @@
 {
-  "appId": "com.yourinstitution.deepdebrief",
-  "productName": "DeepDebrief",
+  "appId": "app.borck.debrief",
+  "productName": "Debrief",
   "directories": {
     "output": "release"
   },

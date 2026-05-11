@@ -1,6 +1,6 @@
 # Transcription & Diarisation
 
-DeepDebrief does both jobs locally: turning audio into text (transcription) and figuring out who said what (diarisation). No external server, no cloud upload, no API key needed for either step.
+Debrief does both jobs locally: turning audio into text (transcription) and figuring out who said what (diarisation). No external server, no cloud upload, no API key needed for either step.
 
 ## How it works
 
@@ -28,7 +28,7 @@ All four ML models are downloaded once on first use and cached in your user data
 
 ## Whisper transcription
 
-DeepDebrief uses Whisper through the `@huggingface/transformers` library, which provides a JavaScript wrapper around ONNX Runtime. The result is a high-quality transcription engine that runs in pure Node.js without needing Python, PyTorch, or a separate server.
+Debrief uses Whisper through the `@huggingface/transformers` library, which provides a JavaScript wrapper around ONNX Runtime. The result is a high-quality transcription engine that runs in pure Node.js without needing Python, PyTorch, or a separate server.
 
 ### Model choices (Settings → Transcription)
 
@@ -49,13 +49,13 @@ For each transcription, Whisper returns:
 - The full transcript text
 - A list of chunks, each with `[startTime, endTime, text]`
 
-The chunks are typically sentence-sized. They become the per-sentence rows in DeepDebrief's transcript segments table, which power features like the synced audio playback and find-in-transcript search.
+The chunks are typically sentence-sized. They become the per-sentence rows in Debrief's transcript segments table, which power features like the synced audio playback and find-in-transcript search.
 
 ### Internal chunking (not the same as the old Speaches chunking)
 
 Whisper itself processes audio in 30-second windows internally with 5-second strides. This is an algorithm parameter, not a network parameter — there's no network call between windows. You don't need to configure it.
 
-(Older versions of DeepDebrief used a separate Speaches HTTP server and chunked at the network level for request size limits. That entire path has been removed.)
+(Older versions of Debrief used a separate Speaches HTTP server and chunked at the network level for request size limits. That entire path has been removed.)
 
 ## Speaker diarisation
 
@@ -83,7 +83,7 @@ Two models work together:
 
 ### Why it's better than the old approach
 
-Earlier DeepDebrief versions sent transcribed text to an LLM and asked it to guess speakers from textual cues. That approach:
+Earlier Debrief versions sent transcribed text to an LLM and asked it to guess speakers from textual cues. That approach:
 
 - Couldn't detect overlapping speech
 - Couldn't handle 4+ speakers
@@ -129,7 +129,7 @@ The AI Correction button uses your configured AI provider (Settings → Processi
 
 ## What's next
 
-- [Analysis](analysis.md) — what DeepDebrief does with the text after transcription
+- [Analysis](analysis.md) — what Debrief does with the text after transcription
 - [AI Chat](ai-chat.md) — talking to your transcripts
 - [Settings → Transcription](../user-guide/settings.md#transcription) — picking a model
 - [Settings → Detect speakers from audio](../user-guide/settings.md#detect-speakers-from-audio) — turning diarisation on/off

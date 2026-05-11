@@ -4,7 +4,7 @@ Power-user features for people who've already done the basic workflow. We'll cov
 
 ## Customising AI prompts
 
-**Settings → AI Prompts** is where you tell DeepDebrief how to talk to the LLM for each task. Each built-in task has a default prompt and a restore button.
+**Settings → AI Prompts** is where you tell Debrief how to talk to the LLM for each task. Each built-in task has a default prompt and a restore button.
 
 ### Why bother
 
@@ -113,9 +113,9 @@ Export → JSON → save. Parse with whatever you like. See the [Export referenc
 
 ## Encrypted API keys
 
-DeepDebrief stores cloud provider API keys encrypted via your OS keychain (macOS Keychain, Windows DPAPI, libsecret on Linux). Nothing to configure — it just works.
+Debrief stores cloud provider API keys encrypted via your OS keychain (macOS Keychain, Windows DPAPI, libsecret on Linux). Nothing to configure — it just works.
 
-On Linux without a running keyring service, DeepDebrief falls back to plain text and logs a warning. If you're on a shared machine, install a keyring service or use Ollama.
+On Linux without a running keyring service, Debrief falls back to plain text and logs a warning. If you're on a shared machine, install a keyring service or use Ollama.
 
 ## Moving the database
 
@@ -124,7 +124,7 @@ On Linux without a running keyring service, DeepDebrief falls back to plain text
 Useful for:
 
 - Freeing up space on your main disk
-- Syncing across machines via Dropbox/iCloud (close DeepDebrief before syncing to avoid conflicts)
+- Syncing across machines via Dropbox/iCloud (close Debrief before syncing to avoid conflicts)
 - Keeping work and personal libraries separate
 
 ## Where to go from here

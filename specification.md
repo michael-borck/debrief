@@ -1,8 +1,8 @@
-# DeepDebrief Electron App Specification
+# Debrief Electron App Specification
 
 ## 🎯 **Application Overview**
 
-DeepDebrief is a professional desktop application for AI-powered conversation
+Debrief is a professional desktop application for AI-powered conversation
 analysis, insight discovery, and interaction. Built with React + Electron, it
 provides a native desktop experience with local data storage and external AI
 service integration. This comprehensive specification gives you everything
@@ -99,7 +99,7 @@ locallisten/
 ### **Application Shell:**
 ```
 ┌─────────────────────────────────────────────────────┐
-│ [🎤] DeepDebrief                                 [_][□][×] │
+│ [🎤] Debrief                                 [_][□][×] │
 ├─────────────────────────────────────────────────────┤
 │ 🏠 Home    📋 Library    ⚙️ Settings    ℹ️ About      │
 ├─────────────────────────────────────────────────────┤
@@ -308,7 +308,7 @@ Configuration management with sane defaults and clear explanations for all optio
 │ 📁 STORAGE & DATA                                  │
 │ ┌─────────────────────────────────────────────────┐ │
 │ │ Database Location:                              │ │
-│ │ /Users/john/Documents/DeepDebrief/                 │ │
+│ │ /Users/john/Documents/Debrief/                 │ │
 │ │ [Change Location] [Open Folder] [Backup Now]   │ │
 │ │                                                 │ │
 │ │ Auto-backup: [✓] Every 7 days                  │ │
@@ -354,7 +354,7 @@ const servicesSettings = {
 ```javascript
 const storageSettings = {
   database: {
-    location: "~/Documents/DeepDebrief/",
+    location: "~/Documents/Debrief/",
     autoBackup: true,
     backupFrequency: "weekly", // daily, weekly, monthly
     backupRetention: 5 // number of backups to keep

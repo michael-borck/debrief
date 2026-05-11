@@ -90,8 +90,8 @@ export const DOCS: DocCategory[] = [
     icon: Rocket,
     pages: [
       { slug: 'quick-start', title: 'Quick Start', summary: 'Get a transcript in five minutes', content: gsQuickStart },
-      { slug: 'installation', title: 'Installation', summary: 'Install DeepDebrief on macOS, Windows, or Linux', content: gsInstallation },
-      { slug: 'first-use', title: 'First Use', summary: 'Configure DeepDebrief for the first time', content: gsFirstUse },
+      { slug: 'installation', title: 'Installation', summary: 'Install Debrief on macOS, Windows, or Linux', content: gsInstallation },
+      { slug: 'first-use', title: 'First Use', summary: 'Configure Debrief for the first time', content: gsFirstUse },
     ],
   },
   {
@@ -99,7 +99,7 @@ export const DOCS: DocCategory[] = [
     title: 'User Guide',
     icon: BookOpen,
     pages: [
-      { slug: 'interface-overview', title: 'Interface Overview', summary: 'Tour of the DeepDebrief window', content: ugInterface },
+      { slug: 'interface-overview', title: 'Interface Overview', summary: 'Tour of the Debrief window', content: ugInterface },
       { slug: 'uploading-files', title: 'Uploading Files', summary: 'How to add audio and video', content: ugUploading },
       { slug: 'managing-transcripts', title: 'Managing Transcripts', summary: 'Library, archive, trash, bulk operations', content: ugManaging },
       { slug: 'projects', title: 'Projects', summary: 'Group transcripts for cross-recording analysis', content: ugProjects },
@@ -111,7 +111,7 @@ export const DOCS: DocCategory[] = [
     title: 'Features',
     icon: Sparkles,
     pages: [
-      { slug: 'transcription', title: 'Transcription & Diarisation', summary: 'How DeepDebrief turns audio into labelled text', content: featTranscription },
+      { slug: 'transcription', title: 'Transcription & Diarisation', summary: 'How Debrief turns audio into labelled text', content: featTranscription },
       { slug: 'analysis', title: 'Analysis', summary: 'Sentiment, emotions, themes, conversation quality', content: featAnalysis },
       { slug: 'ai-chat', title: 'AI Chat', summary: 'Talk to your transcripts and projects', content: featAiChat },
       { slug: 'search', title: 'Search', summary: 'Find anything across transcripts', content: featSearch },

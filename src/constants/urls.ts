@@ -1,5 +1,5 @@
 /**
- * Canonical external URLs for DeepDebrief.
+ * Canonical external URLs for Debrief.
  *
  * Centralised so that any future repo move is a one-line change. Renderer
  * code should import from here rather than hard-coding URLs.
@@ -11,7 +11,7 @@
 
 export const URLS = {
   /** Source repository on GitHub */
-  REPO: 'https://github.com/michael-borck/deep-debrief',
+  REPO: 'https://github.com/michael-borck/debrief',
   /** Issue tracker */
-  ISSUES: 'https://github.com/michael-borck/deep-debrief/issues',
+  ISSUES: 'https://github.com/michael-borck/debrief/issues',
 } as const;

@@ -2,7 +2,7 @@
 
 ## Overview
 
-DeepDebrief implements a sophisticated **Retrieval-Augmented Generation (RAG) system** for semantic search and AI-powered chat functionality. The system is designed as a privacy-first, locally-running solution using embedded vector databases and local language models, providing complete user data control without external API dependencies.
+Debrief implements a sophisticated **Retrieval-Augmented Generation (RAG) system** for semantic search and AI-powered chat functionality. The system is designed as a privacy-first, locally-running solution using embedded vector databases and local language models, providing complete user data control without external API dependencies.
 
 ## System Architecture
 

@@ -54,7 +54,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onAbou
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
               </svg>
             </div>
-            {!isCollapsed && <span className="ml-3 text-xl font-display font-bold text-primary-100 tracking-tight">DeepDebrief</span>}
+            {!isCollapsed && <span className="ml-3 text-xl font-display font-bold text-primary-100 tracking-tight">Debrief</span>}
           </div>
           <button
             onClick={() => onToggleCollapse(!isCollapsed)}
@@ -156,14 +156,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isCollapsed, onToggleCollapse, onAbou
               className="text-[#a09585] hover:text-primary-100 transition-colors flex items-center space-x-1.5"
             >
               <Info size={13} />
-              <span>DeepDebrief v{APP_VERSION}</span>
+              <span>Debrief v{APP_VERSION}</span>
             </button>
             <p className="text-[#6b6358] mt-1">&copy; {new Date().getFullYear()}</p>
           </div>
         ) : (
           <button
             onClick={onAboutClick}
-            title="About DeepDebrief"
+            title="About Debrief"
             className="p-2 hover:bg-white/10 rounded-lg transition-colors mx-auto block"
           >
             <Info size={15} className="text-[#a09585] hover:text-primary-100" />

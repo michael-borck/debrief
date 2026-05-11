@@ -1,6 +1,6 @@
 # Search
 
-DeepDebrief has three ways to find things: the Library search box for a single transcript list, the Search & Filter page for global search, and the Cross-transcript Search tab inside a project.
+Debrief has three ways to find things: the Library search box for a single transcript list, the Search & Filter page for global search, and the Cross-transcript Search tab inside a project.
 
 ## Library search
 
@@ -55,14 +55,14 @@ Results have a slightly different layout — they're grouped by transcript so yo
 
 ## Under the hood: the vector store
 
-Semantic and Hybrid modes depend on DeepDebrief's local vector store. Here's how it works:
+Semantic and Hybrid modes depend on Debrief's local vector store. Here's how it works:
 
-1. When you first chat with a transcript (or run **Reset Search Index** in Settings), DeepDebrief chunks the transcript into speaker-based or time-based pieces
+1. When you first chat with a transcript (or run **Reset Search Index** in Settings), Debrief chunks the transcript into speaker-based or time-based pieces
 2. Each chunk is embedded using a local embedding model (no network calls)
 3. Embeddings go into a local vector database alongside your SQLite store
 4. At query time, your search is embedded the same way and matched by cosine similarity
 
-No data leaves your machine during semantic search — the embedding model is bundled with DeepDebrief and runs in the main process.
+No data leaves your machine during semantic search — the embedding model is bundled with Debrief and runs in the main process.
 
 ### Managing the index
 

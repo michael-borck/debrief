@@ -77,8 +77,8 @@ jobs:
         run: |
           TAG="${GITHUB_REF#refs/tags/}"
           gh release create "$TAG" \
-            --title "DeepDebrief $TAG" \
-            --notes "DeepDebrief $TAG — macOS arm64 build. See CHANGELOG for details." \
+            --title "Debrief $TAG" \
+            --notes "Debrief $TAG — macOS arm64 build. See CHANGELOG for details." \
             --draft || true
           find release-artifacts -type f \( -name "*.dmg" -o -name "*.zip" -o -name "latest-mac.yml" \) \
             -exec gh release upload "$TAG" {} --clobber \;

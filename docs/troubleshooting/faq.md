@@ -4,7 +4,7 @@ Quick answers to the questions people ask most. For longer explanations, see [Co
 
 ## Privacy and data
 
-### Does DeepDebrief send my recordings to the cloud?
+### Does Debrief send my recordings to the cloud?
 
 **Transcription and speaker detection: no, never.** Both run locally via Whisper, pyannote, and wespeaker. No network calls after the initial model download.
 
@@ -14,19 +14,19 @@ Quick answers to the questions people ask most. For longer explanations, see [Co
 
 Locally, in SQLite. Default locations:
 
-- **macOS**: `~/Library/Application Support/deep-debrief/deepdebrief.db`
-- **Windows**: `%APPDATA%\deep-debrief\deepdebrief.db`
-- **Linux**: `~/.config/deep-debrief/deepdebrief.db`
+- **macOS**: `~/Library/Application Support/debrief/debrief.db`
+- **Windows**: `%APPDATA%\debrief\debrief.db`
+- **Linux**: `~/.config/debrief/debrief.db`
 
 You can move it to any folder you like in **Settings → General → Storage & Backup**.
 
 ### Are API keys safe?
 
-Yes. DeepDebrief encrypts API keys using your OS keychain (macOS Keychain, Windows DPAPI, libsecret on Linux). The keys never leave your machine except when being sent to the provider you configured them for.
+Yes. Debrief encrypts API keys using your OS keychain (macOS Keychain, Windows DPAPI, libsecret on Linux). The keys never leave your machine except when being sent to the provider you configured them for.
 
-On Linux without a keyring service, DeepDebrief falls back to plain text and logs a warning.
+On Linux without a keyring service, Debrief falls back to plain text and logs a warning.
 
-### Can I use DeepDebrief offline?
+### Can I use Debrief offline?
 
 Yes, after the first model download. Transcription, diarisation, transcript editing, library management, and Ollama-based AI all work offline.
 
@@ -38,14 +38,14 @@ You need a connection only for:
 
 ## Features
 
-### What file formats does DeepDebrief support?
+### What file formats does Debrief support?
 
 Anything ffmpeg can decode, including:
 
 - **Audio**: MP3, WAV, M4A, AAC, OGG, FLAC, OPUS, WMA
 - **Video**: MP4, MOV, MKV, WebM, AVI, FLV
 
-DeepDebrief extracts the audio track from video files automatically.
+Debrief extracts the audio track from video files automatically.
 
 ### How accurate is transcription?
 
@@ -97,9 +97,9 @@ Most likely because you're on Intel x86 or older Linux hardware. Apple Silicon i
 - Turn off speaker detection for single-speaker recordings
 - Use a cloud AI provider instead of local Ollama
 
-### How much RAM does DeepDebrief use?
+### How much RAM does Debrief use?
 
-Idle: ~200 MB. During transcription with tiny.en: ~400-500 MB. Small.en + diarisation: up to ~1 GB transient. The models stay loaded between runs for speed, so expect DeepDebrief to sit at a few hundred MB of resident memory after warming up.
+Idle: ~200 MB. During transcription with tiny.en: ~400-500 MB. Small.en + diarisation: up to ~1 GB transient. The models stay loaded between runs for speed, so expect Debrief to sit at a few hundred MB of resident memory after warming up.
 
 ### How much disk does it use?
 
@@ -120,15 +120,15 @@ Idle: ~200 MB. During transcription with tiny.en: ~400-500 MB. Small.en + diaris
 
 No. Ollama is fully supported and works for all features. Cloud providers are an upgrade for quality, not a requirement.
 
-### Does DeepDebrief charge me anything?
+### Does Debrief charge me anything?
 
-No. DeepDebrief is free and open source. If you use a cloud AI provider, that provider charges you — DeepDebrief doesn't take a cut. Monitor your spend in **Settings → Processing → Session token usage**.
+No. Debrief is free and open source. If you use a cloud AI provider, that provider charges you — Debrief doesn't take a cut. Monitor your spend in **Settings → Processing → Session token usage**.
 
 ## Installation and updates
 
-### How do I update DeepDebrief?
+### How do I update Debrief?
 
-Download the latest release from [GitHub Releases](https://github.com/michael-borck/deep-debrief/releases) and install over the existing version. Your data stays put — DeepDebrief reads it from the user data folder on next launch.
+Download the latest release from [GitHub Releases](https://github.com/michael-borck/debrief/releases) and install over the existing version. Your data stays put — Debrief reads it from the user data folder on next launch.
 
 Automatic updates are on the roadmap.
 
@@ -138,10 +138,10 @@ Not really — they'd share the same user data folder. If you need to test a new
 
 ### What about Linux without a keyring?
 
-DeepDebrief runs fine. API keys fall back to plain-text storage with a warning. If you're on a shared machine, install GNOME Keyring or KWallet first, or use Ollama to avoid storing any keys at all.
+Debrief runs fine. API keys fall back to plain-text storage with a warning. If you're on a shared machine, install GNOME Keyring or KWallet first, or use Ollama to avoid storing any keys at all.
 
 ## Getting help
 
 - [Common Issues](common-issues.md) — longer troubleshooting
-- [GitHub Issues](https://github.com/michael-borck/deep-debrief/issues) — bug reports
-- [GitHub Discussions](https://github.com/michael-borck/deep-debrief/discussions) — questions and community
+- [GitHub Issues](https://github.com/michael-borck/debrief/issues) — bug reports
+- [GitHub Discussions](https://github.com/michael-borck/debrief/discussions) — questions and community

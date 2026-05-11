@@ -9,13 +9,13 @@ interface LicensesModalProps {
 export const LicensesModal: React.FC<LicensesModalProps> = ({ isOpen, onClose }) => {
   const licenses = [
     {
-      name: 'DeepDebrief',
+      name: 'Debrief',
       version: '1.0.0',
       license: 'MIT',
       description: 'AI-Powered Transcription & Analysis Application',
       licenseText: `MIT License
 
-Copyright (c) 2024 DeepDebrief Project
+Copyright (c) 2024 Debrief Project
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -123,7 +123,7 @@ SOFTWARE.`
             </button>
           </div>
           <p className="text-surface-600 mt-2">
-            DeepDebrief is built with open source software. Here are the licenses for the components we use:
+            Debrief is built with open source software. Here are the licenses for the components we use:
           </p>
         </div>
 
@@ -198,7 +198,7 @@ SOFTWARE.`
                 respective licenses and are properly attributed.
               </p>
               <p>
-                • <strong>Source Code:</strong> DeepDebrief source code is available under MIT license on GitHub.
+                • <strong>Source Code:</strong> Debrief source code is available under MIT license on GitHub.
               </p>
             </div>
           </div>

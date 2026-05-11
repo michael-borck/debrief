@@ -40,7 +40,7 @@ export const HomePage: React.FC = () => {
       <div className="flex items-center justify-between mb-10 animate-fade-in">
         <div>
           <h1 className="text-3xl font-display text-surface-900 tracking-tight">
-            Welcome to DeepDebrief
+            Welcome to Debrief
           </h1>
           <p className="text-surface-500 mt-1 text-sm">Your recent activity and quick access</p>
         </div>

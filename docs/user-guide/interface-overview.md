@@ -1,6 +1,6 @@
 # Interface Overview
 
-A tour of DeepDebrief's main UI elements so you know where everything lives.
+A tour of Debrief's main UI elements so you know where everything lives.
 
 ## Window layout
 
@@ -114,7 +114,7 @@ Five tabs:
 - **Transcription** — Whisper model picker
 - **Processing** — AI provider, speaker detection, transcript correction, diarisation tuning, session token usage
 - **Chat** — conversation mode (Quote Lookup / Smart Search / Full Transcript), chunking, memory
-- **AI Prompts** — customise the prompts DeepDebrief sends to the AI for each task
+- **AI Prompts** — customise the prompts Debrief sends to the AI for each task
 - **General** — storage, backups, appearance, search index
 
 Every control saves immediately. There's no Save button.

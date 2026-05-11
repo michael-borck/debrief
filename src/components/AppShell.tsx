@@ -7,7 +7,7 @@ import { LicensesModal } from './LicensesModal';
 import { ToastContainer } from './ToastContainer';
 import { WelcomeModal } from './WelcomeModal';
 
-const WELCOME_SEEN_KEY = 'deepdebrief:welcomeSeenV1';
+const WELCOME_SEEN_KEY = 'debrief:welcomeSeenV1';
 
 interface AppShellProps {
   children: React.ReactNode;

@@ -209,9 +209,9 @@ export async function buildDocx(payload: ExportPayload): Promise<Blob> {
   }
 
   const doc = new Document({
-    creator: 'DeepDebrief',
+    creator: 'Debrief',
     title: transcript.title,
-    description: 'DeepDebrief transcript export',
+    description: 'Debrief transcript export',
     sections: [{ properties: {}, children }],
   });
 
