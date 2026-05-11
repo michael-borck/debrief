@@ -269,14 +269,34 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
               
               {selectedFiles.length > 0 && (
                 <div className="mt-4">
-                  <h4 className="text-sm font-medium text-surface-700 mb-2">Selected Files:</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-surface-700">
+                      Selected Files ({selectedFiles.length})
+                    </h4>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedFiles([])}
+                      className="text-xs text-surface-500 hover:text-surface-700 transition-colors"
+                    >
+                      Clear all
+                    </button>
+                  </div>
                   <ul className="text-sm text-surface-600 space-y-1">
                     {selectedFiles.map((filePath, index) => {
                       const fileName = filePath.split('/').pop() || filePath;
                       return (
-                        <li key={index} className="flex items-center space-x-2">
-                          <span>📄</span>
-                          <span>{fileName}</span>
+                        <li key={`${filePath}-${index}`} className="flex items-center gap-2">
+                          <span aria-hidden="true">📄</span>
+                          <span className="flex-1 min-w-0 truncate" title={fileName}>{fileName}</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedFiles((prev) => prev.filter((_, i) => i !== index))}
+                            className="text-surface-400 hover:text-error transition-colors flex-shrink-0 p-1"
+                            title="Remove from selection"
+                            aria-label={`Remove ${fileName} from selection`}
+                          >
+                            <X size={14} />
+                          </button>
                         </li>
                       );
                     })}

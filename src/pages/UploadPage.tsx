@@ -1,5 +1,5 @@
 import React, { useState, useContext } from 'react';
-import { Upload, FolderPlus, FileAudio, Play } from 'lucide-react';
+import { Upload, FolderPlus, FileAudio, Play, X } from 'lucide-react';
 import { ProcessingQueue } from '../components/ProcessingQueue';
 import { ServiceContext } from '../contexts/ServiceContext';
 import { TranscriptContext } from '../contexts/TranscriptContext';
@@ -352,9 +352,21 @@ export const UploadPage: React.FC = () => {
                     {selectedFiles.map((filePath, index) => {
                       const fileName = filePath.split('/').pop() || filePath;
                       return (
-                        <li key={index} className="flex items-center gap-2.5 text-sm">
+                        <li key={`${filePath}-${index}`} className="flex items-center gap-2.5 text-sm">
                           <FileAudio size={15} className="text-primary-400 flex-shrink-0" />
-                          <span className="text-surface-800 font-medium truncate">{fileName}</span>
+                          <span className="text-surface-800 font-medium truncate flex-1 min-w-0" title={fileName}>{fileName}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+                            }}
+                            className="text-surface-400 hover:text-error transition-colors flex-shrink-0 p-1"
+                            title="Remove from selection"
+                            aria-label={`Remove ${fileName} from selection`}
+                          >
+                            <X size={14} />
+                          </button>
                         </li>
                       );
                     })}
