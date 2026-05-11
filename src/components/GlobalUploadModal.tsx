@@ -6,6 +6,7 @@ import { TranscriptContext } from '../contexts/TranscriptContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { generateId } from '../utils/helpers';
 import { fileProcessor } from '../services/fileProcessor';
+import { useSidecarStatus } from '../hooks/useSidecarStatus';
 
 interface GlobalUploadModalProps {
   isOpen: boolean;
@@ -16,6 +17,10 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  // Faster poll while the modal is open so the button enables promptly when
+  // sidecar setup finishes.
+  const sidecarStatus = useSidecarStatus(1500);
+  const sidecarReady = sidecarStatus?.state === 'ready';
   const { processingQueue, addToProcessingQueue, updateProcessingItem } = useContext(ServiceContext);
   const { loadTranscripts } = useContext(TranscriptContext);
   const { projects, createProject, addTranscriptToProject } = useProjects();
@@ -373,13 +378,27 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
           >
             Cancel
           </button>
-          <button
-            onClick={handleUpload}
-            disabled={selectedFiles.length === 0}
-            className="btn-primary px-6 py-2"
-          >
-            Upload & Process
-          </button>
+          <div className="flex flex-col items-end gap-1">
+            {!sidecarReady && (
+              <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">
+                Speech analysis engine not ready
+                {sidecarStatus?.state === 'setting_up' && ' — setup running'}
+                {sidecarStatus?.state === 'starting' && ' — starting'}
+                {sidecarStatus?.state === 'failed' && ' — retry via the status pill'}
+                {sidecarStatus?.state === 'stopped' && ' — sidecar stopped'}
+              </p>
+            )}
+            <button
+              onClick={handleUpload}
+              disabled={selectedFiles.length === 0 || !sidecarReady}
+              title={!sidecarReady
+                ? `Speech analysis engine not ready (state: ${sidecarStatus?.state ?? 'unknown'})`
+                : undefined}
+              className="btn-primary px-6 py-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Upload & Process
+            </button>
+          </div>
         </div>
       </div>
     </div>

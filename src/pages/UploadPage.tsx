@@ -7,8 +7,13 @@ import { useProjects } from '../contexts/ProjectContext';
 import { useToast } from '../contexts/ToastContext';
 import { generateId } from '../utils/helpers';
 import { fileProcessor } from '../services/fileProcessor';
+import { useSidecarStatus } from '../hooks/useSidecarStatus';
 
 export const UploadPage: React.FC = () => {
+  // Poll faster while a user is staring at this page so the button enables
+  // promptly the moment sidecar setup finishes.
+  const sidecarStatus = useSidecarStatus(1500);
+  const sidecarReady = sidecarStatus?.state === 'ready';
   const { processingQueue, addToProcessingQueue, updateProcessingItem } = useContext(ServiceContext);
   const { loadTranscripts } = useContext(TranscriptContext);
   const { projects, createProject, addTranscriptToProject } = useProjects();
@@ -454,12 +459,24 @@ export const UploadPage: React.FC = () => {
               </p>
               <button
                 onClick={handleUpload}
-                disabled={selectedFiles.length === 0}
+                disabled={selectedFiles.length === 0 || !sidecarReady}
+                title={!sidecarReady
+                  ? `Speech analysis engine not ready (state: ${sidecarStatus?.state ?? 'unknown'}). Watch the pill in the bottom-right corner.`
+                  : undefined}
                 className="w-full px-4 py-2.5 bg-accent-600 text-white text-sm font-medium rounded-lg hover:bg-accent-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-card hover:shadow-md flex items-center justify-center gap-2"
               >
                 <Play size={15} />
                 Upload &amp; Process
               </button>
+              {!sidecarReady && (
+                <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-3 text-center font-medium">
+                  Speech analysis engine not ready yet
+                  {sidecarStatus?.state === 'setting_up' && ' — first-launch setup is still running'}
+                  {sidecarStatus?.state === 'starting' && ' — sidecar is starting up'}
+                  {sidecarStatus?.state === 'failed' && ' — click the status pill (bottom-right) to retry'}
+                  {sidecarStatus?.state === 'stopped' && ' — sidecar is stopped'}
+                </p>
+              )}
               {selectedProject && (
                 <p className="text-[11px] text-surface-500 mt-3 text-center">
                   Will be added to the selected project

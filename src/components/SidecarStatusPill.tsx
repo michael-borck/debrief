@@ -1,41 +1,15 @@
-import React, { useEffect, useState } from 'react';
-import { CheckCircle2, Loader2, XCircle, AlertTriangle, Circle, RefreshCw } from 'lucide-react';
-
-type State = 'stopped' | 'setting_up' | 'starting' | 'ready' | 'failed';
-
-interface Status {
-  state: State;
-  port: number | null;
-  lastError: string | null;
-  setupSteps: string[];
-}
-
-const POLL_MS = 5000;
+import React, { useState } from 'react';
+import { CheckCircle2, Loader2, XCircle, Circle, RefreshCw } from 'lucide-react';
+import { useSidecarStatus } from '../hooks/useSidecarStatus';
 
 export const SidecarStatusPill: React.FC = () => {
-  const [status, setStatus] = useState<Status | null>(null);
+  const status = useSidecarStatus();
   const [retrying, setRetrying] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const tick = async () => {
-      try {
-        const s = await window.electronAPI.sidecar.status();
-        if (!cancelled) setStatus(s);
-      } catch {
-        // electronAPI unavailable (e.g. test env) — keep status null
-      }
-    };
-    tick();
-    const id = setInterval(tick, POLL_MS);
-    return () => { cancelled = true; clearInterval(id); };
-  }, []);
 
   const handleRetry = async () => {
     setRetrying(true);
     try {
-      const s = await window.electronAPI.sidecar.restart();
-      setStatus(s);
+      await window.electronAPI.sidecar.restart();
     } finally {
       setRetrying(false);
     }
