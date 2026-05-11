@@ -1477,30 +1477,28 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
       } catch (_) { /* ignore */ }
     };
 
+    // Probe duration once, used for both the short-file diarisation skip and
+    // the heartbeat-progress ETA below.
+    const probedDuration = await getAudioDurationSec(audioPath);
+
     // pyannote's 10s analysis window means files shorter than that fail
     // diarisation outright with a cryptic 'requested chunk … resulted in N
     // samples instead of …' error. Skip diarisation for short clips and
     // tell the renderer so the UI can surface a friendly notice.
-    if (wantSpeakers) {
-      const duration = await getAudioDurationSec(audioPath);
-      if (duration !== null && duration < 10) {
-        console.warn(`[local-transcription] audio is ${duration.toFixed(1)}s, shorter than pyannote's 10s minimum; running without diarisation`);
-        wantSpeakers = false;
-        sendProgress({
-          stage: 'transcribing',
-          percent: null,
-          note: `Audio is ${duration.toFixed(1)}s long — too short for speaker detection. Transcribing without speakers.`,
-        });
-      }
+    if (wantSpeakers && probedDuration !== null && probedDuration < 10) {
+      console.warn(`[local-transcription] audio is ${probedDuration.toFixed(1)}s, shorter than pyannote's 10s minimum; running without diarisation`);
+      wantSpeakers = false;
+      sendProgress({
+        stage: 'transcribing',
+        percent: null,
+        note: `Audio is ${probedDuration.toFixed(1)}s long — too short for speaker detection. Transcribing without speakers.`,
+      });
     }
 
     console.log('[local-transcription] starting:', audioPath, 'with', sidecarModel, '| diarisation:', wantSpeakers);
     const totalStart = Date.now();
 
-    // Coarse-grained stage progress only — speech-analyser's /analyse is a
-    // single round-trip and doesn't surface per-chunk progress. SSE-based
-    // streaming would need an upstream feature.
-    sendProgress({ stage: 'transcribing', percent: null });
+    sendProgress({ stage: 'transcribing', percent: 25 });
 
     // Transcode to canonical 16kHz mono WAV. Sidesteps pyannote's MP3
     // frame-alignment bug ('resulted in 439895 samples instead of 441000')
@@ -1515,6 +1513,24 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
       console.warn('[local-transcription] transcode failed; falling back to original file:', transcodeErr.message);
     }
 
+    // /analyse returns all-or-nothing — no per-chunk progress over IPC. To
+    // stop the progress bar looking frozen, emit a synthetic percent that
+    // creeps from 25% to ~72% over the estimated processing wall clock
+    // (audio duration x 1.5 on Apple Silicon CPU). When /analyse returns,
+    // FileProcessor jumps to 75%. The user sees motion the whole time even
+    // though the underlying sidecar work is opaque.
+    const estimatedSec = Math.max(((probedDuration ?? 60) * 1.5), 10);
+    const heartbeat = setInterval(() => {
+      const elapsedMs = Date.now() - totalStart;
+      const fraction = Math.min(elapsedMs / (estimatedSec * 1000), 0.95);
+      const percent = Math.floor(25 + fraction * 47); // ramp 25 -> 72
+      sendProgress({
+        stage: 'transcribing',
+        percent,
+        elapsedSec: Math.floor(elapsedMs / 1000),
+      });
+    }, 1500);
+
     let result;
     try {
       result = await sidecarClient.analyse({
@@ -1523,6 +1539,7 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
         model: sidecarModel,
       });
     } finally {
+      clearInterval(heartbeat);
       if (tempWavPath) {
         try { fs.unlinkSync(tempWavPath); } catch (_) { /* best-effort */ }
       }
