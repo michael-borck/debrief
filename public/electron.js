@@ -1541,7 +1541,11 @@ ipcMain.handle('local-transcription-rediarise', async (event, { audioPath, overr
     if (!fs.existsSync(audioPath)) {
       throw new Error(`Audio file not found: ${audioPath}`);
     }
-    console.log('[local-transcription] rediarise:', audioPath, 'overrides:', overrides);
+    // overrides (cluster_threshold etc.) are no longer honoured — the
+    // sidecar uses pyannote's own clustering hyperparameters. The renderer
+    // still ships the slider; rerunning with any value just re-runs with
+    // pyannote defaults. Repurpose to num_speakers in a follow-up.
+    console.log('[local-transcription] rediarise via sidecar:', audioPath, '(overrides ignored)');
 
     const sendProgress = (data) => {
       try {
@@ -1551,20 +1555,23 @@ ipcMain.handle('local-transcription-rediarise', async (event, { audioPath, overr
       } catch (_) { /* ignore */ }
     };
 
-    const audio = await decodeAudioToFloat32(audioPath);
-    if (audio.length === 0) {
-      throw new Error('Audio decoded to an empty buffer');
-    }
+    sendProgress({ stage: 'diarising', percent: null });
 
-    diarise.loadDiarisationSettings(overrides || {});
     const t0 = Date.now();
-    const speakerTurns = await diarise.diariseAudio(audio, sendProgress);
+    const result = await sidecarClient.analyse({
+      audioPath,
+      diarize: true,
+      // model choice doesn't matter for diarisation, but /analyse requires
+      // a valid one — base is the smallest non-en-only option.
+      model: 'base',
+    });
+    const speakerTurns = sidecarClient.segmentsToSpeakerTurns(result.segments);
     console.log(`[local-transcription] rediarise: ${speakerTurns.length} turns in ${Date.now() - t0} ms`);
 
     return {
       success: true,
       speakerTurns,
-      audioDurationSeconds: audio.length / 16000,
+      audioDurationSeconds: result.duration || 0,
     };
   } catch (error) {
     console.error('[local-transcription] rediarise error:', error);
