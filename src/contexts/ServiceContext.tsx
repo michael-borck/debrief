@@ -38,11 +38,36 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({ children }) =>
   // by ProcessingItem.id; cleared when the item is removed or finishes.
   const controllersRef = useRef<Map<string, AbortController>>(new Map());
 
+  // Map sidecar state to ServiceStatus.speechToText vocabulary.
+  const mapSidecar = (state?: string): ServiceStatus['speechToText'] => {
+    switch (state) {
+      case 'ready': return 'connected';
+      case 'setting_up': return 'setting_up';
+      case 'starting': return 'starting';
+      case 'failed': return 'error';
+      case 'stopped':
+      default: return 'disconnected';
+    }
+  };
+
   const testConnections = async () => {
     try {
-      // Speech-to-text + diarisation now run via the bundled sidecar
-      // (lens/speech-analyser). The SidecarStatusPill surfaces its
-      // readiness; treat it as available here.
+      // Speech-to-text runs via the bundled Python sidecar — read its real
+      // state rather than hard-coding 'connected'.
+      let sidecarState: ServiceStatus['speechToText'] = 'disconnected';
+      let sidecarDetail: string | undefined;
+      try {
+        const s = await window.electronAPI.sidecar.status();
+        sidecarState = mapSidecar(s.state);
+        if (s.state === 'setting_up' && s.setupSteps.length > 0) {
+          sidecarDetail = s.setupSteps[s.setupSteps.length - 1];
+        } else if (s.state === 'failed' && s.lastError) {
+          sidecarDetail = s.lastError;
+        }
+      } catch {
+        // electronAPI.sidecar unavailable (very early / test env)
+      }
+
       const aiUrl = await window.electronAPI.database.get(
         'SELECT value FROM settings WHERE key = ?',
         ['aiAnalysisUrl']
@@ -53,14 +78,15 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({ children }) =>
       );
 
       setServiceStatus({
-        speechToText: 'connected',
+        speechToText: sidecarState,
+        speechToTextDetail: sidecarDetail,
         aiAnalysis: aiResult.success ? 'connected' : 'error',
         lastChecked: new Date()
       });
     } catch (error) {
       console.error('Error testing connections:', error);
       setServiceStatus({
-        speechToText: 'connected',
+        speechToText: 'disconnected',
         aiAnalysis: 'error',
         lastChecked: new Date()
       });
@@ -109,11 +135,36 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({ children }) =>
     );
   };
 
-  // Test connections on mount and periodically
+  // Test connections on mount and periodically. AI analysis ping is the slow
+  // part (HTTP to user's LLM); we leave that at 30s. Sidecar status is a
+  // cheap IPC roundtrip and the user wants to see setup steps tick by, so
+  // we refresh just the sidecar state at 2s in a parallel loop.
   useEffect(() => {
     testConnections();
-    const interval = setInterval(testConnections, 30000); // Test every 30 seconds
-    return () => clearInterval(interval);
+    const aiInterval = setInterval(testConnections, 30000);
+    return () => clearInterval(aiInterval);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const refreshSidecar = async () => {
+      try {
+        const s = await window.electronAPI.sidecar.status();
+        if (cancelled) return;
+        setServiceStatus(prev => ({
+          ...prev,
+          speechToText: mapSidecar(s.state),
+          speechToTextDetail: s.state === 'setting_up' && s.setupSteps.length > 0
+            ? s.setupSteps[s.setupSteps.length - 1]
+            : s.state === 'failed' && s.lastError ? s.lastError : undefined,
+        }));
+      } catch {
+        // electronAPI unavailable
+      }
+    };
+    refreshSidecar();
+    const id = setInterval(refreshSidecar, 2000);
+    return () => { cancelled = true; clearInterval(id); };
   }, []);
 
   return (

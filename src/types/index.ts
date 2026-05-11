@@ -122,8 +122,13 @@ export interface ProcessingItem {
 }
 
 export interface ServiceStatus {
-  speechToText: 'connected' | 'disconnected' | 'error';
+  // 'setting_up' fires while the bundled Python sidecar runs first-launch
+  // venv install; 'starting' covers the boot phase after setup completes.
+  speechToText: 'connected' | 'disconnected' | 'error' | 'setting_up' | 'starting';
   aiAnalysis: 'connected' | 'disconnected' | 'error';
+  // When speechToText is 'setting_up', the latest STEP: line from setup-venv.py
+  // (e.g. 'Installing speech analysis libraries (largest step — PyTorch ~250 MB)').
+  speechToTextDetail?: string;
   lastChecked: Date;
 }
 

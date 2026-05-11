@@ -14,7 +14,6 @@ import { ChatHistoryPage } from './pages/ChatHistoryPage';
 import { UploadPage } from './pages/UploadPage';
 import DocsPage from './pages/DocsPage';
 import ShortcutsModal from './components/ShortcutsModal';
-import { SidecarStatusPill } from './components/SidecarStatusPill';
 import { FirstLaunchSetup } from './components/FirstLaunchSetup';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ServiceProvider } from './contexts/ServiceContext';
@@ -70,7 +69,6 @@ const App: React.FC = () => {
                 isOpen={showShortcuts}
                 onClose={() => setShowShortcuts(false)}
               />
-              <SidecarStatusPill />
               <FirstLaunchSetup />
             </Router>
             </ModalStackProvider>
