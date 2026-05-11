@@ -87,6 +87,27 @@ function migrateLegacyUserDataDir() {
   }
 }
 
+const os = require('os');
+
+// Transcode any input audio to a canonical 16 kHz mono WAV in the OS temp
+// dir. pyannote's torchcodec backend chokes on MP3 frame-boundary precision
+// (a 10s chunk decodes to ~439,895 samples instead of the expected 441,000),
+// so we normalise inputs before POSTing to /analyse. ffmpeg-static is the
+// same binary we use for media probing. Caller owns deletion of the temp
+// file.
+async function transcodeToWav16kMono(inputPath) {
+  const ffmpegPath = getFFmpegPath();
+  const tmp = path.join(os.tmpdir(), `debrief-${Date.now()}-${path.basename(inputPath, path.extname(inputPath))}.wav`);
+  const cmd = `"${ffmpegPath}" -y -i "${inputPath}" -vn -ar 16000 -ac 1 "${tmp}" 2>&1`;
+  try {
+    await execAsync(cmd);
+    return tmp;
+  } catch (err) {
+    try { fs.unlinkSync(tmp); } catch (_) { /* never created */ }
+    throw new Error(`ffmpeg transcode failed: ${err.stderr || err.message}`);
+  }
+}
+
 // Probe an audio file's duration in seconds via ffmpeg's stderr (no ffprobe
 // binding in our toolchain). Returns null if duration can't be parsed.
 async function getAudioDurationSec(audioPath) {
@@ -1481,11 +1502,31 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
     // streaming would need an upstream feature.
     sendProgress({ stage: 'transcribing', percent: null });
 
-    const result = await sidecarClient.analyse({
-      audioPath,
-      diarize: wantSpeakers,
-      model: sidecarModel,
-    });
+    // Transcode to canonical 16kHz mono WAV. Sidesteps pyannote's MP3
+    // frame-alignment bug ('resulted in 439895 samples instead of 441000')
+    // and normalises every input format before /analyse sees it.
+    let analyseInputPath = audioPath;
+    let tempWavPath = null;
+    try {
+      tempWavPath = await transcodeToWav16kMono(audioPath);
+      analyseInputPath = tempWavPath;
+      console.log(`[local-transcription] transcoded to ${tempWavPath}`);
+    } catch (transcodeErr) {
+      console.warn('[local-transcription] transcode failed; falling back to original file:', transcodeErr.message);
+    }
+
+    let result;
+    try {
+      result = await sidecarClient.analyse({
+        audioPath: analyseInputPath,
+        diarize: wantSpeakers,
+        model: sidecarModel,
+      });
+    } finally {
+      if (tempWavPath) {
+        try { fs.unlinkSync(tempWavPath); } catch (_) { /* best-effort */ }
+      }
+    }
 
     const audioSeconds = result.duration || 0;
     const totalMs = Date.now() - totalStart;
