@@ -11,11 +11,13 @@ const URLS = require('./electron-urls');
 const diarise = require('./electron/diarise');
 const { MainVectorStore } = require('./electron/vector-store');
 const { SidecarManager } = require('./electron/sidecar-manager');
+const sidecarClient = require('./electron/sidecar-client');
 
 // Wire diarise module to shared transformers loader and DB
 diarise.init({ getTransformers: () => getTransformers(), getDb: () => db });
 
 const sidecar = new SidecarManager();
+sidecarClient.init({ sidecar });
 
 // ============================================
 // Custom protocol for streaming local audio/video files
@@ -1475,13 +1477,16 @@ ipcMain.handle('local-transcription-load-model', async (event, { modelName }) =>
 ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, modelName, enableDiarisation }) => {
   try {
     const target = modelName || DEFAULT_WHISPER_MODEL;
+    // Renderer historically passed Xenova/whisper-<size>; speech-analyser
+    // wants the bare size (tiny, base, small, medium, large-v3, *.en).
+    const sidecarModel = String(target).replace(/^Xenova\/whisper-/i, '') || 'base';
     const wantSpeakers = enableDiarisation !== false; // default ON
 
     if (!fs.existsSync(audioPath)) {
       throw new Error(`Audio file not found: ${audioPath}`);
     }
 
-    console.log('[local-transcription] starting:', audioPath, 'with', target, '| diarisation:', wantSpeakers);
+    console.log('[local-transcription] starting:', audioPath, 'with', sidecarModel, '| diarisation:', wantSpeakers);
     const totalStart = Date.now();
 
     const sendProgress = (data) => {
@@ -1492,63 +1497,30 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
       } catch (_) { /* ignore */ }
     };
 
-    const transcriber = await getWhisperPipeline(target, sendProgress);
+    // Coarse-grained stage progress only — speech-analyser's /analyse is a
+    // single round-trip and doesn't surface per-chunk progress. SSE-based
+    // streaming would need an upstream feature.
+    sendProgress({ stage: 'transcribing', percent: null });
 
-    const decodeStart = Date.now();
-    const audio = await decodeAudioToFloat32(audioPath);
-    console.log(`[local-transcription] decoded ${audio.length} samples in ${Date.now() - decodeStart} ms`);
-
-    if (audio.length === 0) {
-      throw new Error('Audio decoded to an empty buffer — file may be corrupt or unsupported');
-    }
-
-    const inferenceStart = Date.now();
-    const result = await transcriber(audio, {
-      chunk_length_s: 30,
-      stride_length_s: 5,
-      return_timestamps: true,
-    });
-    const inferenceMs = Date.now() - inferenceStart;
-    const audioSeconds = audio.length / 16000;
-    const realtimeFactor = audioSeconds / (inferenceMs / 1000);
-    console.log(`[local-transcription] transcribed ${audioSeconds.toFixed(2)}s of audio in ${inferenceMs} ms (${realtimeFactor.toFixed(2)}x realtime)`);
-
-    // Map whisper segments to the ChunkTimingInfo shape that
-    // sentenceSegmentsService.createSegmentsFromChunks expects
-    let chunkTimings = (result.chunks || []).map((c, i) => {
-      const start = Array.isArray(c.timestamp) ? (c.timestamp[0] ?? 0) : 0;
-      const end = Array.isArray(c.timestamp) ? (c.timestamp[1] ?? start) : start;
-      return {
-        chunkIndex: i,
-        startTime: start,
-        endTime: end,
-        duration: Math.max(0, end - start),
-        text: (c.text || '').trim(),
-      };
+    const result = await sidecarClient.analyse({
+      audioPath,
+      diarize: wantSpeakers,
+      model: sidecarModel,
     });
 
-    // ----- Optional: speaker diarisation -----
-    let diarisationTurns = [];
-    if (wantSpeakers) {
-      try {
-        diarise.loadDiarisationSettings();
-        const diariseStart = Date.now();
-        diarisationTurns = await diarise.diariseAudio(audio, sendProgress);
-        console.log(`[local-transcription] diarisation: ${diarisationTurns.length} turns in ${Date.now() - diariseStart} ms`);
-        chunkTimings = diarise.alignSpeakersToChunks(chunkTimings, diarisationTurns);
-      } catch (diariseErr) {
-        // Diarisation failures should not block transcription
-        console.error('[local-transcription] diarisation failed (continuing without speakers):', diariseErr.message);
-      }
-    }
+    const audioSeconds = result.duration || 0;
+    const totalMs = Date.now() - totalStart;
+    const realtimeFactor = totalMs > 0 ? audioSeconds / (totalMs / 1000) : 0;
+    console.log(`[local-transcription] analysed ${audioSeconds.toFixed(2)}s of audio in ${totalMs} ms (${realtimeFactor.toFixed(2)}x realtime)`);
 
-    console.log(`[local-transcription] complete in ${Date.now() - totalStart} ms (${chunkTimings.length} chunks)`);
+    const chunkTimings = sidecarClient.segmentsToChunkTimings(result.segments);
+    const speakerTurns = sidecarClient.segmentsToSpeakerTurns(result.segments);
 
     return {
       success: true,
-      text: (result.text || '').trim(),
+      text: (result.transcript || '').trim(),
       chunkTimings,
-      speakerTurns: diarisationTurns,
+      speakerTurns,
     };
   } catch (error) {
     console.error('[local-transcription] error:', error);
