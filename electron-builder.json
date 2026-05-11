@@ -41,20 +41,23 @@
     "!**/{appveyor.yml,.travis.yml,circle.yml}",
     "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}"
   ],
+  "afterSign": "./scripts/notarize.js",
   "mac": {
     "category": "public.app-category.productivity",
     "icon": "public/assets/icon.png",
-    "hardenedRuntime": false,
+    "hardenedRuntime": true,
     "gatekeeperAssess": false,
-    "identity": null,
+    "entitlements": "build/entitlements.mac.plist",
+    "entitlementsInherit": "build/entitlements.mac.plist",
+    "notarize": false,
     "target": [
       {
         "target": "dmg",
-        "arch": ["x64", "arm64"]
+        "arch": ["arm64"]
       },
       {
         "target": "zip",
-        "arch": ["x64", "arm64"]
+        "arch": ["arm64"]
       }
     ]
   },

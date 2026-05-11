@@ -4,138 +4,82 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  build:
-    runs-on: ${{ matrix.os }}
-    
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
-        include:
-          - os: macos-latest
-            platform: mac
-          - os: ubuntu-latest
-            platform: linux
-          - os: windows-latest
-            platform: win
+  build-macos-arm64:
+    # macos-14 = Apple Silicon (arm64). bundle-python.sh currently only ships
+    # an arm64 python-build-standalone tarball; add x64/win/linux jobs once
+    # the script grows multi-arch support.
+    runs-on: macos-14
 
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install dependencies
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Node deps
         run: npm ci
 
-      - name: Build TypeScript and webpack
+      - name: Bundle relocatable Python + prefetch pyannote/whisper weights
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: npm run build:sidecar
+
+      - name: Build webpack bundle
         run: npm run build
 
-      - name: Build Electron app (Windows)
-        if: matrix.os == 'windows-latest'
-        run: npm run dist -- --win
+      - name: Build, sign and notarize the .app
         env:
+          # electron-builder picks up CSC_LINK + CSC_KEY_PASSWORD automatically.
+          CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
+          CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+          # Our scripts/notarize.js reads these. Renamed from APPLE_* on purpose
+          # so electron-builder doesn't run its own (buggy) notarize wrapper.
+          NOTARIZE_APPLE_ID: ${{ secrets.APPLE_ID }}
+          NOTARIZE_APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          NOTARIZE_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac --arm64 --publish=never
 
-      - name: Import macOS signing certificate
-        if: matrix.os == 'macos-latest'
-        env:
-          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
-          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-        run: |
-          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
-          security create-keychain -p actions build.keychain
-          security default-keychain -s build.keychain
-          security unlock-keychain -p actions build.keychain
-          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
-          rm certificate.p12
-
-      - name: Build Electron app (macOS)
-        if: matrix.os == 'macos-latest'
-        run: npm run dist -- --mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build Electron app (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: npm run dist -- --linux
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload artifacts
+      - name: Upload .dmg + .zip artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.platform }}-distributables
+          name: macos-arm64-distributables
           path: |
-            release/*.exe
             release/*.dmg
-            release/*.pkg
-            release/*.AppImage
-            release/*.deb
-            release/*.snap
-            release/*.yml
-            release/*.yaml
+            release/*.zip
+            release/latest-mac.yml
 
   release:
-    needs: build
+    needs: build-macos-arm64
+    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v4
         with:
           path: release-artifacts
 
-      - name: Create Release
+      - name: Create / update GitHub release
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "${{ github.ref_name }}" \
-            --title "DeepTalk ${{ github.ref_name }}" \
-            --notes "## DeepTalk Release ${{ github.ref_name }}
-            
-            ### Downloads
-            
-            #### Windows
-            - `DeepTalk-Setup-*.exe` - Windows installer
-            
-            #### macOS
-            - `DeepTalk-*.dmg` - macOS installer
-            - `DeepTalk-*.pkg` - Mac App Store package
-            
-            #### Linux
-            - `DeepTalk-*.AppImage` - Universal Linux app
-            - `DeepTalk-*.deb` - Debian/Ubuntu package
-            
-            ### Installation Instructions
-            
-            **Windows:** Download and run the .exe installer
-            
-            **macOS:** Download the .dmg file, open it, and drag DeepTalk to Applications
-            
-            **Linux:** 
-            - AppImage: Make executable with `chmod +x` and run
-            - DEB: Install with `sudo dpkg -i DeepTalk-*.deb`
-            
-            ### Requirements
-            - No FFmpeg installation required - it's bundled!
-            - Speaches service for transcription (optional)
-            - Ollama service for AI analysis (optional)"
-
-      - name: Upload Release Assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Upload all artifacts to the release
-          find release-artifacts -type f \( -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" \) -exec gh release upload "${{ github.ref_name }}" {} \;
+          TAG="${GITHUB_REF#refs/tags/}"
+          gh release create "$TAG" \
+            --title "DeepTalk $TAG" \
+            --notes "DeepTalk $TAG — macOS arm64 build. See CHANGELOG for details." \
+            --draft || true
+          find release-artifacts -type f \( -name "*.dmg" -o -name "*.zip" -o -name "latest-mac.yml" \) \
+            -exec gh release upload "$TAG" {} --clobber \;
+          gh release edit "$TAG" --draft=false --latest
