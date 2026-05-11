@@ -1513,24 +1513,10 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
       console.warn('[local-transcription] transcode failed; falling back to original file:', transcodeErr.message);
     }
 
-    // /analyse returns all-or-nothing — no per-chunk progress over IPC. To
-    // stop the progress bar looking frozen, emit a synthetic percent that
-    // creeps from 25% to ~72% over the estimated processing wall clock
-    // (audio duration x 1.5 on Apple Silicon CPU). When /analyse returns,
-    // FileProcessor jumps to 75%. The user sees motion the whole time even
-    // though the underlying sidecar work is opaque.
-    const estimatedSec = Math.max(((probedDuration ?? 60) * 1.5), 10);
-    const heartbeat = setInterval(() => {
-      const elapsedMs = Date.now() - totalStart;
-      const fraction = Math.min(elapsedMs / (estimatedSec * 1000), 0.95);
-      const percent = Math.floor(25 + fraction * 47); // ramp 25 -> 72
-      sendProgress({
-        stage: 'transcribing',
-        percent,
-        elapsedSec: Math.floor(elapsedMs / 1000),
-      });
-    }, 1500);
-
+    // /analyse is all-or-nothing — no per-chunk progress over IPC. Rather
+    // than fake a creeping percentage (feels worse than honest indeterminate),
+    // we just emit the stage once. ProcessingQueue renders an indeterminate
+    // animated bar + elapsed-time counter while in-progress.
     let result;
     try {
       result = await sidecarClient.analyse({
@@ -1539,7 +1525,6 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
         model: sidecarModel,
       });
     } finally {
-      clearInterval(heartbeat);
       if (tempWavPath) {
         try { fs.unlinkSync(tempWavPath); } catch (_) { /* best-effort */ }
       }
