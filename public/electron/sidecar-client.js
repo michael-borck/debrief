@@ -4,6 +4,18 @@
 
 const fs = require('fs');
 const path = require('path');
+const { Agent } = require('undici');
+
+// Long-running localhost dispatcher. Node's undici has a default 5-minute
+// headers timeout — a queued /analyse behind another in-flight request can
+// blow past that without ever seeing a response byte and surface as
+// HeadersTimeoutError. Sidecar is local and we trust it to either finish
+// or crash visibly, so we disable both timeouts here.
+const localhostAgent = new Agent({
+  headersTimeout: 0,
+  bodyTimeout: 0,
+  connectTimeout: 30_000,
+});
 
 let sidecar = null;
 
@@ -40,7 +52,11 @@ async function analyse({ audioPath, diarize = true, model = 'base' }) {
   form.append('diarize', diarize ? 'true' : 'false');
   if (model) form.append('model', model);
 
-  const res = await fetch(`${baseUrl()}/analyse`, { method: 'POST', body: form });
+  const res = await fetch(`${baseUrl()}/analyse`, {
+    method: 'POST',
+    body: form,
+    dispatcher: localhostAgent,
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
     throw new Error(`/analyse returned ${res.status}: ${body || res.statusText}`);
