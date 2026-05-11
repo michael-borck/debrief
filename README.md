@@ -16,8 +16,8 @@ AI-powered conversation analysis and insight discovery platform with local proce
 
 - **Audio/Video Support**: MP3, WAV, MP4, AVI, MOV, M4A, WebM, OGG, and more
 - **Privacy-First**: Transcription and speaker diarisation run entirely on your machine. AI analysis uses your choice of local Ollama or any of OpenAI / Anthropic / Groq / Gemini / OpenRouter / custom — your call.
-- **Local Whisper**: Built-in English transcription via `@huggingface/transformers`. No external server required.
-- **Local Speaker Diarisation**: pyannote-segmentation-3.0 + wespeaker for real audio-level "who said what". No LLM guessing from text.
+- **Local Whisper**: faster-whisper running inside a bundled Python sidecar. No external server required, no cloud upload.
+- **Local Speaker Diarisation**: pyannote.audio 3.1 in the same sidecar. Model weights bundled into the installer (MIT / CC-BY-4.0), no HuggingFace token needed at runtime.
 - **In-app Documentation**: Rendered with the app's theme, ships with the binary, no internet required.
 - **Cross-Platform**: macOS, Windows, Linux. FFmpeg bundled.
 

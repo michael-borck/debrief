@@ -1,5 +1,14 @@
 # Vector Store & Embedding System
 
+> ⚠️ **Stale — pending rewrite.** This document describes the pre-sidecar
+> architecture (pre-2026-05). The `@xenova/transformers` embedding pipeline
+> described below has been removed; the current main process uses a
+> `simpleTextEmbedding` placeholder for chat indexing. The transcription side
+> now runs through the bundled Python sidecar (`lens/speech-analyser`) — see
+> [Transcription & Diarisation](features/transcription.md) for the current
+> pipeline. This page will be rewritten once the embedding layer is restored
+> to a real model-based path.
+
 ## Overview
 
 Debrief implements a sophisticated **Retrieval-Augmented Generation (RAG) system** for semantic search and AI-powered chat functionality. The system is designed as a privacy-first, locally-running solution using embedded vector databases and local language models, providing complete user data control without external API dependencies.

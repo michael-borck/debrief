@@ -30,31 +30,32 @@ On Apple Silicon you can comfortably run the Small.en model and diarisation toge
 | Use case | Minimum | Recommended |
 |---|---|---|
 | **Idle Debrief** | 500 MB | — |
-| **Tiny.en transcription** | 1 GB free | 2 GB free |
-| **Base.en transcription** | 1.5 GB free | 2 GB free |
-| **Small.en transcription** | 2 GB free | 3 GB free |
-| **Diarisation added** | +500 MB | +500 MB |
-| **Ollama model running alongside** | 4-8 GB free for the model itself | 8 GB+ |
+| **Sidecar idle** | +200 MB | — |
+| **Tiny.en transcription** | 1.5 GB free | 2.5 GB free |
+| **Base transcription** *(default)* | 2 GB free | 3 GB free |
+| **Small transcription** | 2.5 GB free | 3.5 GB free |
+| **Diarisation added** | +1 GB | +1 GB |
+| **Ollama model running alongside** | 4–8 GB free for the model itself | 8 GB+ |
 
-If you're running local Ollama in parallel, that model needs its own memory — a 3B model needs ~2-4 GB, an 8B model needs ~5-8 GB, a 14B model needs ~10-14 GB. Plan accordingly.
+The sidecar process holds PyTorch + faster-whisper + pyannote in memory while inference is running. Memory drops back to a few hundred MB when idle.
 
-Minimum total system RAM to run Debrief comfortably: **4 GB**. Recommended: **8 GB+**. If you want cloud-class AI locally (bigger Ollama models): **16 GB+**.
+If you're running local Ollama in parallel, that model needs its own memory — a 3B model needs ~2–4 GB, an 8B model needs ~5–8 GB, a 14B model needs ~10–14 GB. Plan accordingly.
+
+Minimum total system RAM to run Debrief comfortably: **6 GB**. Recommended: **8 GB+**. If you want cloud-class AI locally (bigger Ollama models): **16 GB+**.
 
 ## Disk space
 
 | Component | Size |
 |---|---|
-| Debrief application | ~300 MB |
-| Whisper Tiny.en model | ~75 MB |
-| Whisper Base.en model | ~140 MB |
-| Whisper Small.en model | ~470 MB |
-| Pyannote segmentation model | ~6 MB |
-| Wespeaker embedding model | ~25 MB |
+| Debrief application (installer) | ~600 MB |
+| First-launch sidecar venv (PyTorch + pyannote + faster-whisper) | ~1 GB |
+| Bundled pyannote + wespeaker + faster-whisper-base model weights | ~200 MB |
+| Other Whisper models (downloaded on demand if you change the default) | tiny.en ~75 MB / small ~470 MB / large-v3 ~3 GB |
 | SQLite database | KB per transcript (scales with library size) |
 | Automated backups | Optional, configurable retention |
 
-**Minimum free disk space**: 2 GB (for the app, one Whisper model, and diarisation models).
-**Recommended**: 10+ GB (room for multiple Whisper models, a growing library, and backups).
+**Minimum free disk space at install time**: 3 GB (installer + first-launch venv + bundled models + working room).
+**Recommended**: 10+ GB (room for a larger Whisper model, a growing library, and backups).
 
 ## Network
 
@@ -111,7 +112,7 @@ Bundled with Debrief. You don't need a separate install.
 
 - **No account or sign-in.** Debrief has no cloud component.
 - **No GPU.** All inference runs on CPU in the current build.
-- **No Python.** Whisper runs via `@huggingface/transformers` (JavaScript/ONNX).
+- **No separate Python install.** A relocatable CPython 3.13 runtime ships inside the installer, and the speech analysis engine installs into your user-data folder on first launch.
 - **No Docker.** Just install the app.
 
 ## Next steps

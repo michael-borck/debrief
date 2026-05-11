@@ -1,112 +1,69 @@
 # Transcription & Diarisation
 
-Debrief does both jobs locally: turning audio into text (transcription) and figuring out who said what (diarisation). No external server, no cloud upload, no API key needed for either step.
+Debrief does both jobs locally: turning audio into text (transcription) and figuring out who said what (diarisation). Both run inside a Python sidecar that ships with the app — no external server, no cloud upload, no API key needed for either step.
 
-## How it works
-
-The pipeline runs in the Electron main process so it can use Node.js libraries that aren't available in the browser sandbox:
+## Architecture at a glance
 
 ```
-audio file
-    ↓
-[ffmpeg-static] decode to 16 kHz mono PCM
-    ↓
-[Whisper via @huggingface/transformers] transcribe → text + per-chunk timestamps
-    ↓
-[pyannote-segmentation-3.0] find speech regions and local speaker activity
-    ↓
-[wespeaker-voxceleb-resnet34-LM] compute 256-d voice embedding per turn
-    ↓
-[agglomerative cosine clustering] assign global speaker labels
-    ↓
-[timestamp alignment] join speaker labels to whisper segments
-    ↓
-text segments with speaker tags
+Electron renderer
+    ↓ IPC: audio.transcribe(path, opts)
+Electron main
+    ↓ HTTP: POST /analyse (multipart) → 127.0.0.1:<port>
+Python sidecar  (lens/speech-analyser)
+    │
+    ├── faster-whisper → transcript + per-segment timestamps
+    ├── pyannote.audio 3.1 → speaker turns (if diarize=true)
+    └── speech_analyser → composite metrics (WPM, fillers, quality score)
 ```
 
-All four ML models are downloaded once on first use and cached in your user data folder forever. After that, transcription makes zero network calls.
+The sidecar is a bundled Python process managed by the main process. First-launch setup installs the heavy ML dependencies (PyTorch, torchcodec, pyannote, faster-whisper) into your user-data folder via pip; pyannote and whisper model weights are bundled inside the installer so the runtime doesn't need a HuggingFace token. Subsequent launches spawn the sidecar in seconds.
 
 ## Whisper transcription
 
-Debrief uses Whisper through the `@huggingface/transformers` library, which provides a JavaScript wrapper around ONNX Runtime. The result is a high-quality transcription engine that runs in pure Node.js without needing Python, PyTorch, or a separate server.
+Debrief uses `faster-whisper` (a CTranslate2-optimised reimplementation of OpenAI's Whisper) running inside the sidecar. The default model is `base` (~140 MB); other Whisper sizes (`tiny`, `tiny.en`, `base`, `base.en`, `small`, `medium`, `large-v3`, etc.) can be selected if you swap the model name in Settings.
 
-### Model choices (Settings → Transcription)
+### Model choices
 
-| Model | Size | Speed (M-series Mac) | Best for |
+`faster-whisper` supports the full Whisper family. Defaults to `base`. Larger models give better accuracy but consume more memory and CPU time:
+
+| Model | Approx. memory | Speed (M-series Mac) | Best for |
 |---|---|---|---|
-| **Tiny (English)** | ~75 MB | ~2-3× realtime | Quick drafts, short clips, slower hardware |
-| **Base (English)** | ~140 MB | ~1.5× realtime | Most users — recommended balance |
-| **Small (English)** | ~470 MB | ~0.7× realtime | Best accuracy, when speed isn't critical |
+| `tiny.en` | ~150 MB | ~3× realtime | Quick drafts, short clips |
+| `base` *(default)* | ~250 MB | ~1.5× realtime | Most users |
+| `small` | ~500 MB | ~0.7× realtime | Highest accuracy in the small family |
+| `large-v3` | ~3 GB | ~0.2× realtime | Production transcription, fast machines |
 
-The number after `realtime` is the multiplier. 2× realtime means a 1-minute file transcribes in 30 seconds. 0.7× means it takes 1.4 minutes.
+Only `base` ships pre-bundled in the installer. Picking a different model triggers a one-time HuggingFace download into the sidecar venv's cache.
 
-All three models are English-only (`.en`). They're faster and more accurate than the multilingual variants for English audio.
+`base` is the safe default. Apple Silicon makes it fast enough for most use, and it handles accents and noisy audio better than `tiny`.
 
 ### What you get back
 
-For each transcription, Whisper returns:
+For each transcription, the sidecar returns:
 
 - The full transcript text
-- A list of chunks, each with `[startTime, endTime, text]`
+- A list of sentence-level segments, each with `{start, end, text, speaker}` (`speaker` is `null` when diarisation is off)
+- A `speech_metrics` block: word count, speaking rate (WPM), filler word count + rate, silence ratio, plus a composite quality score (0–100) with clarity/depth/balance/pace factor breakdown
+- A `speakers` list with per-speaker word count and percentage (when diarisation is on)
 
-The chunks are typically sentence-sized. They become the per-sentence rows in Debrief's transcript segments table, which power features like the synced audio playback and find-in-transcript search.
-
-### Internal chunking (not the same as the old Speaches chunking)
-
-Whisper itself processes audio in 30-second windows internally with 5-second strides. This is an algorithm parameter, not a network parameter — there's no network call between windows. You don't need to configure it.
-
-(Older versions of Debrief used a separate Speaches HTTP server and chunked at the network level for request size limits. That entire path has been removed.)
+The segments become the per-sentence rows in Debrief's `transcript_segments` table, which power synced audio playback and find-in-transcript search.
 
 ## Speaker diarisation
 
-Diarisation runs after transcription if "Detect speakers from audio" is enabled in Settings → Processing.
+Diarisation runs when "Detect speakers from audio" is enabled in Settings → Processing. The sidecar uses `pyannote.audio` 3.1's pre-trained pipeline:
 
-Two models work together:
+- **`pyannote/speaker-diarization-3.1`** — the orchestrator. Bundled at install time.
+- **`pyannote/segmentation-3.0`** — finds speech regions and identifies up to 3 overlapping local speakers in each 5-second window. MIT licensed, bundled.
+- **`pyannote/wespeaker-voxceleb-resnet34-LM`** — turns each turn into a 256-dimensional voice fingerprint vector. CC-BY-4.0 licensed, bundled.
+- **`pyannote/speaker-diarization-community-1`** — clustering / PLDA backend. CC-BY-4.0 licensed, bundled.
 
-- **`onnx-community/pyannote-segmentation-3.0`** (~6 MB) — finds speech regions and identifies up to 3 simultaneous local speakers in each 5-second analysis window. Output is a sequence of frames classified into 7 "powerset" classes (silence, single speakers 0-2, and the three pair combinations for overlap detection).
-- **`onnx-community/wespeaker-voxceleb-resnet34-LM`** (~25 MB) — turns a slice of audio into a 256-dimensional voice fingerprint vector.
+All four model files live inside the installer (`Contents/Resources/embedded-server/models/`). At runtime the sidecar sets `HF_HOME` to point at the bundled cache and `HF_HUB_OFFLINE=1` so pyannote loads them without contacting HuggingFace.
 
-### The full algorithm
+The whole pipeline is opaque from Debrief's side — we POST the audio, pyannote returns speaker turns. Internal hyperparameters (segmentation thresholds, clustering distance, etc.) aren't currently exposed.
 
-1. **Window the audio** in 5-second chunks
-2. **Segment each window** with pyannote → per-frame speaker activations
-3. **Median filter** the frame activations (11-frame window) to kill single-frame jitter that causes over-segmentation
-4. **Convert frames to turns** by finding contiguous runs of each speaker
-5. **Merge brief gaps** within the same speaker channel (gaps shorter than 200ms are bridged)
-6. **Drop turns shorter than 500ms** from the clustering pool — they're too short to embed reliably
-7. **Embed each long-enough turn** with wespeaker
-8. **Cluster** turns using agglomerative cosine clustering at threshold 0.5
-9. **Reassign noise clusters** — any cluster totalling less than 3 seconds of audio is moved to the temporally-nearest substantial cluster (this kills the long tail of "ghost speakers" you'd otherwise see on noisy audio)
-10. **Reassign the dropped short turns** to their nearest neighbour cluster
-11. **Renumber** clusters from 1 contiguously
-12. **Align with Whisper segments** by timestamp overlap — each text chunk gets the speaker label of the diarisation turn it overlaps most with
+### After diarisation: manual correction
 
-### Why it's better than the old approach
-
-Earlier Debrief versions sent transcribed text to an LLM and asked it to guess speakers from textual cues. That approach:
-
-- Couldn't detect overlapping speech
-- Couldn't handle 4+ speakers
-- Gave noisy results on rapid back-and-forth
-- Was slow (extra LLM round-trip per file)
-
-The current pipeline uses voice fingerprints from the actual audio, which is dramatically more accurate. On real test files: a clean 30-second 2-speaker clip identifies 2 speakers correctly; a 14-minute structured interview identifies 2 speakers with the expected interviewer/interviewee split; a tough 5-min noisy 5-speaker file identifies 4-6 speakers (the dominant 4 covering 98%+ of the audio).
-
-### Tuning (advanced)
-
-Every diarisation tunable is exposed as a slider under **Settings → Processing → Advanced diarisation tuning** (inside the Detect speakers collapsible). Defaults are validated across a range of audio types:
-
-- Median filter: 11 frames
-- Min duration on (turn length): 0.5s
-- Min duration off (gap merging): 0.2s
-- Cluster threshold (cosine similarity): 0.5
-- Noise reassignment minimum: 3.0s
-
-Don't touch these unless the pipeline is misbehaving on a specific file — tuning is a last resort after Speaker Tagging can't fix the result manually. See the [Advanced Features Tutorial](../tutorials/advanced-features.md#diarisation-tuning) for guidance on which knob to turn when.
-
-## After diarisation: manual correction
-
-The diarisation pipeline gives you a starting point with generic labels (`Speaker 1`, `Speaker 2`, ...). You can then:
+The diarisation pipeline gives you a starting point with generic labels (`SPEAKER_00`, `SPEAKER_01`, …). You can then:
 
 - **Rename speakers** to meaningful names (Interviewer, Sarah, Customer Service, etc.)
 - **Merge speakers** if pyannote over-split one real person
@@ -120,16 +77,25 @@ Open the **Speaker Tagging** modal from the transcript detail page. The modal ha
 
 The AI Correction button uses your configured AI provider (Settings → Processing → AI Analysis Service). It sends 5 representative samples per speaker to the model, asks for label suggestions and merge candidates, and returns structured JSON.
 
+### Per-transcript rerun
+
+The transcript detail page has a **Diarisation** panel with a **Rerun** button. Clicking it re-submits the audio to the sidecar for a fresh pass. Because `/analyse` is currently a single endpoint that does transcription + diarisation together, a rerun re-transcribes too — a regression versus older versions that supported diarisation-only reruns. A diarise-only sidecar endpoint is on the roadmap.
+
+### Known limitations
+
+- **No advanced tuning knobs.** Older Debrief versions exposed sliders for cluster threshold, median filter frames, etc. Pyannote 3.1's high-level API doesn't expose those, so the sliders are no-ops in the current build. Repurposing the panel for a `num_speakers` hint (telling pyannote you know how many speakers there are) is planned.
+- **No per-chunk progress events.** The sidecar's `/analyse` endpoint returns the full result in one HTTP response — there's no per-chunk progress while it runs. The Processing Queue shows a single "transcribing" stage until completion. Server-Sent Events from the sidecar would address this.
+- **Cancel closes the connection but the sidecar keeps churning.** A cancel button stops the renderer waiting, but the underlying compute completes in the background until the response is discarded.
+
 ## Performance notes
 
-- **First-time costs.** First time you transcribe: Whisper model download. First time you diarise: pyannote + wespeaker download. After that, no network calls.
-- **CPU only.** No GPU acceleration in the current build. Apple Silicon is fast enough; Intel Macs and old Linux laptops are noticeably slower.
-- **Memory.** Whisper holds the model in memory (~150 MB for tiny.en, ~500 MB for small.en). Diarisation models are smaller. Total resident memory during transcription is typically 300-700 MB on top of the base Electron process.
-- **Long files.** Transcription scales linearly with audio length. A 30-minute interview takes about 10-15 minutes with base.en + diarisation enabled on an M-series Mac. Faster on Apple Silicon, slower on Intel.
+- **First-time costs.** First-launch setup installs ~1 GB of Python deps. After that, all model loading is from local disk — no further network needed.
+- **CPU only.** No GPU acceleration in the current build. Apple Silicon is fast enough for `base`; Intel Macs and older Linux laptops are noticeably slower.
+- **Memory.** Sidecar process holds the Whisper model plus pyannote in memory — typically 1.5–2.5 GB during active inference. Idle memory drops once the response is returned. Total resident memory across Electron + sidecar is ~3 GB peak.
+- **Long files.** Transcription scales linearly with audio length. A 30-minute interview takes about 12–18 minutes with `base` + diarisation enabled on an M-series Mac.
 
 ## What's next
 
 - [Analysis](analysis.md) — what Debrief does with the text after transcription
 - [AI Chat](ai-chat.md) — talking to your transcripts
-- [Settings → Transcription](../user-guide/settings.md#transcription) — picking a model
 - [Settings → Detect speakers from audio](../user-guide/settings.md#detect-speakers-from-audio) — turning diarisation on/off

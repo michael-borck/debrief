@@ -1,26 +1,26 @@
 # Settings
 
-The Settings page (sidebar → **Settings**) is organised into five tabs. This page covers everything in each one.
+The Settings page (sidebar → **Settings**) is organised into tabs. This page covers everything in each one.
 
 ## Transcription
 
-Where you choose which Whisper model runs locally to turn audio into text.
+The transcription engine is the bundled Python sidecar (`lens/speech-analyser`) running `faster-whisper`. Default model is `base` (~140 MB), pre-bundled into the installer.
 
 ### Transcription Model
 
-Three model options. All English-only. All run entirely on your machine — no network calls during transcription.
+Pick the Whisper variant the sidecar uses. All run entirely on your machine — no network calls during transcription:
 
-| Model | Size | Speed | Best for |
+| Model | Approx. memory | Speed (M-series Mac) | Best for |
 |---|---|---|---|
-| **Tiny (English)** | ~75 MB | Fastest (~2-3× realtime on M-series) | Quick drafts, short clips, slow hardware |
-| **Base (English)** | ~140 MB | Balanced | Most users, most recordings |
-| **Small (English)** | ~470 MB | Slower | Highest accuracy in this set |
+| **`tiny.en`** | ~150 MB | ~3× realtime | Quick drafts, short clips, slow hardware |
+| **`base`** *(default)* | ~250 MB | ~1.5× realtime | Most users — only model pre-bundled |
+| **`small.en` / `small`** | ~500 MB | ~0.7× realtime | Highest accuracy in this tier |
+| **`medium`** | ~1.5 GB | ~0.3× realtime | Better accuracy, slower |
+| **`large-v3`** | ~3 GB | ~0.2× realtime | Best accuracy, fast machines only |
 
-The first time you transcribe with a model, Debrief downloads it to your user data folder (`~/Library/Application Support/debrief/models/` on macOS, equivalents on Windows/Linux) and caches it forever. Subsequent transcriptions just use the cached model — no download, no network.
+Only `base` ships pre-bundled. Picking any other model triggers a one-time HuggingFace download into the sidecar venv's cache (`~/Library/Application Support/debrief/venv/...` on macOS).
 
-### Download model now
-
-Optional button. Pre-fetches the chosen model so the first transcription doesn't pay the download cost. Useful if you want to be ready to work offline.
+The `.en` variants are English-only and faster + slightly more accurate than the multilingual versions for English audio.
 
 ## Processing
 
@@ -56,15 +56,9 @@ A coloured banner under the dropdown reminds you which mode you're in (green for
 
 Toggle for the diarisation pipeline. On by default.
 
-When on, after Whisper finishes, Debrief runs:
+When on, the sidecar's `/analyse` call runs `pyannote.audio` 3.1 alongside faster-whisper to assign speaker labels to each segment. Adds about 1× the audio length to processing time. Turn it off for known single-speaker recordings to save time.
 
-1. **Pyannote segmentation** to find speech regions and local speaker activity in 5-second windows
-2. **Wespeaker** to compute a 256-dimensional voice fingerprint for each turn
-3. **Agglomerative clustering** to assign global speaker labels across the whole recording
-
-Adds about 1× the audio length to processing time. Turn it off for single-speaker recordings to save time.
-
-**Advanced diarisation tuning** (collapsible) — exposes the pipeline's tunables as sliders: cluster similarity threshold, median filter frames, min turn duration, min gap to split, noise cluster minimum. Defaults are validated across clean, noisy, and multi-speaker recordings — only touch these if the pipeline misbehaves on a specific file. Click **Reset to defaults** to revert.
+**Advanced diarisation tuning** (collapsible) — historically exposed cluster threshold and segmentation parameters as sliders. Pyannote 3.1's high-level API doesn't expose those knobs, so the sliders are currently no-ops; they'll be repurposed into a `num_speakers` hint ("I know there are 2 speakers — pin it") in a future release.
 
 ### AI token usage
 
@@ -137,13 +131,12 @@ The vector embeddings Debrief uses to power chat search. Reset only if you exper
 
 A reminder of what stays local and what doesn't:
 
-> Debrief stores all data locally on your computer. No data is sent to external services except for transcription and analysis processing through your configured services.
-
-(Transcription is now always local — that line predates the local Whisper migration. It'll be updated in a future release.)
+> Debrief stores all data locally on your computer. Transcription and speaker diarisation run in a bundled Python sidecar on your machine. AI analysis is sent to whichever provider you've configured — local (Ollama) by default, or a cloud provider you've explicitly chosen. The status banner under the AI provider dropdown always shows which mode is active.
 
 ## Tips
 
-- **Start with defaults.** Tiny.en + Ollama local + speaker detection on works well for most cases.
-- **If you upgrade your AI**, also try a better Whisper model — the bottleneck for "good summaries" is sometimes transcript quality, not the LLM.
+- **Start with defaults.** `base` model + Ollama local + speaker detection on works well for most cases.
+- **Watch the sidecar pill** (bottom-right). Green means transcribe-ready. Blue means first-launch setup is still running. Red means restart — click to retry.
+- **If you upgrade your AI**, also try a larger Whisper model — the bottleneck for "good summaries" is sometimes transcript quality, not the LLM.
 - **API keys are encrypted at rest** via your OS keychain. On Linux without a keyring service Debrief falls back to plain text — use Ollama on shared machines if that matters.
 - **Settings save immediately.** No "Save" button — every toggle and dropdown writes to the database as you change it.

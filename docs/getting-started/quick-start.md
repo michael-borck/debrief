@@ -2,21 +2,15 @@
 
 The speed-run version of getting productive with Debrief. If you've already read [First Use](first-use.md), skip straight to Step 1.
 
-**Time needed:** about 10 minutes, most of which is waiting for the first model download.
+**Time needed:** about 5 minutes once the speech analysis engine is installed (a one-time ~5–15 minute setup happens on first launch).
 
-## Step 1 — Pick a transcription model
+## Step 0 — First-launch setup (one time)
 
-Open **Settings → Transcription**. Three choices:
+The first time you open Debrief, a **First-time setup** modal walks through installing the speech analysis engine into your user-data folder (`~/Library/Application Support/debrief/venv/` on macOS). Roughly **1 GB on disk**, **3–10 minutes** depending on your connection. You can keep using settings + library while it runs; transcription becomes available once setup completes.
 
-| Model | Size | When to pick |
-|---|---|---|
-| **Tiny (English)** | ~75 MB | Default. Fastest. Fine for most recordings. |
-| **Base (English)** | ~140 MB | Recommended balance of speed and accuracy. |
-| **Small (English)** | ~470 MB | Best accuracy. Pick on a fast machine. |
+You only do this once. Subsequent launches are instant.
 
-Click **Download model now** to pre-fetch it, or just move on — Debrief will download it the first time you hit Transcribe.
-
-## Step 2 — Point Debrief at an LLM
+## Step 1 — Point Debrief at an LLM
 
 Open **Settings → Processing → AI Analysis Service**. Everything after transcription (summary, themes, action items, chat) needs a language model.
 
@@ -25,21 +19,21 @@ Open **Settings → Processing → AI Analysis Service**. Everything after trans
 
 Click **Test Connection**, then **Refresh Models** and pick one. That's it.
 
-## Step 3 — Upload a file
+## Step 2 — Upload a file
 
 Click **Upload & Process** in the sidebar. Drag an audio or video file into the dropzone (MP3, WAV, M4A, OGG, MP4, MOV, WebM, FLAC — most formats work). Optionally assign it to a project. Click **Upload & Process**.
 
 Debrief will:
 
 1. Decode the audio
-2. Transcribe with Whisper (local)
-3. Detect speakers from audio with pyannote + wespeaker (local, if enabled)
+2. Transcribe via the local sidecar (faster-whisper)
+3. Detect speakers via pyannote 3.1 (local, if enabled)
 4. Run AI analysis for summary, themes, sentiment, action items
 5. Save everything to the Library
 
 You can navigate away — processing continues in the background. A toast tells you when it's done.
 
-## Step 4 — Read the results
+## Step 3 — Read the results
 
 Click the transcript in the **Library**. The detail page has:
 
@@ -50,7 +44,7 @@ Click the transcript in the **Library**. The detail page has:
 
 If you need to rename speakers or fix diarisation mistakes, open **Speaker Tagging** from the transcript detail page.
 
-## Step 5 — Organise with projects
+## Step 4 — Organise with projects
 
 Projects let you analyse multiple recordings together.
 
@@ -61,15 +55,16 @@ Projects let you analyse multiple recordings together.
 
 A project's chat has access to every transcript in the project at once — good for questions like "which interviews mentioned the Q3 roadmap?".
 
-## Step 6 — Export
+## Step 5 — Export
 
 From any transcript detail page, click **Export** to save as Markdown, TXT, JSON, or PDF. Projects have their own export with multi-transcript analysis bundled in.
 
 ## Tips
 
-- **Start with short files** while you're learning. A 2-minute recording gives you the full workflow in under a minute of processing on an M-series Mac.
-- **Defaults are sensible.** Tiny.en + Ollama + speaker detection is a reasonable starting point for most users.
+- **Start with short files** while you're learning. A 2-minute recording gives you the full workflow in about a minute of processing on an M-series Mac.
+- **Defaults are sensible.** Local sidecar + Ollama + speaker detection is a reasonable starting point for most users.
 - **Settings save immediately.** No Save button.
+- **Watch the status pill** (bottom-right of the window) for sidecar health. Green = ready, blue = setup in progress, red = check connection or click to retry.
 - **Press `Cmd/Ctrl + ?`** anytime for the full keyboard shortcuts list.
 
 ## Next steps

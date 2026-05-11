@@ -1,5 +1,14 @@
 # RAG System Architecture for Electron Applications
 
+> ⚠️ **Stale — pending rewrite.** This document describes the pre-sidecar
+> architecture (pre-2026-05). The transcription/diarisation pipeline has since
+> moved into the bundled Python sidecar (`lens/speech-analyser`), the
+> @xenova/transformers dependency has been removed, and main-process embedding
+> is currently a `simpleTextEmbedding` placeholder rather than transformers-
+> based. References to `@xenova/transformers` and the in-process Whisper
+> pipeline are historical. Treat the RAG flow described here as aspirational
+> until this page is refreshed.
+
 ## Overview
 
 This document describes a complete Retrieval-Augmented Generation (RAG) system implementation for Electron applications. The system provides local, privacy-first chat functionality with document content using embedded vector databases and local language models.
