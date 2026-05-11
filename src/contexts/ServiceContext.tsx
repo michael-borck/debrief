@@ -40,9 +40,9 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({ children }) =>
 
   const testConnections = async () => {
     try {
-      // Speech-to-text now runs locally via @huggingface/transformers — no
-      // server to test. Treat it as always available; the model will be
-      // downloaded lazily on first transcription.
+      // Speech-to-text + diarisation now run via the bundled sidecar
+      // (lens/speech-analyser). The SidecarStatusPill surfaces its
+      // readiness; treat it as available here.
       const aiUrl = await window.electronAPI.database.get(
         'SELECT value FROM settings WHERE key = ?',
         ['aiAnalysisUrl']

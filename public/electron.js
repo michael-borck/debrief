@@ -8,13 +8,9 @@ const { promisify } = require('util');
 const execAsync = promisify(exec);
 const aiProviders = require('./ai-providers');
 const URLS = require('./electron-urls');
-const diarise = require('./electron/diarise');
 const { MainVectorStore } = require('./electron/vector-store');
 const { SidecarManager } = require('./electron/sidecar-manager');
 const sidecarClient = require('./electron/sidecar-client');
-
-// Wire diarise module to shared transformers loader and DB
-diarise.init({ getTransformers: () => getTransformers(), getDb: () => db });
 
 const sidecar = new SidecarManager();
 sidecarClient.init({ sidecar });
@@ -43,90 +39,9 @@ protocol.registerSchemesAsPrivileged([
   },
 ]);
 
-// ============================================
-// Local Whisper transcription (transformers.js)
-// ============================================
-//
-// Whisper runs in-process via @huggingface/transformers. No external server,
-// no network calls after the model is cached. The pipeline is loaded
-// lazily on first transcription and kept in memory across requests.
-
-const DEFAULT_WHISPER_MODEL = 'Xenova/whisper-tiny.en';
-let whisperPipeline = null;
-let whisperPipelineModel = null;
-
-// Lazy import: @huggingface/transformers is ESM-only and bigger than we
-// want to load on app startup. Cache the module after first import.
-let huggingfaceTransformers = null;
-async function getTransformers() {
-  if (huggingfaceTransformers) return huggingfaceTransformers;
-  huggingfaceTransformers = await import('@huggingface/transformers');
-  // Cache models in Electron user data so they survive reinstalls and
-  // don't pollute the working directory
-  huggingfaceTransformers.env.cacheDir = path.join(app.getPath('userData'), 'models');
-  huggingfaceTransformers.env.allowLocalModels = false;
-  huggingfaceTransformers.env.allowRemoteModels = true;
-  return huggingfaceTransformers;
-}
-
-async function getWhisperPipeline(modelName, progressCallback) {
-  if (whisperPipeline && whisperPipelineModel === modelName) {
-    return whisperPipeline;
-  }
-
-  // Different model requested — drop the old one
-  whisperPipeline = null;
-  whisperPipelineModel = null;
-
-  const { pipeline, env } = await getTransformers();
-
-  console.log(`[whisper] loading pipeline: ${modelName} (cache: ${env.cacheDir})`);
-  const t0 = Date.now();
-  whisperPipeline = await pipeline('automatic-speech-recognition', modelName, {
-    progress_callback: progressCallback,
-  });
-  whisperPipelineModel = modelName;
-  console.log(`[whisper] pipeline ready in ${Date.now() - t0} ms`);
-
-  return whisperPipeline;
-}
-
-function decodeAudioToFloat32(audioPath) {
-  return new Promise((resolve, reject) => {
-    const ffmpegPath = getFFmpegPath();
-    const ffmpeg = spawn(ffmpegPath, [
-      '-hide_banner',
-      '-loglevel', 'error',
-      '-i', audioPath,
-      '-f', 'f32le',
-      '-acodec', 'pcm_f32le',
-      '-ac', '1',
-      '-ar', '16000',
-      'pipe:1',
-    ]);
-
-    const chunks = [];
-    let stderr = '';
-
-    ffmpeg.stdout.on('data', (chunk) => chunks.push(chunk));
-    ffmpeg.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    ffmpeg.on('error', reject);
-    ffmpeg.on('close', (code) => {
-      if (code !== 0) {
-        reject(new Error(`ffmpeg exited with code ${code}: ${stderr}`));
-        return;
-      }
-      const buffer = Buffer.concat(chunks);
-      const float32 = new Float32Array(
-        buffer.buffer,
-        buffer.byteOffset,
-        Math.floor(buffer.byteLength / 4)
-      );
-      resolve(float32);
-    });
-  });
-}
-
+// Whisper transcription + diarisation now run inside the sidecar (see
+// public/electron/sidecar-client.js); the in-process @huggingface/transformers
+// pipeline and JS-side diariser have been removed.
 
 let mainWindow;
 let db;
@@ -1453,33 +1368,19 @@ ipcMain.handle('fs-delete-file', async (event, filePath) => {
   }
 });
 
-ipcMain.handle('local-transcription-load-model', async (event, { modelName }) => {
-  try {
-    const target = modelName || DEFAULT_WHISPER_MODEL;
-
-    // Stream download/init progress to the renderer so the UI can show it
-    const sendProgress = (data) => {
-      try {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('local-transcription-progress', data);
-        }
-      } catch (_) { /* ignore — window may be closed */ }
-    };
-
-    await getWhisperPipeline(target, sendProgress);
-    return { success: true, modelName: target };
-  } catch (error) {
-    console.error('[local-transcription] load failed:', error);
-    return { success: false, error: error.message };
-  }
+ipcMain.handle('local-transcription-load-model', async (_event, { modelName }) => {
+  // No-op: the sidecar lazily loads its faster-whisper model on the first
+  // /analyse call (~5s once per process lifetime). Pre-warming would need a
+  // /preload endpoint upstream. Renderer still calls this; reply success.
+  return { success: true, modelName: modelName || 'base' };
 });
 
 ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, modelName, enableDiarisation }) => {
   try {
-    const target = modelName || DEFAULT_WHISPER_MODEL;
-    // Renderer historically passed Xenova/whisper-<size>; speech-analyser
-    // wants the bare size (tiny, base, small, medium, large-v3, *.en).
-    const sidecarModel = String(target).replace(/^Xenova\/whisper-/i, '') || 'base';
+    // Renderer historically passed Xenova/whisper-<size> for the JS pipeline;
+    // speech-analyser wants the bare size (tiny, base, small, medium, large-v3,
+    // *.en). Default to 'base' when nothing is passed.
+    const sidecarModel = String(modelName || 'base').replace(/^Xenova\/whisper-/i, '') || 'base';
     const wantSpeakers = enableDiarisation !== false; // default ON
 
     if (!fs.existsSync(audioPath)) {
