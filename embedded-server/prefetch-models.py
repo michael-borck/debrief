@@ -1,13 +1,12 @@
-"""Build-time: prefetch pyannote models into embedded-server/models/.
+"""Build-time: prefetch pyannote + whisper model weights into embedded-server/models/.
 
-Downloads pyannote/speaker-diarization-3.1 (and its sub-models — segmentation
-and the embedding model) into a self-contained cache directory that gets
-bundled into the PyInstaller binary via --add-data. At runtime the sidecar
-points HF_HOME at the bundled cache so no token is needed.
+Pure huggingface_hub.snapshot_download — no pyannote.audio / torch import, so
+this runs fast in CI with just `pip install huggingface_hub`. The bundled
+binary points HF_HOME at this directory at runtime, so no token is needed
+once shipped.
 
-Requires HF_TOKEN env var (sourced from .env by build.sh) and prior
-acceptance of terms on huggingface.co/pyannote/speaker-diarization-3.1
-and huggingface.co/pyannote/segmentation-3.0.
+Requires HF_TOKEN env var (sourced from .env by prefetch-models.sh) and
+prior acceptance of terms on the gated pyannote pages.
 """
 import os
 import sys
@@ -22,24 +21,22 @@ if not token:
     print("ERROR: HF_TOKEN not set. Add it to embedded-server/.env (see .env.example).", file=sys.stderr)
     sys.exit(1)
 
-print(f"Downloading pyannote/speaker-diarization-3.1 into {CACHE_DIR}", flush=True)
-from pyannote.audio import Pipeline
+# All four pyannote repos are gated; their licences (MIT or CC-BY-4.0) permit
+# redistribution provided we credit pyannote/wespeaker in the about screen.
+# Systran/faster-whisper-base is ungated.
+REPOS = [
+    "pyannote/speaker-diarization-3.1",
+    "pyannote/segmentation-3.0",
+    "pyannote/speaker-diarization-community-1",
+    "pyannote/wespeaker-voxceleb-resnet34-LM",
+    "Systran/faster-whisper-base",
+]
 
-pipeline = Pipeline.from_pretrained("pyannote/speaker-diarization-3.1", token=token)
-if pipeline is None:
-    print("ERROR: Pipeline.from_pretrained returned None — token invalid or terms not accepted?", file=sys.stderr)
-    sys.exit(2)
-
-# Whisper isn't gated, but HF_HUB_OFFLINE=1 at runtime blocks any download —
-# so we pre-pull the default model alongside pyannote. base = ~75MB; we
-# match speech-analyser's AudioLens default.
-print("Downloading Systran/faster-whisper-base", flush=True)
 from huggingface_hub import snapshot_download
 
-snapshot_download("Systran/faster-whisper-base")
+for repo in REPOS:
+    print(f"Downloading {repo}", flush=True)
+    snapshot_download(repo, token=token)
 
 total_bytes = sum(f.stat().st_size for f in CACHE_DIR.rglob("*") if f.is_file())
 print(f"Done. Cache size: {total_bytes / 1e6:.1f} MB ({total_bytes / 1e9:.2f} GB)")
-print("Top-level cache contents:")
-for child in sorted(CACHE_DIR.iterdir()):
-    print(f"  {child.name}")

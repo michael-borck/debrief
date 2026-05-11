@@ -12,7 +12,7 @@
     "webpack-dev": "webpack serve --mode development",
     "electron-dev": "wait-on http://localhost:9000 && electron . --no-sandbox",
     "build": "webpack --mode production",
-    "build:sidecar": "bash embedded-server/bundle-python.sh",
+    "build:sidecar": "bash embedded-server/bundle-python.sh && bash embedded-server/prefetch-models.sh",
     "electron": "electron . --no-sandbox",
     "pack": "npm run build && npm run build:sidecar && electron-builder --dir",
     "dist": "npm run build && npm run build:sidecar && electron-builder",
