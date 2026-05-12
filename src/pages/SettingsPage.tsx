@@ -1108,13 +1108,13 @@ export const SettingsPage: React.FC = () => {
                         className="mt-0.5 text-primary-800 focus:ring-primary-500"
                       />
                       <div className="flex-1">
-                        <div className="font-medium text-surface-900">Quote Lookup</div>
+                        <div className="font-medium text-surface-900">Find quotes</div>
                         <div className="text-sm text-surface-600 mt-1">
-                          Returns relevant transcript excerpts directly without AI interpretation. 
-                          <strong>Fastest</strong> and most factual - shows exact quotes with timestamps and relevance scores.
+                          Returns exact passages from the transcript that match your question — no AI rewriting.
+                          <strong> Fastest</strong>, and the answer is always a real quote with a timestamp.
                         </div>
                         <div className="text-xs text-primary-800 mt-1">
-                          Best for: Finding specific information, quotes, or references
+                          Best for: pulling out specific things that were said
                         </div>
                       </div>
                     </label>
@@ -1132,13 +1132,13 @@ export const SettingsPage: React.FC = () => {
                         className="mt-0.5 text-primary-800 focus:ring-primary-500"
                       />
                       <div className="flex-1">
-                        <div className="font-medium text-surface-900">Smart Search (Recommended)</div>
+                        <div className="font-medium text-surface-900">Ask AI (Recommended)</div>
                         <div className="text-sm text-surface-600 mt-1">
-                          Retrieves relevant chunks and sends them to AI for interpretation and analysis. 
-                          <strong>Balanced</strong> approach providing context-aware responses with good performance.
+                          Finds the parts of the transcript relevant to your question and lets the AI write an answer based on them.
+                          <strong> Balanced</strong> — good answers, modest cost.
                         </div>
                         <div className="text-xs text-green-600 mt-1">
-                          Best for: General questions, analysis, and interactive conversations
+                          Best for: most everyday questions and back-and-forth chat
                         </div>
                       </div>
                     </label>
@@ -1156,13 +1156,13 @@ export const SettingsPage: React.FC = () => {
                         className="mt-0.5 text-primary-800 focus:ring-primary-500"
                       />
                       <div className="flex-1">
-                        <div className="font-medium text-surface-900">Full Transcript</div>
+                        <div className="font-medium text-surface-900">Read whole transcript</div>
                         <div className="text-sm text-surface-600 mt-1">
-                          Sends the full transcript directly to AI for comprehensive analysis. 
-                          <strong>Most thorough</strong> but slower and may hit context limits with long transcripts.
+                          Sends the entire transcript to the AI in one go.
+                          <strong> Most thorough</strong>, but slower and more expensive. Long recordings may exceed the AI's context window.
                         </div>
                         <div className="text-xs text-orange-600 mt-1">
-                          Best for: Deep analysis, summaries, and questions requiring full context
+                          Best for: holistic questions (summary, arc, themes across the whole recording)
                         </div>
                       </div>
                     </label>
@@ -1172,7 +1172,7 @@ export const SettingsPage: React.FC = () => {
                 {/* Mode-specific Settings */}
                 {conversationMode === 'vector-only' && (
                   <div className="bg-white p-4 rounded-lg border">
-                    <h4 className="text-sm font-medium text-surface-900 mb-2">Vector Search Settings</h4>
+                    <h4 className="text-sm font-medium text-surface-900 mb-2">Find Quotes Settings</h4>
                     <div>
                       <label className="label">
                         Number of Excerpts to Show
@@ -1203,7 +1203,7 @@ export const SettingsPage: React.FC = () => {
 
                 {conversationMode === 'direct-llm' && (
                   <div className="bg-white p-4 rounded-lg border">
-                    <h4 className="text-sm font-medium text-surface-900 mb-2">Direct LLM Settings</h4>
+                    <h4 className="text-sm font-medium text-surface-900 mb-2">Read-Whole-Transcript Settings</h4>
                     <div>
                       <label className="label">
                         Context Limit (characters)

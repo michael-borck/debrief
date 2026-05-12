@@ -215,9 +215,9 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
                     onChange={(e) => handleModeChange(e.target.value)}
                     className="text-xs px-2 py-1 bg-surface-100 border border-surface-200 rounded-full text-surface-600 hover:bg-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer"
                   >
-                    <option value="vector-only">🔍 Vector Search</option>
-                    <option value="rag">🤖 RAG Mode</option>
-                    <option value="direct-llm">📄 Direct LLM</option>
+                    <option value="vector-only">🔍 Find quotes</option>
+                    <option value="rag">🤖 Ask AI</option>
+                    <option value="direct-llm">📄 Read whole transcript</option>
                   </select>
                 )}
               </div>
@@ -300,9 +300,9 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
                   {currentMode && (
                     <div className="text-xs text-surface-500 space-y-1">
                       <p>
-                        {currentMode === 'vector-only' && 'Vector Search mode - you\'ll get direct transcript excerpts with timestamps.'}
-                        {currentMode === 'rag' && 'RAG mode - AI will interpret relevant transcript sections to answer your questions.'}
-                        {currentMode === 'direct-llm' && 'Direct LLM mode - AI analyzes the full transcript for comprehensive responses.'}
+                        {currentMode === 'vector-only' && 'Find quotes — you\'ll get exact passages from the transcript with timestamps. No AI rewriting.'}
+                        {currentMode === 'rag' && 'Ask AI — the assistant pulls the relevant parts of the transcript and writes an answer.'}
+                        {currentMode === 'direct-llm' && 'Read whole transcript — sends the entire recording to the AI for the most thorough answer.'}
                       </p>
                       <p className="text-surface-400">
                         You can change the conversation mode using the dropdown in the header.
@@ -346,9 +346,9 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
                           )}
                           {message.metadata?.mode && message.role === 'assistant' && (
                             <span className="ml-2">
-                              {message.metadata.mode === 'vector-only' && '🔍 Vector Search'}
-                              {message.metadata.mode === 'rag' && '🤖 RAG Mode'}
-                              {message.metadata.mode === 'direct-llm' && '📄 Direct LLM'}
+                              {message.metadata.mode === 'vector-only' && '🔍 Find quotes'}
+                              {message.metadata.mode === 'rag' && '🤖 Ask AI'}
+                              {message.metadata.mode === 'direct-llm' && '📄 Whole transcript'}
                             </span>
                           )}
                         </p>
