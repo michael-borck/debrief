@@ -33,8 +33,6 @@ export const SettingsPage: React.FC = () => {
   }>>([]);
   const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [aiTestMessage, setAiTestMessage] = useState<string>('');
-  const [autoBackup, setAutoBackup] = useState(true);
-  const [backupFrequency, setBackupFrequency] = useState('weekly');
   const [theme, setTheme] = useState('system');
   const [databaseInfo, setDatabaseInfo] = useState<any>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
@@ -147,8 +145,6 @@ export const SettingsPage: React.FC = () => {
         setAiApiKey('');
       }
       setAiModel(settingsMap.aiModel || '');
-      setAutoBackup(settingsMap.autoBackup === 'true');
-      setBackupFrequency(settingsMap.backupFrequency || 'weekly');
       setTheme(settingsMap.theme || 'system');
       
       // Load transcript processing settings
@@ -1423,37 +1419,6 @@ export const SettingsPage: React.FC = () => {
                   </button>
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      checked={autoBackup}
-                      onChange={(e) => {
-                        setAutoBackup(e.target.checked);
-                        saveSetting('autoBackup', e.target.checked.toString());
-                      }}
-                      className="rounded text-primary-800 focus:ring-primary-500"
-                    />
-                    <span className="text-sm text-surface-700">Auto-backup</span>
-                  </label>
-                  
-                  {autoBackup && (
-                    <div className="ml-6">
-                      <select
-                        value={backupFrequency}
-                        onChange={(e) => {
-                          setBackupFrequency(e.target.value);
-                          saveSetting('backupFrequency', e.target.value);
-                        }}
-                        className="text-sm px-3 py-1 border border-surface-200 rounded-lg"
-                      >
-                        <option value="daily">Daily</option>
-                        <option value="weekly">Weekly</option>
-                        <option value="monthly">Monthly</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
             

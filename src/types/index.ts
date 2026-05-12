@@ -228,16 +228,5 @@ export interface Settings {
   speechToTextUrl: string;
   aiAnalysisUrl: string;
   aiModel: string;
-  autoBackup: boolean;
-  backupFrequency: 'daily' | 'weekly' | 'monthly';
-  backupRetention: number;
-  cleanupTempFiles: boolean;
   theme: 'light' | 'dark' | 'system';
-  
-  // Additional settings
-  autoTestOnStartup?: boolean;
-  showNotifications?: boolean;
-  compactMode?: boolean;
-  fontSize?: 'small' | 'medium' | 'large';
-  accentColor?: 'blue' | 'green' | 'purple' | 'orange';
 }
