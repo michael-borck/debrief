@@ -22,8 +22,13 @@ const AI_STATES: Record<ServiceStatus['aiAnalysis'], { label: string; dot: strin
 export const StatusBar: React.FC = () => {
   const { serviceStatus, processingQueue } = useContext(ServiceContext);
 
-  const activeProcessing = processingQueue.filter(item =>
-    item.status === 'transcribing' || item.status === 'analyzing'
+  // Count everything that's still going to happen (queued waiting for the
+  // mutex + actively transcribing/analyzing). The user reads this as 'how
+  // many files am I still waiting on?'.
+  const remaining = processingQueue.filter(item =>
+    item.status === 'queued' ||
+    item.status === 'transcribing' ||
+    item.status === 'analyzing'
   ).length;
 
   const stt = STT_STATES[serviceStatus.speechToText];
@@ -53,11 +58,11 @@ export const StatusBar: React.FC = () => {
           </div>
         </div>
 
-        {activeProcessing > 0 && (
+        {remaining > 0 && (
           <div className="flex items-center space-x-1.5">
             <div className="w-1.5 h-1.5 bg-accent-500 rounded-full animate-pulse" />
             <span className="text-surface-700 font-medium">
-              Processing {activeProcessing} file{activeProcessing > 1 ? 's' : ''}
+              {remaining === 1 ? '1 file remaining' : `${remaining} files remaining`}
             </span>
           </div>
         )}

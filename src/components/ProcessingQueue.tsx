@@ -83,10 +83,30 @@ export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
         }
       `}</style>
 
-      <h2 className="text-base font-display text-surface-900 mb-4 flex items-center gap-2">
-        <BarChart3 size={18} className="text-primary-500" />
-        Processing Queue
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-display text-surface-900 flex items-center gap-2">
+          <BarChart3 size={18} className="text-primary-500" />
+          Processing Queue
+        </h2>
+        {items.some(i =>
+          i.status === 'completed' || i.status === 'error' || i.status === 'cancelled'
+        ) && (
+          <button
+            type="button"
+            onClick={() => {
+              items
+                .filter(i =>
+                  i.status === 'completed' || i.status === 'error' || i.status === 'cancelled'
+                )
+                .forEach(i => removeFromProcessingQueue(i.id));
+            }}
+            className="text-xs text-surface-500 hover:text-surface-700 transition-colors"
+            title="Remove all completed, errored, and cancelled items"
+          >
+            Clear completed
+          </button>
+        )}
+      </div>
 
       <div className="space-y-3">
         {items.map(item => {
