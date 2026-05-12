@@ -10,93 +10,35 @@ interface ShortcutsModalProps {
 const ShortcutsModal: React.FC<ShortcutsModalProps> = ({ isOpen, onClose }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Only shortcuts that are actually wired. The previous list documented
+  // ~40 shortcuts most of which were aspirational. If you wire a new
+  // shortcut, add it here too — and if you remove one, take it out.
   const shortcuts = [
     {
-      category: 'Navigation',
+      category: 'App',
       items: [
-        { keys: ['Ctrl/Cmd', '1'], description: 'Home page' },
-        { keys: ['Ctrl/Cmd', '2'], description: 'Library page' },
-        { keys: ['Ctrl/Cmd', '3'], description: 'Projects page' },
-        { keys: ['Ctrl/Cmd', '4'], description: 'Search page' },
-        { keys: ['Ctrl/Cmd', '5'], description: 'Settings page' },
-        { keys: ['Ctrl/Cmd', ','], description: 'Open Settings' },
-        { keys: ['F11'], description: 'Toggle fullscreen mode' },
-        { keys: ['Esc'], description: 'Close modal/dialog, cancel operation' },
+        { keys: ['Ctrl/Cmd', 'O'], description: 'New upload (from File menu)' },
+        { keys: ['Ctrl/Cmd', ','], description: 'Open Settings (from File menu)' },
+        { keys: ['Ctrl/Cmd', 'Q'], description: 'Quit Debrief' },
+        { keys: ['Ctrl/Cmd', '?'], description: 'Show this dialog' },
       ]
     },
     {
-      category: 'File Operations',
+      category: 'Modals & Dialogs',
       items: [
-        { keys: ['Ctrl/Cmd', 'U'], description: 'Upload files' },
-        { keys: ['Ctrl/Cmd', 'O'], description: 'Open file dialog' },
-        { keys: ['Ctrl/Cmd', 'S'], description: 'Save current transcript' },
-        { keys: ['Ctrl/Cmd', 'Shift', 'S'], description: 'Save as (new copy)' },
-        { keys: ['Ctrl/Cmd', 'E'], description: 'Export current content' },
-        { keys: ['Ctrl/Cmd', 'N'], description: 'New project' },
-        { keys: ['Delete'], description: 'Move to trash' },
+        { keys: ['Esc'], description: 'Close the topmost open modal' },
       ]
     },
     {
-      category: 'Search and Discovery',
+      category: 'Editing',
       items: [
-        { keys: ['Ctrl/Cmd', 'F'], description: 'Search in current page' },
-        { keys: ['Ctrl/Cmd', 'K'], description: 'Global search bar' },
-        { keys: ['Ctrl/Cmd', 'G'], description: 'Find next occurrence' },
-        { keys: ['Ctrl/Cmd', 'Shift', 'G'], description: 'Find previous occurrence' },
-        { keys: ['Enter'], description: 'Execute search' },
-        { keys: ['Esc'], description: 'Clear/close search' },
-      ]
-    },
-    {
-      category: 'Text Editing',
-      items: [
-        { keys: ['Ctrl/Cmd', 'A'], description: 'Select all text' },
         { keys: ['Ctrl/Cmd', 'C'], description: 'Copy selected text' },
         { keys: ['Ctrl/Cmd', 'V'], description: 'Paste text' },
         { keys: ['Ctrl/Cmd', 'X'], description: 'Cut selected text' },
-        { keys: ['Ctrl/Cmd', 'Z'], description: 'Undo last action' },
-        { keys: ['Ctrl/Cmd', 'Y'], description: 'Redo action' },
-        { keys: ['F2'], description: 'Edit speaker name' },
-        { keys: ['Tab'], description: 'Jump to next speaker' },
+        { keys: ['Ctrl/Cmd', 'A'], description: 'Select all text' },
+        { keys: ['Ctrl/Cmd', 'Z'], description: 'Undo (in editable fields)' },
       ]
     },
-    {
-      category: 'Audio/Video Playback',
-      items: [
-        { keys: ['Space'], description: 'Play/pause toggle' },
-        { keys: ['←'], description: 'Skip backward (5 seconds)' },
-        { keys: ['→'], description: 'Skip forward (5 seconds)' },
-        { keys: ['Shift', '←'], description: 'Skip backward (30 seconds)' },
-        { keys: ['Shift', '→'], description: 'Skip forward (30 seconds)' },
-        { keys: ['Home'], description: 'Go to beginning' },
-        { keys: ['End'], description: 'Go to end' },
-        { keys: ['+'], description: 'Increase playback speed' },
-        { keys: ['-'], description: 'Decrease playback speed' },
-        { keys: ['0'], description: 'Reset to normal speed' },
-        { keys: ['M'], description: 'Mute/unmute' },
-        { keys: ['↑'], description: 'Increase volume' },
-        { keys: ['↓'], description: 'Decrease volume' },
-      ]
-    },
-    {
-      category: 'AI and Analysis',
-      items: [
-        { keys: ['Ctrl/Cmd', 'Shift', 'A'], description: 'Start AI analysis' },
-        { keys: ['Ctrl/Cmd', 'Shift', 'C'], description: 'Open AI chat' },
-        { keys: ['Ctrl/Cmd', 'Enter'], description: 'Send chat message' },
-        { keys: ['Enter'], description: 'Send message' },
-        { keys: ['Shift', 'Enter'], description: 'New line in message' },
-        { keys: ['↑'], description: 'Previous message in history' },
-        { keys: ['↓'], description: 'Next message in history' },
-      ]
-    },
-    {
-      category: 'Help and Documentation',
-      items: [
-        { keys: ['Ctrl/Cmd', '?'], description: 'Show keyboard shortcuts (this dialog)' },
-        { keys: ['F1'], description: 'Help documentation' },
-      ]
-    }
   ];
 
   const filteredShortcuts = shortcuts.map(category => ({
