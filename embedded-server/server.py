@@ -22,14 +22,18 @@ os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ.setdefault("AUDIO_LENS_MODE", "desktop")
 
 from speech_analyser.app import app
-from fastapi import HTTPException
+from speech_analyser.diarizer import Diarizer
+from fastapi import HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
+import tempfile
+from pathlib import Path as _Path
 
 from embedder import Embedder
 
 VERSION = "0.0.1-spike"
 
 _embedder = Embedder()
+_diarizer = Diarizer()
 
 
 @app.get("/healthz")
@@ -63,6 +67,42 @@ def embed(req: _EmbedRequest) -> _EmbedResponse:
         raise HTTPException(status_code=503, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class _RediariseTurn(BaseModel):
+    start: float
+    end: float
+    speaker: str
+
+
+class _RediariseResponse(BaseModel):
+    speakers: list[_RediariseTurn]
+    num_speakers_used: int | None
+
+
+@app.post("/rediarise", response_model=_RediariseResponse)
+async def rediarise(
+    file: UploadFile = File(..., description="Audio file to re-diarise"),
+    num_speakers: int | None = Form(default=None, description="Exact speaker count hint (omit for auto)"),
+) -> _RediariseResponse:
+    """Re-run diarisation only (no transcription). Debrief-specific endpoint
+    so the per-transcript rerun is cheap and the speaker-count slider is
+    honoured. Whisper is skipped — the renderer already has the segments."""
+    suffix = _Path(file.filename or "upload").suffix or ".wav"
+    content = await file.read()
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(content)
+        tmp_path = _Path(tmp.name)
+    try:
+        turns = _diarizer.diarize(tmp_path, num_speakers=num_speakers)
+        return _RediariseResponse(
+            speakers=[_RediariseTurn(start=t.start, end=t.end, speaker=t.speaker) for t in turns],
+            num_speakers_used=num_speakers,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        tmp_path.unlink(missing_ok=True)
 
 
 def main() -> None:

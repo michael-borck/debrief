@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Users, RefreshCw, AlertCircle, CheckCircle, Ban } from 'lucide-react';
 import { rediarisationService } from '../services/rediarisationService';
 import { useToast } from '../contexts/ToastContext';
@@ -12,9 +12,9 @@ interface DiarisationPanelProps {
   onRerunComplete?: () => void | Promise<void>;
 }
 
-const SLIDER_MIN = 0.30;
-const SLIDER_MAX = 0.75;
-const SLIDER_STEP = 0.01;
+// "auto" means: pass null to pyannote and let it decide. Anything else is
+// an exact speaker count hint pyannote will respect.
+type SpeakerChoice = 'auto' | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 
 export const DiarisationPanel: React.FC<DiarisationPanelProps> = ({
   transcriptId,
@@ -23,33 +23,10 @@ export const DiarisationPanel: React.FC<DiarisationPanelProps> = ({
   onRerunComplete,
 }) => {
   const { showToast } = useToast();
-  const [threshold, setThreshold] = useState<number>(0.50);
+  const [choice, setChoice] = useState<SpeakerChoice>('auto');
   const [isRunning, setIsRunning] = useState(false);
   const [lastResult, setLastResult] = useState<{ ok: boolean; message: string } | null>(null);
   const controllerRef = useRef<AbortController | null>(null);
-
-  // Load the global default threshold once, just to seed the slider so
-  // the user's current saved preference is the visible starting point.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const row = await window.electronAPI.database.get(
-          'SELECT value FROM settings WHERE key = ?',
-          ['diaClusterThreshold']
-        );
-        const saved = row?.value != null ? parseFloat(row.value) : 0.50;
-        if (!cancelled && Number.isFinite(saved)) {
-          setThreshold(Math.min(SLIDER_MAX, Math.max(SLIDER_MIN, saved)));
-        }
-      } catch {
-        // Fallback to default; not worth a toast.
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   const handleRerun = async () => {
     if (!filePath) return;
@@ -58,10 +35,12 @@ export const DiarisationPanel: React.FC<DiarisationPanelProps> = ({
     const controller = new AbortController();
     controllerRef.current = controller;
 
+    const numSpeakers = choice === 'auto' ? null : choice;
+
     const result = await rediarisationService.rerun(
       transcriptId,
       filePath,
-      { clusterThreshold: threshold },
+      { numSpeakers },
       controller.signal
     );
 
@@ -87,7 +66,9 @@ export const DiarisationPanel: React.FC<DiarisationPanelProps> = ({
     showToast({
       kind: 'success',
       title: 'Speakers updated',
-      body: `${count} speaker${count === 1 ? '' : 's'} detected at threshold ${threshold.toFixed(2)}.`,
+      body: numSpeakers
+        ? `Asked for ${numSpeakers}; detected ${count}.`
+        : `Auto-detected ${count} speaker${count === 1 ? '' : 's'}.`,
       duration: 5000,
     });
     if (onRerunComplete) {
@@ -119,23 +100,30 @@ export const DiarisationPanel: React.FC<DiarisationPanelProps> = ({
       )}
 
       <div>
-        <label className="text-xs font-medium text-surface-700 flex items-center justify-between mb-1.5">
-          <span>Cluster threshold</span>
-          <span className="text-surface-500 tabular-nums">{threshold.toFixed(2)}</span>
+        <label className="text-xs font-medium text-surface-700 block mb-1.5">
+          Number of speakers
         </label>
-        <input
-          type="range"
-          min={SLIDER_MIN}
-          max={SLIDER_MAX}
-          step={SLIDER_STEP}
-          value={threshold}
+        <select
+          value={String(choice)}
           disabled={isRunning || fileMissing}
-          onChange={(e) => setThreshold(parseFloat(e.target.value))}
-          className="w-full accent-accent-500 h-1"
-        />
+          onChange={(e) => {
+            const v = e.target.value;
+            setChoice(v === 'auto' ? 'auto' : (Number(v) as SpeakerChoice));
+          }}
+          className="text-sm border border-surface-200 rounded px-2 py-1 w-full bg-white focus:outline-none focus:ring-2 focus:ring-primary-400"
+        >
+          <option value="auto">Auto-detect</option>
+          <option value="2">2 speakers</option>
+          <option value="3">3 speakers</option>
+          <option value="4">4 speakers</option>
+          <option value="5">5 speakers</option>
+          <option value="6">6 speakers</option>
+          <option value="7">7 speakers</option>
+          <option value="8">8 speakers</option>
+        </select>
         <p className="text-[11px] text-surface-500 mt-1 leading-snug">
-          Lower values split speakers more aggressively (more speakers).
-          Higher values merge similar voices (fewer speakers).
+          If auto-detect is splitting one person into two (or merging two
+          people into one), pick the number you actually expect and rerun.
         </p>
       </div>
 
@@ -147,7 +135,7 @@ export const DiarisationPanel: React.FC<DiarisationPanelProps> = ({
             className="btn-primary flex items-center gap-1.5 text-xs py-1.5 px-3 disabled:opacity-50"
           >
             <RefreshCw size={12} />
-            Rerun with this threshold
+            Rerun
           </button>
         ) : (
           <>

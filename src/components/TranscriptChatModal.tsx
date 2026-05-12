@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, MessageCircle, User, Bot, AlertCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, Send, MessageCircle, User, Bot, AlertCircle, Plus } from 'lucide-react';
 import { Transcript } from '../types';
 import { chatService, ChatMessage, ProcessingProgress } from '../services/chatService';
 
@@ -82,6 +83,24 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       console.error('Failed to initialize chat:', error);
       setError('Failed to initialize chat. Please try again.');
       setIsProcessingTranscript(false);
+    }
+  };
+
+  const handleNewChat = async () => {
+    if (messages.length > 0) {
+      const confirmed = window.confirm(
+        'Start a new chat? The current conversation will stay saved but won\'t appear here anymore.'
+      );
+      if (!confirmed) return;
+    }
+    try {
+      const newConvId = await chatService.startNewConversation(transcript.id);
+      setConversationId(newConvId);
+      setMessages([]);
+      setError(null);
+    } catch (e) {
+      console.error('Failed to start new chat:', e);
+      setError('Failed to start a new chat. Please try again.');
     }
   };
 
@@ -196,7 +215,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="modal-backdrop">
       <div className="bg-white rounded-lg shadow-elevated w-full max-w-4xl h-[80vh] flex flex-col">
         {/* Header */}
@@ -215,20 +234,32 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
                     onChange={(e) => handleModeChange(e.target.value)}
                     className="text-xs px-2 py-1 bg-surface-100 border border-surface-200 rounded-full text-surface-600 hover:bg-surface-200 focus:outline-none focus:ring-2 focus:ring-primary-400 cursor-pointer"
                   >
-                    <option value="vector-only">🔍 Find quotes</option>
-                    <option value="rag">🤖 Ask AI</option>
-                    <option value="direct-llm">📄 Read whole transcript</option>
+                    <option value="vector-only">🔍 Find quotes — specific things said</option>
+                    <option value="rag">🤖 Ask AI — everyday Q&amp;A (recommended)</option>
+                    <option value="direct-llm">📄 Read whole transcript — summaries &amp; themes</option>
                   </select>
                 )}
               </div>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-surface-400 hover:text-surface-600 transition-colors"
-          >
-            <X size={24} />
-          </button>
+          <div className="flex items-center space-x-1">
+            {chatReady && (
+              <button
+                onClick={handleNewChat}
+                title="Start a new chat"
+                className="flex items-center gap-1 px-2 py-1 text-xs text-surface-600 hover:text-surface-900 hover:bg-surface-100 rounded transition-colors"
+              >
+                <Plus size={14} /> New chat
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="text-surface-400 hover:text-surface-600 transition-colors p-1"
+              title="Close"
+            >
+              <X size={24} />
+            </button>
+          </div>
         </div>
 
         {/* Processing/Error States */}
@@ -378,6 +409,11 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
 
             {/* Input */}
             <div className="border-t border-surface-200 p-4">
+              <div className="text-xs text-surface-500 mb-2">
+                {currentMode === 'vector-only' && '🔍 Find quotes — best for pulling out specific things that were said.'}
+                {currentMode === 'rag' && '🤖 Ask AI — best for most everyday questions and back-and-forth chat.'}
+                {currentMode === 'direct-llm' && '📄 Read whole transcript — best for summaries, themes, and big-picture questions.'}
+              </div>
               <div className="flex space-x-3">
                 <textarea
                   ref={textareaRef}
@@ -401,6 +437,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

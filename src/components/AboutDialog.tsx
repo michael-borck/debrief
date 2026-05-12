@@ -80,7 +80,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose, onSho
               <li>• Process audio, video, podcasts, and conversations</li>
               <li>• AI-powered analysis with theme discovery and pattern recognition</li>
               <li>• Cross-transcript intelligence and consensus analysis</li>
-              <li>• Interactive chat with semantic search using local RAG</li>
+              <li>• Interactive chat with semantic search over your transcripts</li>
               <li>• Project-based workflow for research and content analysis</li>
               <li>• Complete privacy with local processing and storage</li>
             </ul>

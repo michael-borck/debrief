@@ -1553,21 +1553,19 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
   }
 });
 
-// Rerun ONLY diarisation on an already-transcribed audio file with
-// per-call tunable overrides. Used by the per-transcript Diarisation
-// panel so the user can tweak cluster threshold without re-running
-// whisper. Returns updated speakerTurns; the renderer is responsible
-// for re-aligning to existing chunk timings and persisting.
+// Rerun ONLY diarisation on an already-transcribed audio file. Hits the
+// debrief-specific /rediarise endpoint so we skip whisper. The
+// per-transcript panel passes a num_speakers hint (or null for auto) which
+// pyannote actually honours.
 ipcMain.handle('local-transcription-rediarise', async (event, { audioPath, overrides }) => {
   try {
     if (!fs.existsSync(audioPath)) {
       throw new Error(`Audio file not found: ${audioPath}`);
     }
-    // overrides (cluster_threshold etc.) are no longer honoured — the
-    // sidecar uses pyannote's own clustering hyperparameters. The renderer
-    // still ships the slider; rerunning with any value just re-runs with
-    // pyannote defaults. Repurpose to num_speakers in a follow-up.
-    console.log('[local-transcription] rediarise via sidecar:', audioPath, '(overrides ignored)');
+    const numSpeakers = overrides && Number.isFinite(overrides.numSpeakers)
+      ? Number(overrides.numSpeakers)
+      : null;
+    console.log('[local-transcription] rediarise via sidecar /rediarise:', audioPath, 'numSpeakers=', numSpeakers);
 
     const sendProgress = (data) => {
       try {
@@ -1580,20 +1578,16 @@ ipcMain.handle('local-transcription-rediarise', async (event, { audioPath, overr
     sendProgress({ stage: 'diarising', percent: null });
 
     const t0 = Date.now();
-    const result = await sidecarClient.analyse({
-      audioPath,
-      diarize: true,
-      // model choice doesn't matter for diarisation, but /analyse requires
-      // a valid one — base is the smallest non-en-only option.
-      model: 'base',
-    });
-    const speakerTurns = sidecarClient.segmentsToSpeakerTurns(result.segments);
+    const result = await sidecarClient.rediarise({ audioPath, numSpeakers });
+    const speakerTurns = (result.speakers || []).map(t => ({
+      start: t.start, end: t.end, speaker: t.speaker,
+    }));
     console.log(`[local-transcription] rediarise: ${speakerTurns.length} turns in ${Date.now() - t0} ms`);
 
     return {
       success: true,
       speakerTurns,
-      audioDurationSeconds: result.duration || 0,
+      audioDurationSeconds: 0,
     };
   } catch (error) {
     console.error('[local-transcription] rediarise error:', error);

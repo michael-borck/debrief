@@ -54,33 +54,35 @@ def main() -> int:
     target = Path(os.environ["DEBRIEF_VENV"]) if "DEBRIEF_VENV" in os.environ \
         else user_data_dir() / "venv"
 
-    if target.exists() and venv_python(target).exists():
-        emit("Venv already present; skipping setup")
-        return 0
+    fresh_install = not (target.exists() and venv_python(target).exists())
 
-    target.parent.mkdir(parents=True, exist_ok=True)
-
-    emit(f"Creating Python environment at {target}")
-    try:
-        subprocess.run([sys.executable, "-m", "venv", str(target)], check=True)
-    except subprocess.CalledProcessError as e:
-        fail(f"venv creation failed (exit {e.returncode})", e.returncode)
+    if fresh_install:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        emit(f"Creating Python environment at {target}")
+        try:
+            subprocess.run([sys.executable, "-m", "venv", str(target)], check=True)
+        except subprocess.CalledProcessError as e:
+            fail(f"venv creation failed (exit {e.returncode})", e.returncode)
 
     pip = venv_pip(target)
     py = venv_python(target)
 
-    emit("Upgrading pip")
-    try:
-        subprocess.run([str(pip), "install", "--quiet", "--upgrade", "pip"], check=True)
-    except subprocess.CalledProcessError as e:
-        fail(f"pip upgrade failed (exit {e.returncode})", e.returncode)
+    if fresh_install:
+        emit("Upgrading pip")
+        try:
+            subprocess.run([str(pip), "install", "--quiet", "--upgrade", "pip"], check=True)
+        except subprocess.CalledProcessError as e:
+            fail(f"pip upgrade failed (exit {e.returncode})", e.returncode)
 
-    emit("Installing speech + embedding libraries (largest step — PyTorch is ~250 MB)")
+        emit("Installing speech + embedding libraries (largest step — PyTorch is ~250 MB)")
+    else:
+        emit("Syncing dependencies")
+
     try:
         subprocess.run([str(pip), "install", "--quiet", *INSTALL_SPECS], check=True)
     except subprocess.CalledProcessError as e:
         fail(
-            "pip install of speech-analyser failed. Check your internet connection "
+            "pip install of dependencies failed. Check your internet connection "
             f"and try again (exit {e.returncode})",
             e.returncode,
         )
@@ -93,6 +95,7 @@ def main() -> int:
                 "-c",
                 "from speech_analyser import SpeechAnalyser; "
                 "from pyannote.audio import Pipeline; "
+                "from sentence_transformers import SentenceTransformer; "
                 "print('OK')",
             ],
             check=True,

@@ -77,24 +77,28 @@ class SidecarManager {
       return this.getStatus();
     }
 
-    if (!fs.existsSync(paths.userVenvPython)) {
-      const ok = await this._runSetup(paths);
-      if (!ok) {
-        this.state = 'failed';
-        return this.getStatus();
-      }
+    // Always run setup so newly-added INSTALL_SPECS reach existing users, but
+    // distinguish the two cases for the UI: a missing venv is a real first
+    // launch (show modal); an existing venv just needs a quick pip sync
+    // (invisible — state stays 'starting').
+    const freshInstall = !fs.existsSync(paths.userVenvPython);
+    const ok = await this._runSetup(paths, { freshInstall });
+    if (!ok) {
+      this.state = 'failed';
+      return this.getStatus();
     }
 
     return this._spawnServer(paths);
   }
 
-  // First-launch venv creation. Streams STEP: lines from setup-venv.py into
-  // setupSteps so the renderer (polling getStatus) can render progress.
-  _runSetup(paths) {
+  // Run setup-venv.py. For a fresh install this is the visible first-launch
+  // flow ('setting_up' state drives the modal); for a sync over an existing
+  // venv we stay in 'starting' so the modal doesn't flash on every launch.
+  _runSetup(paths, { freshInstall = true } = {}) {
     return new Promise((resolve) => {
-      this.state = 'setting_up';
+      this.state = freshInstall ? 'setting_up' : 'starting';
       this.setupSteps = [];
-      console.log('[sidecar] running first-launch setup');
+      console.log(`[sidecar] running setup-venv.py (${freshInstall ? 'fresh install' : 'sync'})`);
 
       this.setupProc = spawn(paths.bundledPython, [paths.setupScript], {
         env: { ...process.env, DEBRIEF_VENV: paths.userVenv },

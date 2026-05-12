@@ -6,6 +6,10 @@
 import { abortable, checkCancelled, isCancelled } from '../utils/cancellation';
 
 export interface DiarisationOverrides {
+  // Exact speaker count hint passed straight to pyannote. null/undefined means auto-detect.
+  numSpeakers?: number | null;
+  // Legacy/unused fields kept for type-compat with older callers; the
+  // /rediarise endpoint ignores them.
   clusterThreshold?: number;
   medianFilterFrames?: number;
   minDurationOn?: number;

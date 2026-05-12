@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Send, MessageSquare, Users, BarChart3, Loader } from 'lucide-react';
 import { Project } from '../types';
 import { projectChatService, ProjectChatMessage } from '../services/projectChatService';
@@ -133,7 +134,7 @@ export const ProjectChatModal: React.FC<ProjectChatModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="modal-backdrop">
       <div className="bg-white rounded-lg w-4/5 h-4/5 max-w-4xl max-h-[800px] flex flex-col">
         {/* Header */}
@@ -246,6 +247,7 @@ export const ProjectChatModal: React.FC<ProjectChatModalProps> = ({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

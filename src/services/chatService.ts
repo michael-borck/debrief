@@ -236,7 +236,7 @@ export class ChatService {
       fits,
       contentLength,
       memoryLength,
-      recommendation: fits ? undefined : `Content too long. Try reducing to ${contentLimit} characters or use RAG mode.`
+      recommendation: fits ? undefined : `Content too long. Try reducing to ${contentLimit} characters or switch to "Ask AI" mode.`
     };
   }
 
@@ -247,9 +247,9 @@ export class ChatService {
     const overagePercent = ((usage - budget.estimatedTokens!) / budget.estimatedTokens! * 100).toFixed(1);
     
     if (usage > budget.estimatedTokens! * 1.5) {
-      return `Content exceeds context limit by ${overagePercent}%. Consider using RAG mode or reducing conversation history.`;
+      return `Content exceeds context limit by ${overagePercent}%. Consider switching to "Ask AI" mode or reducing conversation history.`;
     } else if (usage > budget.estimatedTokens! * 1.2) {
-      return `Content is ${overagePercent}% over limit. Consider compacting conversation memory or switching to RAG mode.`;
+      return `Content is ${overagePercent}% over limit. Consider compacting conversation memory or switching to "Ask AI" mode.`;
     } else {
       return `Content slightly exceeds limit by ${overagePercent}%. Some conversation history may be truncated.`;
     }
@@ -797,16 +797,18 @@ export class ChatService {
 
       // Validate and optimize context usage
       const validation = this.validateContextUsage(transcriptText, memoryContext);
-      
+      let transcriptWasTruncated = false;
+
       // Apply smart truncation if needed
       if (!validation.fits) {
         console.log(`Direct LLM mode: ${validation.recommendation}`);
-        
+
         // Truncate transcript to fit within content budget
         const availableContentSpace = contentLimit - 500; // Reserve space for formatting
         if (transcriptText.length > availableContentSpace) {
-          transcriptText = transcriptText.substring(0, availableContentSpace) + 
-            "\n\n[Note: Transcript was truncated to fit context limit. Consider using RAG mode for better handling of long transcripts.]";
+          transcriptWasTruncated = true;
+          transcriptText = transcriptText.substring(0, availableContentSpace) +
+            "\n\n[Note: Transcript was truncated to fit context limit. Consider switching to \"Ask AI\" mode for better handling of long transcripts.]";
         }
 
         // Truncate memory if needed
@@ -869,13 +871,16 @@ export class ChatService {
       });
 
       if (response.success) {
+        if (transcriptWasTruncated) {
+          return `⚠️ This transcript was longer than the model's context window, so only part of it was sent. The answer below may be incomplete — switch to **Ask AI** mode for better handling of long transcripts.\n\n---\n\n${response.response}`;
+        }
         return response.response;
       } else {
         throw new Error(response.error || 'Failed to generate response');
       }
     } catch (error) {
       console.error('Direct LLM mode error:', error);
-      return "I encountered an error while processing the full transcript. Please try again or consider using RAG mode for better performance with long transcripts.";
+      return "I encountered an error while processing the full transcript. Please try again or switch to \"Ask AI\" mode for better performance with long transcripts.";
     }
   }
 
@@ -960,6 +965,23 @@ export class ChatService {
       console.error('Failed to load conversation history:', error);
       return [];
     }
+  }
+
+  /**
+   * Force-create a fresh conversation for a transcript (skips the
+   * "return latest" path). Used by the "New chat" button.
+   */
+  async startNewConversation(transcriptId: string): Promise<string> {
+    const conversationId = `conv_${transcriptId}_${Date.now()}`;
+    try {
+      await window.electronAPI.database.run(
+        'INSERT INTO chat_conversations (id, transcript_id) VALUES (?, ?)',
+        [conversationId, transcriptId]
+      );
+    } catch (error) {
+      console.error('Failed to create new conversation:', error);
+    }
+    return conversationId;
   }
 
   /**

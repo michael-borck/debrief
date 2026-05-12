@@ -64,6 +64,31 @@ async function analyse({ audioPath, diarize = true, model = 'base' }) {
   return await res.json();
 }
 
+// POST /rediarise — debrief-specific diarisation-only endpoint. Skips
+// transcription (returns just speaker turns) and honours the num_speakers
+// hint from the per-transcript slider.
+async function rediarise({ audioPath, numSpeakers = null }) {
+  ensureReady();
+  if (!fs.existsSync(audioPath)) {
+    throw new Error(`Audio file not found: ${audioPath}`);
+  }
+  const fileBuffer = fs.readFileSync(audioPath);
+  const filename = path.basename(audioPath);
+  const form = new FormData();
+  form.append('file', new Blob([fileBuffer]), filename);
+  if (numSpeakers != null) form.append('num_speakers', String(numSpeakers));
+  const res = await fetch(`${baseUrl()}/rediarise`, {
+    method: 'POST',
+    body: form,
+    dispatcher: localhostAgent,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`/rediarise returned ${res.status}: ${body || res.statusText}`);
+  }
+  return await res.json();
+}
+
 // POST /embed for batch sentence embeddings. Returns 384-dim L2-normalised
 // vectors via all-MiniLM-L6-v2. First call per sidecar lifetime pays the
 // ~80MB model-load cost (~2-3s on Apple Silicon); subsequent calls are
@@ -121,6 +146,7 @@ function segmentsToSpeakerTurns(segments) {
 module.exports = {
   init,
   analyse,
+  rediarise,
   embed,
   segmentsToChunkTimings,
   segmentsToSpeakerTurns,
