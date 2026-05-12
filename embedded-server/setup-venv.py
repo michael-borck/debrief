@@ -10,7 +10,16 @@ import sys
 from pathlib import Path
 
 # Same pin we publish to PyPI. Bump in lockstep with speech-analyser releases.
-SPEECH_ANALYSER_PIN = "speech-analyser[diarization]>=0.2.0"
+# Pip specs installed into the user-data venv on first launch.
+#   - speech-analyser[diarization] for transcription + speaker diarisation
+#   - sentence-transformers for the /embed endpoint (chat RAG retrieval).
+#     384-dim all-MiniLM-L6-v2 weights (~80 MB) are downloaded on first
+#     /embed call; eventually we'll bundle them via prefetch-models for
+#     fully offline first launch.
+INSTALL_SPECS = [
+    "speech-analyser[diarization]>=0.2.0",
+    "sentence-transformers>=2.7,<6",
+]
 
 
 def user_data_dir() -> Path:
@@ -66,9 +75,9 @@ def main() -> int:
     except subprocess.CalledProcessError as e:
         fail(f"pip upgrade failed (exit {e.returncode})", e.returncode)
 
-    emit("Installing speech analysis libraries (largest step — PyTorch is ~250 MB)")
+    emit("Installing speech + embedding libraries (largest step — PyTorch is ~250 MB)")
     try:
-        subprocess.run([str(pip), "install", "--quiet", SPEECH_ANALYSER_PIN], check=True)
+        subprocess.run([str(pip), "install", "--quiet", *INSTALL_SPECS], check=True)
     except subprocess.CalledProcessError as e:
         fail(
             "pip install of speech-analyser failed. Check your internet connection "

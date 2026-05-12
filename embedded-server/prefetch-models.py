@@ -24,19 +24,39 @@ if not token:
 # All four pyannote repos are gated; their licences (MIT or CC-BY-4.0) permit
 # redistribution provided we credit pyannote/wespeaker in the about screen.
 # Systran/faster-whisper-base is ungated.
-REPOS = [
+# Each entry is either a repo id (download everything) or a dict with
+# optional allow_patterns / ignore_patterns to keep the bundle lean.
+REPOS: list = [
     "pyannote/speaker-diarization-3.1",
     "pyannote/segmentation-3.0",
     "pyannote/speaker-diarization-community-1",
     "pyannote/wespeaker-voxceleb-resnet34-LM",
     "Systran/faster-whisper-base",
+    # MiniLM ships ONNX / OpenVINO / TF / Rust variants that we don't need.
+    # Excluding them keeps the PyTorch path at ~80 MB instead of ~1 GB.
+    {
+        "id": "sentence-transformers/all-MiniLM-L6-v2",
+        "ignore_patterns": [
+            "onnx/**",
+            "openvino/**",
+            "*.onnx",
+            "tf_model.h5",
+            "flax_model.msgpack",
+            "rust_model.ot",
+        ],
+    },
 ]
 
 from huggingface_hub import snapshot_download
 
 for repo in REPOS:
-    print(f"Downloading {repo}", flush=True)
-    snapshot_download(repo, token=token)
+    if isinstance(repo, str):
+        repo_id, opts = repo, {}
+    else:
+        repo_id = repo["id"]
+        opts = {k: v for k, v in repo.items() if k != "id"}
+    print(f"Downloading {repo_id}", flush=True)
+    snapshot_download(repo_id, token=token, **opts)
 
 total_bytes = sum(f.stat().st_size for f in CACHE_DIR.rglob("*") if f.is_file())
 print(f"Done. Cache size: {total_bytes / 1e6:.1f} MB ({total_bytes / 1e9:.2f} GB)")

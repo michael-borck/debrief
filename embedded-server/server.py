@@ -22,13 +22,47 @@ os.environ["HF_HUB_OFFLINE"] = "1"
 os.environ.setdefault("AUDIO_LENS_MODE", "desktop")
 
 from speech_analyser.app import app
+from fastapi import HTTPException
+from pydantic import BaseModel
+
+from embedder import Embedder
 
 VERSION = "0.0.1-spike"
+
+_embedder = Embedder()
 
 
 @app.get("/healthz")
 def healthz():
     return {"status": "ok", "version": VERSION}
+
+
+class _EmbedRequest(BaseModel):
+    texts: list[str]
+    normalize: bool = True
+
+
+class _EmbedResponse(BaseModel):
+    embeddings: list[list[float]]
+    model: str
+    dim: int
+
+
+@app.post("/embed", response_model=_EmbedResponse)
+def embed(req: _EmbedRequest) -> _EmbedResponse:
+    """Embed a batch of texts for chat-RAG retrieval. Debrief-specific —
+    sits alongside speech-analyser's /analyse on the same sidecar process."""
+    try:
+        vectors = _embedder.embed(req.texts, normalize=req.normalize)
+        return _EmbedResponse(
+            embeddings=vectors,
+            model=_embedder.model_id,
+            dim=_embedder.dim,
+        )
+    except RuntimeError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 def main() -> None:
