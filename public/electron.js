@@ -1861,73 +1861,52 @@ let embeddingPipeline = null;
 let vectorStore = null;
 let isEmbeddingInitialized = false;
 
-// Embedding service implementation
+// Embedding service — delegates to the bundled Python sidecar's /embed
+// endpoint (sentence-transformers/all-MiniLM-L6-v2, 384-dim). The legacy
+// simpleTextEmbedding helper is kept below as a fallback for the very brief
+// window between app launch and sidecar ready, but the canonical path is
+// the sidecar so chat RAG retrieval is real semantic search rather than
+// keyword frequency.
 ipcMain.handle('embedding-initialize', async () => {
-  try {
-    console.log('embedding-initialize called - current state:', { isEmbeddingInitialized });
-    
-    if (isEmbeddingInitialized) {
-      console.log('Embedding already initialized, returning success');
-      return { success: true };
-    }
-
-    console.log('Initializing simple text embedding service...');
-    
-    // For now, we'll use the simple text-based approach
-    // This can be enhanced later with real transformers.js integration
-    isEmbeddingInitialized = true;
-    console.log('Embedding service initialized successfully (using simple text similarity)');
-    
-    return { success: true };
-  } catch (error) {
-    console.error('Failed to initialize embedding service:', error);
-    isEmbeddingInitialized = false;
-    return { success: false, error: error.message };
-  }
+  // Initialisation is now implicit (sidecar lazy-loads on first /embed call).
+  // Keep the IPC for renderer compat — return success.
+  isEmbeddingInitialized = true;
+  return { success: true };
 });
 
-ipcMain.handle('embedding-embed-text', async (event, { text, metadata }) => {
+ipcMain.handle('embedding-embed-text', async (_event, { text, metadata }) => {
   try {
-    console.log('embedText called - isEmbeddingInitialized:', isEmbeddingInitialized);
-    
-    if (!isEmbeddingInitialized) {
-      console.error('Embedding service not ready - isInitialized:', isEmbeddingInitialized);
-      throw new Error('Embedding service not initialized');
+    if (sidecar.state === 'ready') {
+      const res = await sidecarClient.embed([text]);
+      return { embedding: res.embeddings[0], text, metadata };
     }
-
-    // Generate embedding using simple text-based approach
-    const embedding = simpleTextEmbedding(text);
-
-    return {
-      embedding,
-      text,
-      metadata
-    };
+    // Sidecar not ready (first-launch setup running, or it crashed). Fall
+    // back to the placeholder so chat doesn't hard-fail; the user gets
+    // worse retrieval but the app keeps working until the sidecar comes up.
+    console.warn('[embedding] sidecar not ready, using placeholder');
+    return { embedding: simpleTextEmbedding(text), text, metadata };
   } catch (error) {
     console.error('Failed to embed text:', error);
     throw error;
   }
 });
 
-ipcMain.handle('embedding-embed-batch', async (event, { texts, metadata }) => {
+ipcMain.handle('embedding-embed-batch', async (_event, { texts, metadata }) => {
   try {
-    if (!isEmbeddingInitialized) {
-      throw new Error('Embedding service not initialized');
-    }
-
-    const results = [];
-    for (let i = 0; i < texts.length; i++) {
-      const text = texts[i];
-      const embedding = simpleTextEmbedding(text);
-      
-      results.push({
+    if (sidecar.state === 'ready') {
+      const res = await sidecarClient.embed(texts);
+      return res.embeddings.map((embedding, i) => ({
         embedding,
-        text,
-        metadata: metadata?.[i]
-      });
+        text: texts[i],
+        metadata: metadata?.[i],
+      }));
     }
-
-    return results;
+    console.warn('[embedding] sidecar not ready, using placeholder for batch');
+    return texts.map((text, i) => ({
+      embedding: simpleTextEmbedding(text),
+      text,
+      metadata: metadata?.[i],
+    }));
   } catch (error) {
     console.error('Failed to embed batch:', error);
     throw error;

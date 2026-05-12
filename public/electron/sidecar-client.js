@@ -64,6 +64,31 @@ async function analyse({ audioPath, diarize = true, model = 'base' }) {
   return await res.json();
 }
 
+// POST /embed for batch sentence embeddings. Returns 384-dim L2-normalised
+// vectors via all-MiniLM-L6-v2. First call per sidecar lifetime pays the
+// ~80MB model-load cost (~2-3s on Apple Silicon); subsequent calls are
+// effectively instant.
+async function embed(texts, { normalize = true } = {}) {
+  ensureReady();
+  if (!Array.isArray(texts)) {
+    throw new Error('embed() expects an array of strings');
+  }
+  if (texts.length === 0) {
+    return { embeddings: [], model: '', dim: 0 };
+  }
+  const res = await fetch(`${baseUrl()}/embed`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ texts, normalize }),
+    dispatcher: localhostAgent,
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`/embed returned ${res.status}: ${body || res.statusText}`);
+  }
+  return await res.json();
+}
+
 // Map speech-analyser segments to the ChunkTimingInfo shape the renderer
 // expects (sentenceSegmentsService.createSegmentsFromChunks consumes this).
 function segmentsToChunkTimings(segments) {
@@ -96,6 +121,7 @@ function segmentsToSpeakerTurns(segments) {
 module.exports = {
   init,
   analyse,
+  embed,
   segmentsToChunkTimings,
   segmentsToSpeakerTurns,
 };
