@@ -2,6 +2,11 @@ const path = require('path');
 const HtmlWebpackPlugin = require('html-webpack-plugin');
 const webpack = require('webpack');
 
+// Webpack passes `--mode production` via argv; default to development.
+const IS_PROD = process.argv.includes('--mode=production') ||
+                process.argv.includes('production') ||
+                process.env.NODE_ENV === 'production';
+
 module.exports = {
   mode: 'development',
   entry: './src/index.tsx',
@@ -53,6 +58,11 @@ module.exports = {
   plugins: [
     new HtmlWebpackPlugin({
       template: './public/index.html',
+      // Webpack dev uses eval-source-map (default for `mode: development`),
+      // which needs 'unsafe-eval' in the CSP. Production builds don't, so we
+      // drop it entirely there — that's what triggered Electron's
+      // "Insecure Content-Security-Policy" runtime warning.
+      cspEval: IS_PROD ? '' : "'unsafe-eval'",
     }),
     new webpack.DefinePlugin({
       global: 'window',

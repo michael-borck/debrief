@@ -21,6 +21,15 @@ os.environ["HF_HUB_OFFLINE"] = "1"
 # renderer). Read at import time, so set first.
 os.environ.setdefault("AUDIO_LENS_MODE", "desktop")
 
+# Suppress shutdown-time "leaked semaphore" warnings from loky/joblib.
+# When Electron sends SIGTERM, worker pools spawned by tokenizers' Rust
+# layer and sklearn's loky backend don't always clean up their named
+# semaphores. Disabling those two specifically avoids the leak without
+# touching torch's CPU thread count (which would slow Whisper). Whisper
+# itself uses torch's intra-op parallelism, which is unaffected.
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
+
 from speech_analyser.app import app
 from speech_analyser.diarizer import Diarizer
 from fastapi import HTTPException, UploadFile, File, Form

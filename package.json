@@ -10,7 +10,7 @@
   "scripts": {
     "start": "NODE_ENV=development concurrently \"npm run webpack-dev\" \"npm run electron-dev\"",
     "webpack-dev": "webpack serve --mode development",
-    "electron-dev": "wait-on http://localhost:9000 && electron . --no-sandbox",
+    "electron-dev": "wait-on http://localhost:9000/bundle.js && electron . --no-sandbox",
     "build": "webpack --mode production",
     "build:sidecar": "bash embedded-server/bundle-python.sh && bash embedded-server/prefetch-models.sh",
     "electron": "electron . --no-sandbox",

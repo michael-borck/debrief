@@ -58,6 +58,30 @@ let db;
 // to the current one. legacyNames lists every previous product slug; path
 // literals are built with string concatenation so the bulk-rename script
 // doesn't rewrite them away when we drop the next product name in.
+//
+// Electron pre-creates the new userData dir with empty Cache/Cookies before
+// this runs, so `readdirSync(newDir).length > 0` is always true and a naive
+// check skips migration even on a clean install. We detect "real" data by
+// looking for our app's DB file — if it's not there, the new dir is just
+// Electron's scaffolding and is safe to clobber.
+const APP_DATA_MARKER = 'audio-scribe.db';
+
+function hasRealAppData(dir) {
+  try {
+    return fs.existsSync(path.join(dir, APP_DATA_MARKER));
+  } catch {
+    return false;
+  }
+}
+
+function rmRecursive(target) {
+  try {
+    fs.rmSync(target, { recursive: true, force: true });
+  } catch (err) {
+    console.warn(`[migration] could not remove ${target}:`, err.message);
+  }
+}
+
 function migrateLegacyUserDataDir() {
   const newDir = app.getPath('userData');
   const home = require('os').homedir();
@@ -72,18 +96,36 @@ function migrateLegacyUserDataDir() {
     const oldDir = path.join(platformBase, legacy);
     if (oldDir === newDir) continue;
     if (!fs.existsSync(oldDir)) continue;
-    if (fs.existsSync(newDir) && fs.readdirSync(newDir).length > 0) {
-      console.warn(`[migration] both ${oldDir} and ${newDir} exist with content; skipping rename to avoid clobber.`);
+
+    const newHasData = hasRealAppData(newDir);
+    const oldHasData = hasRealAppData(oldDir);
+
+    // Case A: new dir has the real DB → it's the active one. Old dir is
+    // either stale or empty Electron scaffolding. Either way, remove it.
+    if (newHasData) {
+      console.log(`[migration] active data dir is ${newDir}; cleaning up stale ${oldDir}`);
+      rmRecursive(oldDir);
       continue;
     }
-    try {
-      if (fs.existsSync(newDir)) fs.rmdirSync(newDir);
-      fs.renameSync(oldDir, newDir);
-      console.log(`[migration] renamed user-data dir ${oldDir} -> ${newDir}`);
-      return;
-    } catch (err) {
-      console.error(`[migration] rename ${oldDir} -> ${newDir} failed:`, err);
+
+    // Case B: old dir has the DB, new dir is just Electron's scaffolding.
+    // Wipe the new dir's empty scaffolding and rename the old dir onto it.
+    if (oldHasData) {
+      rmRecursive(newDir);
+      try {
+        fs.renameSync(oldDir, newDir);
+        console.log(`[migration] renamed ${oldDir} -> ${newDir}`);
+        return;
+      } catch (err) {
+        console.error(`[migration] rename ${oldDir} -> ${newDir} failed:`, err);
+      }
+      continue;
     }
+
+    // Case C: neither has real data. Old dir is just Electron junk from a
+    // previous launch under the legacy name. Safe to remove.
+    console.log(`[migration] removing empty legacy dir ${oldDir}`);
+    rmRecursive(oldDir);
   }
 }
 
@@ -717,8 +759,10 @@ function createWindow() {
     console.error('Failed to load:', errorCode, errorDescription);
   });
 
-  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
-    console.log('Console:', message);
+  // Electron ≥28: console-message uses a single Event object instead of
+  // positional (level, message, line, sourceId) args.
+  mainWindow.webContents.on('console-message', (e) => {
+    console.log('Console:', e.message);
   });
 
   mainWindow.on('closed', () => {
