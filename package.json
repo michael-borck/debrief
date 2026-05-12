@@ -1,6 +1,6 @@
 {
   "name": "debrief",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "AI-powered conversation analysis and insight discovery platform",
   "author": {
     "name": "Michael Borck",
@@ -66,6 +66,7 @@
     "jspdf": "^4.2.1",
     "lucide-react": "^0.511.0",
     "node-fetch": "^3.3.2",
+    "undici": "^7.25.0",
     "postcss": "^8.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
