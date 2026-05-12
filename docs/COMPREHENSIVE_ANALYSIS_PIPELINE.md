@@ -43,15 +43,14 @@ Debrief implements a sophisticated **7-stage comprehensive analysis pipeline** t
 **Progress**: 20-65% ("transcribing")
 
 **Process**:
-- Configurable STT service integration (default: Speaches service)
-- Chunk-based transcription with precise timing information
-- Returns full text with chunk timings for sentence segmentation
-- Handles various audio qualities and formats
+- Bundled Python sidecar (`lens/speech-analyser`) runs `faster-whisper` locally — no external service required.
+- The renderer POSTs the audio to the sidecar's `/analyse` endpoint, which returns the full transcript plus per-segment timing info in one response.
+- Diarisation (`pyannote.audio` 3.1) runs alongside on the same call, returning speaker turns aligned to the same segments.
 
 **Key Features**:
-- **Service Abstraction**: Pluggable STT service architecture
-- **Timing Precision**: Chunk-level timestamp preservation
-- **Quality Handling**: Adaptive processing for different audio qualities
+- **Local-only**: no network calls during transcription. Models are bundled at build time and cached in user-data.
+- **Timing Precision**: per-segment start/end timestamps, used downstream for sentence segmentation and audio-player jumps.
+- **Speaker-aware**: when diarisation is enabled, each segment carries a speaker tag.
 - **Progress Tracking**: Real-time transcription progress updates
 
 ### Stage 3: Transcript Validation and Correction
@@ -239,8 +238,8 @@ interface ValidationOptions {
 
 ### Core Service Dependencies
 
-#### 1. Sentence Segmentation Service
-**Location**: `/src/services/sentenceSegmentationService.ts`
+#### 1. Sentence Segments Service
+**Location**: `/src/services/sentenceSegmentsService.ts`
 
 **Features**:
 - **Smart Boundary Detection**: Intelligent sentence splitting

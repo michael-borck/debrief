@@ -23,9 +23,9 @@ The vector index is built incrementally as you transcribe. There's no separate "
 
 ## Conversation modes
 
-Settings → Chat lets you choose how the chat works. Three options:
+Settings → Chat lets you choose how the chat works. Three options (the in-app dropdown shows the same names):
 
-### Quote Lookup
+### Find quotes 🔍
 
 Returns relevant transcript excerpts directly, with no AI rewriting.
 
@@ -35,9 +35,9 @@ Returns relevant transcript excerpts directly, with no AI rewriting.
 
 You'll see exact excerpts with timestamps and a relevance score. No interpretation, no synthesis.
 
-### Smart Search (Recommended, default)
+### Ask AI (Recommended, default) 🤖
 
-Retrieves the most relevant chunks and sends them to the AI for interpretation.
+Retrieves the most relevant passages and sends them to the AI for interpretation. This is real RAG over sentence-transformers/MiniLM embeddings via the bundled sidecar — not keyword search.
 
 - **Balanced** — speed and quality
 - **Best for**: general questions, analysis, follow-up conversation
@@ -45,15 +45,15 @@ Retrieves the most relevant chunks and sends them to the AI for interpretation.
 
 Most users should leave it on this setting.
 
-### Full Transcript
+### Read whole transcript 📄
 
 Sends the entire transcript to the AI in one shot.
 
 - **Most thorough** — the AI sees everything
 - **Slowest** — long transcripts use a lot of tokens
-- **Best for**: questions that need full context ("what's the overall arc of this conversation?")
+- **Best for**: summarising, identifying themes across the whole recording, "what's the overall arc?"
 
-This mode has a configurable context limit (default 8,000 characters) for transcripts that exceed the LLM's window.
+When the transcript is bigger than the model's context window it gets truncated, and the chat response is prefixed with a ⚠️ banner explaining the trade-off and recommending Ask AI mode. The cutoff threshold (default 8,000 characters) is configurable under Settings → Chat → Advanced.
 
 ## What you can ask
 
@@ -76,6 +76,22 @@ When you chat with a project, the AI sees context from every transcript in the p
 
 The context is retrieved using the same vector search, just over a wider pool of chunks.
 
+## Topics panel
+
+The **Topics** tab on a transcript reuses the same passages and embeddings as chat to cluster the conversation into a handful of topics. Each topic gets:
+
+- A short LLM-generated label (3-5 words) and one-sentence summary
+- The number of passages it covers and the time range it spans
+- An expandable list of the passages, with click-to-jump timestamps
+
+How it works:
+
+- **Clustering** runs in JavaScript: k-means with k-means++ seeding over the 384-dim sentence-transformers vectors. Choose **Auto** (2-6 picked by silhouette score) or pin an exact number from the dropdown.
+- **Labelling** sends the three centroid-closest passages from each cluster to your configured LLM, with strict instructions to return a short label + summary. Falls back to a keyword extraction if no LLM is configured (labels will be uglier).
+- **Caching:** topics persist to a `transcript_topics` table. Reopening the tab loads instantly. Click **Recompute** to redo it.
+
+When to use it: orientation on long recordings — "what does this 90-minute interview actually cover?" — rather than rigorous thematic analysis. For codebook-style qual work, export the transcript and use a dedicated tool like NVivo or MaxQDA.
+
 ## Conversation memory
 
 Debrief remembers the last 20 messages in a conversation by default. After that, older messages get summarised to keep the context window manageable. You can adjust the memory limit in Settings → Chat → Advanced Chat Settings → Conversation Memory Limit.
@@ -94,7 +110,9 @@ Conversations are scoped to either a transcript or a project — they show which
 
 - **Be specific.** "Summarise this" works, but "Give me a 3-bullet summary focused on action items" works better.
 - **Reference time.** If you remember roughly when something was said, mention it ("around 12 minutes in"). The AI can use timestamps in the chunks.
-- **Use Quote Lookup for evidence.** When you need exact wording for a report or paper, switch to Quote Lookup mode for verbatim excerpts.
+- **Use Find quotes for evidence.** When you need exact wording for a report or paper, switch to Find quotes mode for verbatim excerpts.
+- **Use Read whole transcript for summaries.** RAG (Ask AI) only sees the chunks it retrieves, so it can miss things scattered throughout. For summaries or "main themes" questions, Read whole transcript is the right pick.
+- **Click New chat to start fresh.** The button in the modal header creates a new conversation. The old one stays saved (open it from Chat History).
 - **Switch providers per task.** A small local Ollama model is fine for "find me X" questions but might struggle with deep analysis. Switching to a cloud provider in Settings affects all subsequent chat — no per-conversation override.
 - **Privacy reminder.** When you're using a cloud AI provider, your chat questions AND the retrieved transcript chunks are sent to that provider. Check the privacy banner in Settings to confirm which mode you're in.
 

@@ -79,12 +79,14 @@ The AI Correction button uses your configured AI provider (Settings → Processi
 
 ### Per-transcript rerun
 
-The transcript detail page has a **Diarisation** panel with a **Rerun** button. Clicking it re-submits the audio to the sidecar for a fresh pass. Because `/analyse` is currently a single endpoint that does transcription + diarisation together, a rerun re-transcribes too — a regression versus older versions that supported diarisation-only reruns. A diarise-only sidecar endpoint is on the roadmap.
+The transcript detail page has a **Speaker detection** panel with a **Number of speakers** dropdown (Auto / 2–8) and a **Rerun** button. Clicking it hits a debrief-specific `/rediarise` endpoint on the sidecar that **skips Whisper** — the existing transcript text is reused, only the speaker tags get rewritten. Much faster than a full re-import.
+
+When the dropdown is set to a specific count, pyannote uses it as a hard `num_speakers` hint. This is the right knob when auto-detect over-splits one person into two voices, or merges two voices into one. Pyannote does not interpret the hint as "at least N" or "at most N" — it produces exactly N clusters.
 
 ### Known limitations
 
-- **No advanced tuning knobs.** Older Debrief versions exposed sliders for cluster threshold, median filter frames, etc. Pyannote 3.1's high-level API doesn't expose those, so the sliders are no-ops in the current build. Repurposing the panel for a `num_speakers` hint (telling pyannote you know how many speakers there are) is planned.
-- **No per-chunk progress events.** The sidecar's `/analyse` endpoint returns the full result in one HTTP response — there's no per-chunk progress while it runs. The Processing Queue shows a single "transcribing" stage until completion. Server-Sent Events from the sidecar would address this.
+- **Auto-detect over- or under-splits short or noisy recordings.** Workaround: set the speaker count manually on the rerun panel. Pyannote honours an exact count hint.
+- **No per-chunk progress events.** The sidecar's `/analyse` endpoint returns the full result in one HTTP response — there's no per-chunk progress while it runs. The Processing Queue shows a single "transcribing" stage with an indeterminate progress bar until completion. Server-Sent Events from the sidecar would address this.
 - **Cancel closes the connection but the sidecar keeps churning.** A cancel button stops the renderer waiting, but the underlying compute completes in the background until the response is discarded.
 
 ## Performance notes

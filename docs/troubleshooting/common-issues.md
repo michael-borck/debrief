@@ -82,14 +82,14 @@ If you've tried all three and it's still bad, try running the audio through nois
 
 Symptom: the pipeline says 4 speakers but there are only 2, or vice versa.
 
-Open **Settings → Processing → Advanced diarisation tuning** and adjust:
+Open the transcript and find the **Speaker detection** panel on the detail page:
 
-- **Too many speakers (over-splitting)** — lower the cluster threshold (e.g. 0.40), or raise the noise cluster minimum to absorb fragments
-- **Too few speakers (merging)** — raise the cluster threshold (e.g. 0.60)
+1. Set **Number of speakers** to the exact count you expect (or leave on Auto).
+2. Click **Rerun**. This re-runs only the diarisation step (Whisper is skipped — much faster than a fresh import).
 
-Re-process the file after changing settings. These knobs apply per-run.
+Pyannote will produce exactly that many speaker clusters and re-tag the transcript. If you set a count that doesn't match the audio (e.g. 3 on a single-speaker recording), the result will still split into 3 clusters — so only pin a count you're confident about.
 
-You can also fix it manually in **Speaker Tagging → Merge** without touching settings.
+You can also fix mis-splits manually in **Speaker Tagging → Merge** without rerunning.
 
 ### Speakers are mislabelled as "Speaker 1", "Speaker 2", etc.
 

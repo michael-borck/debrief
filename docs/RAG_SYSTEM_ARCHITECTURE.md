@@ -1,13 +1,17 @@
 # RAG System Architecture for Electron Applications
 
-> ⚠️ **Stale — pending rewrite.** This document describes the pre-sidecar
-> architecture (pre-2026-05). The transcription/diarisation pipeline has since
-> moved into the bundled Python sidecar (`lens/speech-analyser`), the
-> @xenova/transformers dependency has been removed, and main-process embedding
-> is currently a `simpleTextEmbedding` placeholder rather than transformers-
-> based. References to `@xenova/transformers` and the in-process Whisper
-> pipeline are historical. Treat the RAG flow described here as aspirational
-> until this page is refreshed.
+> ⚠️ **Partially stale.** Predates Sprint 3 (2026-05). Current state:
+>
+> - Transcription/diarisation run in the bundled Python sidecar
+>   (`lens/speech-analyser`). The in-process Whisper / `@xenova/transformers`
+>   pipeline described below is gone.
+> - Embeddings are real — `sentence-transformers/all-MiniLM-L6-v2` via the
+>   sidecar `/embed` endpoint. The `simpleTextEmbedding` placeholder is gone.
+> - UI mode labels are **Find quotes** / **Ask AI** / **Read whole transcript**.
+>
+> The RAG flow described below is broadly correct in shape but uses older
+> component names. See [features/ai-chat.md](features/ai-chat.md) for the
+> current user-facing description.
 
 ## Overview
 

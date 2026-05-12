@@ -1,13 +1,19 @@
 # Vector Store & Embedding System
 
-> ⚠️ **Stale — pending rewrite.** This document describes the pre-sidecar
-> architecture (pre-2026-05). The `@xenova/transformers` embedding pipeline
-> described below has been removed; the current main process uses a
-> `simpleTextEmbedding` placeholder for chat indexing. The transcription side
-> now runs through the bundled Python sidecar (`lens/speech-analyser`) — see
-> [Transcription & Diarisation](features/transcription.md) for the current
-> pipeline. This page will be rewritten once the embedding layer is restored
-> to a real model-based path.
+> ⚠️ **Partially stale.** This document predates Sprint 3 (2026-05). Current state:
+>
+> - **Embeddings are real** — `sentence-transformers/all-MiniLM-L6-v2` via the
+>   sidecar `/embed` endpoint. The `simpleTextEmbedding` placeholder is gone.
+> - **Vectors are 384-dim, L2-normalised**, stored in LanceDB at
+>   `~/Library/Application Support/debrief/vector-store/chunks`.
+> - **Chat modes use friendly names in the UI**: Find quotes (vector-only),
+>   Ask AI (rag, default), Read whole transcript (direct-llm). The internal
+>   identifiers `vector-only` / `rag` / `direct-llm` still match the code.
+> - **`@xenova/transformers` dep removed** — the in-process transformer.js
+>   pipeline described below no longer exists.
+>
+> The technical sections below haven't been line-by-line refreshed and may
+> reference older names. Treat as data-flow sketch, not literal API reference.
 
 ## Overview
 

@@ -58,7 +58,7 @@ Toggle for the diarisation pipeline. On by default.
 
 When on, the sidecar's `/analyse` call runs `pyannote.audio` 3.1 alongside faster-whisper to assign speaker labels to each segment. Adds about 1× the audio length to processing time. Turn it off for known single-speaker recordings to save time.
 
-**Advanced diarisation tuning** (collapsible) — historically exposed cluster threshold and segmentation parameters as sliders. Pyannote 3.1's high-level API doesn't expose those knobs, so the sliders are currently no-ops; they'll be repurposed into a `num_speakers` hint ("I know there are 2 speakers — pin it") in a future release.
+Per-transcript tuning lives on the transcript detail page under **Speaker detection**, not in Settings. There you can override auto-detect with an exact speaker count (Auto / 2–8) and rerun — see [Transcription → Per-transcript rerun](../features/transcription.md#per-transcript-rerun).
 
 ### AI token usage
 

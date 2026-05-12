@@ -83,7 +83,8 @@ Tabs along the top:
 - **Overview** — summary, key topics, action items, notable quotes, sentiment, emotions
 - **Transcript** — full text with speaker tags and per-sentence timestamps; click any line to jump the audio player
 - **Analysis** — deeper views: research themes, Q&A pairs, concept frequency, talk-time per speaker, filler word stats, conversation quality metrics
-- **Chat** — ask questions about this transcript
+- **Topics** — clusters the conversation's passages into a handful of topics with click-to-jump timestamps. See [AI Chat](../features/ai-chat.md#topics-panel) for what's going on under the hood.
+- **Conversations** — saved chat conversations for this transcript
 - **Notes** — your personal notes on the recording
 
 Right-side action buttons:
