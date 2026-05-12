@@ -7,6 +7,7 @@ import { useProjects } from '../contexts/ProjectContext';
 import { useToast } from '../contexts/ToastContext';
 import { generateId } from '../utils/helpers';
 import { fileProcessor } from '../services/fileProcessor';
+import { runSerial } from '../services/processingScheduler';
 import { useSidecarStatus } from '../hooks/useSidecarStatus';
 
 export const UploadPage: React.FC = () => {
@@ -124,6 +125,24 @@ export const UploadPage: React.FC = () => {
   ) => {
     const fileName = filePath.split('/').pop() || filePath;
     try {
+      // Wait our turn. While we wait, the queue UI shows status='queued'.
+      // If the user cancels (signal.aborted) before our turn, skip entirely
+      // and delete the stub transcript record so the library stays clean.
+      await runSerial(async () => {
+        if (signal.aborted) {
+          updateProcessingItem(processingItemId, { status: 'cancelled' });
+          try {
+            await window.electronAPI.database.run(
+              'DELETE FROM transcripts WHERE id = ?',
+              [transcriptId]
+            );
+          } catch (e) {
+            console.warn('Failed to delete cancelled transcript record:', e);
+          }
+          await loadTranscripts();
+          return;
+        }
+
       updateProcessingItem(processingItemId, { status: 'transcribing', stage: 'analyzing_media' });
 
       await fileProcessor.processFile(filePath, transcriptId, {
@@ -198,6 +217,7 @@ export const UploadPage: React.FC = () => {
           await loadTranscripts();
         }
       });
+      }); // closes runSerial
     } catch (error) {
       console.error('Error starting processing:', error);
       updateProcessingItem(processingItemId, {
@@ -257,7 +277,13 @@ export const UploadPage: React.FC = () => {
           created_at: timestamp
         }, controller);
 
-        await startProcessing(processingItemId, transcriptId, filePath, controller.signal);
+        // Fire-and-forget — startProcessing handles its own errors via
+        // onError/onCancelled callbacks. NOT awaiting lets the for-loop
+        // enqueue every file rapidly so they all appear as 'queued' in the
+        // Processing Queue immediately; the runSerial mutex inside
+        // startProcessing keeps the actual sidecar work strictly one-at-
+        // a-time across this batch AND any other concurrent uploads.
+        startProcessing(processingItemId, transcriptId, filePath, controller.signal);
 
       } catch (error) {
         console.error('Error creating transcript:', error);

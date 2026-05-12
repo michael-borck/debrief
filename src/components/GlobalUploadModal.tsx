@@ -6,6 +6,7 @@ import { TranscriptContext } from '../contexts/TranscriptContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { generateId } from '../utils/helpers';
 import { fileProcessor } from '../services/fileProcessor';
+import { runSerial } from '../services/processingScheduler';
 import { useSidecarStatus } from '../hooks/useSidecarStatus';
 
 interface GlobalUploadModalProps {
@@ -75,6 +76,18 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
     signal: AbortSignal
   ) => {
     try {
+      await runSerial(async () => {
+        if (signal.aborted) {
+          updateProcessingItem(processingItemId, { status: 'cancelled' });
+          try {
+            await window.electronAPI.database.run('DELETE FROM transcripts WHERE id = ?', [transcriptId]);
+          } catch (e) {
+            console.warn('Failed to delete cancelled transcript record:', e);
+          }
+          await loadTranscripts();
+          return;
+        }
+
       updateProcessingItem(processingItemId, { status: 'transcribing', stage: 'analyzing_media' });
 
       await fileProcessor.processFile(filePath, transcriptId, {
@@ -111,11 +124,11 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
         },
         onComplete: async () => {
           console.log('Processing completed for:', transcriptId);
-          updateProcessingItem(processingItemId, { 
+          updateProcessingItem(processingItemId, {
             status: 'completed',
             progress: 100
           });
-          
+
           // Add transcript to project if one was selected
           if (selectedProject) {
             try {
@@ -125,10 +138,11 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
               console.error('Error adding transcript to project:', error);
             }
           }
-          
+
           await loadTranscripts();
         }
       });
+      }); // closes runSerial
     } catch (error) {
       console.error('Error starting processing:', error);
       updateProcessingItem(processingItemId, { 
@@ -188,7 +202,9 @@ export const GlobalUploadModal: React.FC<GlobalUploadModalProps> = ({
         }, controller);
 
         // Start processing
-        await startProcessing(processingItemId, transcriptId, filePath, controller.signal);
+        // Fire-and-forget: startProcessing awaits the global runSerial mutex,
+        // so files queue rapidly in the UI and process one-at-a-time.
+        startProcessing(processingItemId, transcriptId, filePath, controller.signal);
         
       } catch (error) {
         console.error('Error creating transcript:', error);

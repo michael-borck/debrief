@@ -221,18 +221,24 @@ export class FileProcessor {
     } catch (error) {
       if (isCancelled(error)) {
         console.log('Processing cancelled by user:', transcriptId);
-        // Persist cancellation as 'error' with a clear marker so the row
-        // doesn't stay stuck in 'processing'. ProcessingItem.status uses
-        // a separate 'cancelled' so the UI can distinguish.
+        // The user expectation: cancel = it never happened. Delete the
+        // transcript row outright (plus any segments already created) so
+        // the library doesn't carry around a 'cancelled / error' ghost.
         try {
           await window.electronAPI.database.run(
-            `UPDATE transcripts
-             SET status = ?, error_message = ?
-             WHERE id = ?`,
-            ['error', 'Cancelled by user', transcriptId]
+            'DELETE FROM transcript_segments WHERE transcript_id = ?',
+            [transcriptId]
+          );
+        } catch (segErr) {
+          console.warn('Failed to delete cancelled transcript segments:', segErr);
+        }
+        try {
+          await window.electronAPI.database.run(
+            'DELETE FROM transcripts WHERE id = ?',
+            [transcriptId]
           );
         } catch (dbErr) {
-          console.error('Failed to mark transcript cancelled:', dbErr);
+          console.error('Failed to delete cancelled transcript:', dbErr);
         }
         callbacks.onCancelled?.();
         return;
