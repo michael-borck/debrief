@@ -18,11 +18,12 @@ import { FillerWordsCard } from '../components/FillerWordsCard';
 import { TalkTimeCard } from '../components/TalkTimeCard';
 import { AudioPlayerBar } from '../components/AudioPlayerBar';
 import { DiarisationPanel } from '../components/DiarisationPanel';
+import { TopicsTab } from '../components/TopicsTab';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { analyzeConversation } from '../services/conversationMetricsService';
 import { sentenceSegmentsService } from '../services/sentenceSegmentsService';
 
-type TabType = 'overview' | 'transcript' | 'analysis' | 'conversations' | 'notes';
+type TabType = 'overview' | 'transcript' | 'analysis' | 'topics' | 'conversations' | 'notes';
 
 export const TranscriptDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -346,6 +347,7 @@ export const TranscriptDetailPage: React.FC = () => {
     { id: 'overview' as const, label: 'Overview', name: 'Overview' },
     { id: 'transcript' as const, label: 'Transcript', name: 'Transcript' },
     { id: 'analysis' as const, label: 'Analysis', name: 'Analysis' },
+    { id: 'topics' as const, label: 'Topics', name: 'Topics' },
     { id: 'conversations' as const, label: 'Conversations', name: 'Conversations' },
     { id: 'notes' as const, label: 'Notes', name: 'Notes' }
   ];
@@ -1279,6 +1281,12 @@ export const TranscriptDetailPage: React.FC = () => {
         {activeTab === 'overview' && renderOverviewTab()}
         {activeTab === 'transcript' && renderTranscriptTab()}
         {activeTab === 'analysis' && renderAnalysisTab()}
+        {activeTab === 'topics' && (
+          <TopicsTab
+            transcript={transcript}
+            onSeek={audioPlayer.loadState === 'ready' ? audioPlayer.seek : undefined}
+          />
+        )}
         {activeTab === 'conversations' && renderConversationsTab()}
         {activeTab === 'notes' && renderNotesTab()}
       </div>

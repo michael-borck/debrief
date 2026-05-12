@@ -248,6 +248,32 @@ function runMigrations() {
       console.log('transcript_segments table already exists');
     }
 
+    // transcript_topics — caches per-transcript topic clusters (Topics tab).
+    // Recomputed on user demand; ON DELETE CASCADE so it tracks the parent.
+    const topicsTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transcript_topics'").all();
+    if (topicsTable.length === 0) {
+      console.log('Creating transcript_topics table...');
+      db.exec(`
+        CREATE TABLE transcript_topics (
+          id TEXT PRIMARY KEY,
+          transcript_id TEXT NOT NULL,
+          topic_index INTEGER NOT NULL,
+          label TEXT NOT NULL,
+          summary TEXT,
+          chunk_ids TEXT NOT NULL,
+          centroid TEXT,
+          model_used TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (transcript_id) REFERENCES transcripts(id) ON DELETE CASCADE
+        )
+      `);
+      db.exec(`
+        CREATE INDEX idx_transcript_topics_transcript ON transcript_topics(transcript_id);
+        CREATE INDEX idx_transcript_topics_order ON transcript_topics(transcript_id, topic_index);
+      `);
+      console.log('transcript_topics table created');
+    }
+
     // Check if ai_prompts table exists and create it if not
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ai_prompts'").all();
     if (tables.length === 0) {
