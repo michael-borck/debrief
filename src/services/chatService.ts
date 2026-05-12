@@ -365,11 +365,8 @@ export class ChatService {
       onProgress?.({ stage: 'storing', progress: 0, total: 100, message: 'Storing in vector database...' });
       
       await vectorStoreService.storeChunks(chunks, embeddings);
-      
-      onProgress?.({ stage: 'storing', progress: 100, total: 100, message: 'Storage complete' });
 
-      // Update database to mark transcript as chat-ready
-      await this.markTranscriptChatReady(transcript.id);
+      onProgress?.({ stage: 'storing', progress: 100, total: 100, message: 'Storage complete' });
 
       console.log(`Successfully processed transcript ${transcript.id} for chat`);
     } catch (error) {
@@ -893,17 +890,6 @@ export class ChatService {
     } catch (error) {
       console.error('Failed to get transcript metadata:', error);
       return null;
-    }
-  }
-
-  private async markTranscriptChatReady(transcriptId: string): Promise<void> {
-    try {
-      await window.electronAPI.database.run(
-        "UPDATE transcripts SET metadata = JSON_SET(COALESCE(metadata, '{}'), '$.chatReady', 1) WHERE id = ?",
-        [transcriptId]
-      );
-    } catch (error) {
-      console.error('Failed to mark transcript as chat ready:', error);
     }
   }
 

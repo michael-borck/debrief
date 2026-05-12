@@ -56,6 +56,11 @@ class MainVectorStore {
         console.log('Opened existing chunks table');
       } catch (error) {
         // Create table if it doesn't exist
+        // Schema-defining seed. LanceDB infers types from this row, so
+        // every field must be present with a value of the type we'll
+        // actually store. Nulls and raw arrays break inference — use
+        // empty strings, and JSON-stringify list fields to match the
+        // format produced by storeChunks().
         const sampleData = [{
           id: 'sample',
           transcriptId: 'sample',
@@ -63,15 +68,15 @@ class MainVectorStore {
           vector: new Array(384).fill(0),
           startTime: 0,
           endTime: 1,
-          speaker: null,
+          speaker: '',
           chunkIndex: 0,
           wordCount: 2,
-          speakers: [],
+          speakers: JSON.stringify([]),
           method: 'sample',
           transcriptTitle: 'sample',
           transcriptSummary: 'sample',
-          keyTopics: [],
-          actionItems: [],
+          keyTopics: JSON.stringify([]),
+          actionItems: JSON.stringify([]),
           totalSpeakers: 1,
           createdAt: new Date().toISOString()
         }];
@@ -111,7 +116,7 @@ class MainVectorStore {
           vector: embedding?.embedding || new Array(384).fill(0),
           startTime: chunk.startTime,
           endTime: chunk.endTime,
-          speaker: chunk.speaker || null,
+          speaker: chunk.speaker || '',
           chunkIndex: chunk.metadata?.chunkIndex || i,
           wordCount: chunk.metadata?.wordCount || chunk.text.split(' ').length,
           speakers: JSON.stringify(chunk.metadata?.speakers || []),
