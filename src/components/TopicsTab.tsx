@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sparkles, Loader, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Clock } from 'lucide-react';
 import { topicsService, Topic } from '../services/topicsService';
 import { chatService } from '../services/chatService';
+import { vectorStoreService } from '../services/vectorStoreService';
 import { Transcript } from '../types';
 
 interface TopicsTabProps {
@@ -43,21 +44,38 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ transcript, onSeek }) => {
     return () => { cancelled = true; };
   }, [transcript.id]);
 
-  const ensureChunksExist = async (): Promise<void> => {
-    // If chunks aren't in the vector store yet, run the same processing
-    // that the chat modal would do on first open. Cheap if already present.
+  const ensurePassagesExist = async (): Promise<void> => {
+    // Check the vector store directly — stats.transcripts.includes() can
+    // report stale membership from a previous half-completed indexing.
     if (!chatService.isReady()) {
+      setProgress('Starting chat service');
       await chatService.initialize();
     }
-    const stats = await chatService.getStats();
-    if (stats.vectorStats.transcripts.includes(transcript.id)) return;
+    const existing = await vectorStoreService.getTranscriptChunks(transcript.id);
+    if (existing && existing.length > 0) return;
 
-    setProgress('Indexing transcript (one-time)');
+    setProgress('Preparing passages (one-time)');
     const segments = await window.electronAPI.database.all(
       'SELECT * FROM transcript_segments WHERE transcript_id = ? ORDER BY start_time',
       [transcript.id]
     );
-    await chatService.processTranscriptForChat(transcript, segments);
+    if (!segments || segments.length === 0) {
+      throw new Error(
+        'This transcript has no segments to analyse. Open the transcript and run diarisation, then try again.'
+      );
+    }
+    await chatService.processTranscriptForChat(transcript, segments, (p) => {
+      if (p?.message) setProgress(p.message);
+    });
+
+    // Verify the indexing actually persisted — if the segments were empty
+    // or the embedder failed, processTranscriptForChat returns silently.
+    const recheck = await vectorStoreService.getTranscriptChunks(transcript.id);
+    if (!recheck || recheck.length === 0) {
+      throw new Error(
+        'Could not prepare passages. The transcript may be empty, or the embedding service may not be ready.'
+      );
+    }
   };
 
   const handleCompute = async () => {
@@ -65,7 +83,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ transcript, onSeek }) => {
     setError(null);
     setProgress('Preparing');
     try {
-      await ensureChunksExist();
+      await ensurePassagesExist();
       const numTopics = choice === 'auto' ? null : choice;
       const computed = await topicsService.compute(transcript.id, {
         numTopics,
@@ -162,7 +180,8 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ transcript, onSeek }) => {
           <Sparkles size={28} className="mx-auto mb-3 text-surface-300" />
           <p>No topics yet. Click <strong>Discover topics</strong> to analyse this transcript.</p>
           <p className="text-xs mt-2">
-            Uses the same embeddings as Chat — no extra cost beyond a small LLM call per topic.
+            First-time setup takes a few seconds. After that, results are saved
+            and load instantly.
           </p>
         </div>
       )}

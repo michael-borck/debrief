@@ -223,13 +223,13 @@ export class TopicsService {
   async compute(transcriptId: string, opts: ComputeOptions = {}): Promise<Topic[]> {
     const { numTopics, onProgress } = opts;
 
-    onProgress?.('Loading chunks');
+    onProgress?.('Loading passages');
     const chunks = await vectorStoreService.getTranscriptChunks(transcriptId);
     if (!chunks || chunks.length === 0) {
-      throw new Error('No chunks found for this transcript. Open the chat tab once to index it, then retry.');
+      throw new Error('This transcript hasn\'t been prepared yet. The Topics panel will set it up the next time you click Discover topics.');
     }
     if (chunks.length < MIN_K) {
-      throw new Error(`Only ${chunks.length} chunk(s) available — need at least ${MIN_K} to form topics. The transcript may be very short.`);
+      throw new Error(`Only ${chunks.length} passage${chunks.length === 1 ? '' : 's'} available — need at least ${MIN_K} to form topics. The transcript may be very short.`);
     }
 
     const vectors = chunks.map(c => c.vector);
