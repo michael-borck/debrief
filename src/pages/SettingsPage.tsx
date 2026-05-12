@@ -393,14 +393,16 @@ export const SettingsPage: React.FC = () => {
 
   const handleResetVectorDB = async () => {
     const confirmed = window.confirm(
-      'Are you sure you want to reset the vector database? This will delete all chat embeddings and you\'ll need to re-process transcripts for chat functionality.'
+      'Reset the chat search index?\n\n' +
+      'Your transcripts and library are NOT affected — only the behind-the-scenes index that powers Chat.\n\n' +
+      'Each transcript automatically rebuilds its index the next time you open Chat on it (a few seconds). You don\'t need to re-import anything.'
     );
-    
+
     if (confirmed) {
       try {
         const result = await window.electronAPI.vectorStore.reset();
         if (result.success) {
-          alert('Vector database reset successfully! You\'ll need to re-process transcripts for chat.');
+          alert('Chat search index reset. Open any transcript\'s Chat tab and it\'ll rebuild its index automatically.');
           setVectorStats(null);
         } else {
           alert(`Reset failed: ${result.error}`);
