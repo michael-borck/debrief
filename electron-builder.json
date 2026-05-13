@@ -19,7 +19,7 @@
       "to": "embedded-server",
       "filter": [
         "python/**/*",
-        "models/**/*",
+        "models.tar.gz",
         "server.py",
         "setup-venv.py"
       ]

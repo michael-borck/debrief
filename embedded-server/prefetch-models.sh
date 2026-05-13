@@ -6,8 +6,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
-if [ -n "$(ls -A models 2>/dev/null || true)" ]; then
-  echo "Models already cached in embedded-server/models/. Skipping prefetch."
+if [ -f models.tar.gz ]; then
+  echo "Models already packed at embedded-server/models.tar.gz. Skipping prefetch."
   exit 0
 fi
 
@@ -39,10 +39,21 @@ fi
 
 "$PY" prefetch-models.py
 
-# HF writes empty .lock files into models/hub/.locks/ as concurrency markers
-# during downloads. They serve no runtime purpose (HF only reads them when
-# fetching) but their deeply-nested layout trips NSIS's 7zip step on
-# Windows. Safe to delete on every platform.
-echo "Removing .locks/ directories (build-time concurrency markers)..."
+# HF writes empty .lock files into models/hub/.locks/ as concurrency
+# markers; they serve no runtime purpose. Remove before packing.
+echo "Removing .locks/ directories..."
 find models -type d -name ".locks" -prune -exec rm -rf {} + 2>/dev/null || true
+
+# Pack the entire HF cache into a single tarball. The HF cache directory
+# layout (blobs/, snapshots/, refs/) is deeply nested and trips NSIS's
+# bundled 7zip on Windows with "directory name is invalid". Shipping one
+# short-named tarball sidesteps that entirely — setup-venv.py extracts
+# it into <userData>/hf-cache on first launch.
+echo "Packing models into models.tar.gz..."
+tar -czf models.tar.gz models/
+SIZE=$(du -sh models.tar.gz | cut -f1)
+echo "Wrote models.tar.gz (${SIZE})"
+
+# Remove the unpacked cache so electron-builder doesn't bundle both.
+rm -rf models/
 echo "Done."

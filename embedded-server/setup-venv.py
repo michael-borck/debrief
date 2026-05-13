@@ -9,6 +9,7 @@ after the modal disappears.
 import os
 import subprocess
 import sys
+import tarfile
 from datetime import datetime
 from pathlib import Path
 
@@ -172,6 +173,37 @@ def main() -> int:
         [str(pip), "install", "--quiet", *INSTALL_SPECS],
         hint="Common causes: corporate proxy, antivirus blocking, or a temporary PyPI outage.",
     )
+
+    # Extract the bundled HF model cache into <userData>/hf-cache. The
+    # tarball sits next to this script in the .app bundle (read-only on
+    # macOS notarised builds, hence we extract elsewhere). Idempotent —
+    # skip when the cache is already populated.
+    bundle_dir = Path(__file__).resolve().parent
+    models_tar = bundle_dir / "models.tar.gz"
+    hf_cache_dir = target.parent / "hf-cache"
+    hf_cache_marker = hf_cache_dir / "hub"
+    if models_tar.exists() and not hf_cache_marker.exists():
+        emit("Extracting bundled model cache (one-time, ~400 MB on disk)")
+        hf_cache_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            with tarfile.open(models_tar, "r:gz") as tf:
+                # tar was created from inside embedded-server/, so members are
+                # 'models/...'. We strip the leading 'models/' so they land
+                # directly under hf-cache/.
+                for member in tf.getmembers():
+                    if member.name.startswith("models/"):
+                        member.name = member.name[len("models/"):]
+                    if not member.name:
+                        continue
+                    tf.extract(member, hf_cache_dir, filter="data")
+            _log(f"Extracted {models_tar} -> {hf_cache_dir}")
+        except Exception as e:
+            fail(
+                f"Failed to extract model cache: {e}",
+                1,
+            )
+    elif not models_tar.exists() and not hf_cache_marker.exists():
+        _log(f"WARNING: no models.tar.gz at {models_tar} and no existing cache. Pyannote/whisper will need network on first use.")
 
     emit("Verifying installation")
     run_step(

@@ -11,10 +11,30 @@ if hasattr(sys, "_MEIPASS"):
 else:
     _BUNDLE_DIR = Path(__file__).resolve().parent
 
-# Point HF at the bundled pyannote cache and force offline mode so we never
-# touch the gated-repo gate at runtime. Must happen BEFORE speech_analyser
-# imports anything from huggingface_hub / pyannote.
-os.environ["HF_HOME"] = str(_BUNDLE_DIR / "models")
+
+def _user_data_dir() -> Path:
+    """Mirror Electron's app.getPath('userData'). Must match the path used by
+    setup-venv.py and the renderer's appId-derived userData location."""
+    home = Path.home()
+    if sys.platform == "darwin":
+        return home / "Library" / "Application Support" / "debrief"
+    if sys.platform == "win32":
+        return Path(os.environ.get("APPDATA", str(home / "AppData" / "Roaming"))) / "debrief"
+    return Path(os.environ.get("XDG_CONFIG_HOME", str(home / ".config"))) / "debrief"
+
+
+# Point HF at the extracted cache in userData (setup-venv.py extracted the
+# bundled models.tar.gz here on first launch). Force offline mode so we
+# never touch the gated-repo gate at runtime. Must happen BEFORE
+# speech_analyser imports anything from huggingface_hub / pyannote.
+_hf_cache = _user_data_dir() / "hf-cache"
+# Backwards-compatibility: pre-v1.9 builds bundled models/ directly inside
+# the .app under embedded-server/models/ — still honour that layout if the
+# new tarball-based one isn't materialised yet (e.g. first run hasn't
+# completed setup-venv yet).
+if not (_hf_cache / "hub").exists() and (_BUNDLE_DIR / "models" / "hub").exists():
+    _hf_cache = _BUNDLE_DIR / "models"
+os.environ["HF_HOME"] = str(_hf_cache)
 os.environ["HF_HUB_OFFLINE"] = "1"
 
 # Tell speech-analyser's app to allow any localhost origin (the Electron
