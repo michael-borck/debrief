@@ -32,7 +32,9 @@ case "$(uname -s)" in
     PYTHON_BIN="python/bin/python3"
     ;;
   MINGW*|MSYS*|CYGWIN*)
-    TRIPLE="x86_64-pc-windows-msvc-shared"
+    # PBS dropped the "-shared" suffix from Windows builds; current
+    # release line is plain x86_64-pc-windows-msvc.
+    TRIPLE="x86_64-pc-windows-msvc"
     PYTHON_BIN="python/python.exe"
     ;;
   *)
