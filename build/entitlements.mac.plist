@@ -8,6 +8,21 @@
     <true/>
     <key>com.apple.security.cs.debugger</key>
     <true/>
+    <!-- Required for the embedded Python sidecar. PyPI-distributed wheels
+         (numpy, torch, pyannote.audio, etc.) ship .so/.dylib binaries
+         signed by their own teams. Under hardened runtime, dyld refuses
+         to load a library whose Team ID doesn't match the loading
+         process — even if both are valid signatures. This entitlement
+         tells macOS to allow cross-team library loads in this process
+         tree. Without it, the very first `import numpy` in the venv
+         crashes with "code signature... not valid for use in process:
+         mapping process and mapped file have different Team IDs". -->
+    <key>com.apple.security.cs.disable-library-validation</key>
+    <true/>
+    <!-- Python's venv mechanism relies on PYTHONHOME / PYTHONPATH env
+         vars to point the venv interpreter at the bundled stdlib. -->
+    <key>com.apple.security.cs.allow-dyld-environment-variables</key>
+    <true/>
     <key>com.apple.security.files.user-selected.read-write</key>
     <true/>
     <key>com.apple.security.files.downloads.read-write</key>
