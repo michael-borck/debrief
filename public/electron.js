@@ -12,6 +12,17 @@ const { MainVectorStore } = require('./electron/vector-store');
 const { SidecarManager } = require('./electron/sidecar-manager');
 const sidecarClient = require('./electron/sidecar-client');
 
+// Isolate dev's userData dir from packaged so they don't share a single
+// `~/Library/Application Support/debrief/` and poison each other's venv
+// (the venv's pyvenv.cfg pins the original Python path; if dev created it,
+// the packaged app's signed Python can't take over, and vice versa).
+//
+// Must run BEFORE anything calls app.getPath('userData'). app.setName()
+// overrides app.getName(), which is what userData resolution uses.
+if (process.env.NODE_ENV === 'development' && !app.isPackaged) {
+  app.setName('debrief-dev');
+}
+
 const sidecar = new SidecarManager();
 sidecarClient.init({ sidecar });
 
