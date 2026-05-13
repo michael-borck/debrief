@@ -67,14 +67,43 @@ To enable automatic builds when you create a release tag, set up these GitHub se
 2. **Automatic (Already exists)**:
    - `GITHUB_TOKEN`: Automatically provided by GitHub Actions
 
+### Local pre-tag smoke test (recommended)
+
+**Do this before every release tag.** `npm start` only exercises the dev runtime; it doesn't catch hardened-runtime, code-signing, or sidecar-spawn-from-packaged-app bugs (we shipped three of those in a row — v1.8.0/.1/.2 — for not doing this).
+
+```bash
+# Builds the .app under release/mac-arm64/, signed with hardened
+# runtime if a Developer ID cert is in your Keychain. Skips dmg
+# packaging and notarization (NOTARIZE_APPLE_* not set locally).
+npm run pack
+
+# Launch the packed .app — same hardened-runtime conditions as the
+# eventual dmg, but no notarization round-trip.
+open release/mac-arm64/Debrief.app
+
+# Watch the sidecar logs while it boots:
+tail -f ~/Library/Application\ Support/debrief/logs/setup.log
+```
+
+If the packed app starts cleanly and you can transcribe a short clip end-to-end, then you can tag with confidence. If it fails, you'll see the actual subprocess error in `setup.log` (a real traceback, not just `exit 1`).
+
+If `npm start` was your only test, **delete the dev userData dir before testing the packed app** to make sure the packed app's first-launch path actually runs:
+
+```bash
+rm -rf ~/Library/Application\ Support/debrief/venv
+```
+
+(`audio-scribe.db` stays — only the Python env gets rebuilt, ~3-10 min one-time.)
+
 ### Creating a Release
 
-1. Update version in `package.json`
-2. Commit changes: `git commit -am "Bump version to v1.0.0"`
-3. Create tag: `git tag v1.0.0`
-4. Push tag: `git push origin v1.0.0`
-5. GitHub Actions will automatically build for all platforms
-6. Edit the draft release on GitHub and publish
+1. Do the local pre-tag smoke test above.
+2. Update version in `package.json`
+3. Commit changes: `git commit -am "Bump version to v1.0.0"`
+4. Create tag: `git tag v1.0.0`
+5. Push tag: `git push origin v1.0.0`
+6. GitHub Actions will automatically build for all platforms
+7. Edit the draft release on GitHub and publish
 
 ### Build Outputs
 
