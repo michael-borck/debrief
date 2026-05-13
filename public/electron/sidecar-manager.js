@@ -32,7 +32,10 @@ function resolvePaths() {
     : path.join(__dirname, '..', '..', 'embedded-server');
   return {
     baseDir,
-    bundledPython: path.join(baseDir, 'python', winExt ? 'Scripts/python.exe' : 'bin/python3'),
+    // PBS Windows install_only layout puts python.exe at python/python.exe
+    // (root of the python folder), NOT python/Scripts/python.exe. Mac and
+    // Linux PBS use bin/python3.
+    bundledPython: path.join(baseDir, 'python', winExt ? 'python.exe' : 'bin/python3'),
     serverScript: path.join(baseDir, 'server.py'),
     setupScript: path.join(baseDir, 'setup-venv.py'),
     userVenv,
