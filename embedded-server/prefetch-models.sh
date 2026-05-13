@@ -38,3 +38,11 @@ if ! "$PY" -c "import huggingface_hub" 2>/dev/null; then
 fi
 
 "$PY" prefetch-models.py
+
+# HF writes empty .lock files into models/hub/.locks/ as concurrency markers
+# during downloads. They serve no runtime purpose (HF only reads them when
+# fetching) but their deeply-nested layout trips NSIS's 7zip step on
+# Windows. Safe to delete on every platform.
+echo "Removing .locks/ directories (build-time concurrency markers)..."
+find models -type d -name ".locks" -prune -exec rm -rf {} + 2>/dev/null || true
+echo "Done."
