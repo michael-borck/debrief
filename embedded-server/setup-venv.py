@@ -158,9 +158,12 @@ def main() -> int:
 
     if fresh_install:
         emit("Upgrading pip")
+        # Use `python -m pip` rather than `pip` directly: on Windows, pip
+        # can't replace its own pip.exe binary while pip.exe is the running
+        # process. Invoking through python.exe sidesteps that.
         run_step(
             "pip upgrade",
-            [str(pip), "install", "--quiet", "--upgrade", "pip"],
+            [str(py), "-m", "pip", "install", "--quiet", "--upgrade", "pip"],
             hint="Usually a network issue.",
         )
 
@@ -170,7 +173,7 @@ def main() -> int:
 
     run_step(
         "pip install",
-        [str(pip), "install", "--quiet", *INSTALL_SPECS],
+        [str(py), "-m", "pip", "install", "--quiet", *INSTALL_SPECS],
         hint="Common causes: corporate proxy, antivirus blocking, or a temporary PyPI outage.",
     )
 
