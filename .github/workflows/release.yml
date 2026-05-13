@@ -10,11 +10,22 @@ permissions:
   contents: write
 
 jobs:
-  build-macos-arm64:
-    # macos-14 = Apple Silicon (arm64). bundle-python.sh currently only ships
-    # an arm64 python-build-standalone tarball; add x64/win/linux jobs once
-    # the script grows multi-arch support.
-    runs-on: macos-14
+  build:
+    strategy:
+      fail-fast: false  # one platform failing must not cancel the others
+      matrix:
+        include:
+          - os: macos-14
+            platform: mac
+            arch: arm64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+          - os: windows-latest
+            platform: win
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - uses: actions/checkout@v4
@@ -27,41 +38,81 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: Free disk space (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          # ubuntu-latest only has ~14 GB free. PyTorch wheels + venv
+          # builds + electron-builder cache routinely push past that.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          docker system prune -af --volumes || true
+          df -h
+
       - name: Install Node deps
         run: npm ci
 
-      - name: Bundle relocatable Python + prefetch pyannote/whisper weights
+      - name: Bundle relocatable Python + prefetch model weights
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        shell: bash  # ensures git-bash on Windows runners
         run: npm run build:sidecar
 
       - name: Build webpack bundle
         run: npm run build
 
-      - name: Build, sign and notarize the .app
+      - name: Import macOS signing certificate
+        if: matrix.os == 'macos-14'
         env:
-          # electron-builder picks up CSC_LINK + CSC_KEY_PASSWORD automatically.
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PWD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
+        run: |
+          echo "$MACOS_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p actions build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p actions build.keychain
+          security import certificate.p12 -k build.keychain -P "$MACOS_CERTIFICATE_PWD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
+          rm certificate.p12
+
+      - name: Build Electron app (macOS)
+        if: matrix.os == 'macos-14'
+        env:
           CSC_LINK: ${{ secrets.MACOS_CERTIFICATE }}
           CSC_KEY_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PWD }}
-          # Our scripts/notarize.js reads these. Renamed from APPLE_* on purpose
-          # so electron-builder doesn't run its own (buggy) notarize wrapper.
+          # Renamed from APPLE_* so electron-builder doesn't auto-fire its
+          # own (buggy) notarize wrapper alongside our scripts/notarize.js
           NOTARIZE_APPLE_ID: ${{ secrets.APPLE_ID }}
           NOTARIZE_APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
           NOTARIZE_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npx electron-builder --mac --arm64 --publish=never
 
-      - name: Upload .dmg + .zip artifacts
+      - name: Build Electron app (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux --x64 --publish=never
+
+      - name: Build Electron app (Windows)
+        if: matrix.os == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --x64 --publish=never
+
+      - name: Upload distributables
         uses: actions/upload-artifact@v4
         with:
-          name: macos-arm64-distributables
+          name: ${{ matrix.platform }}-${{ matrix.arch }}-distributables
           path: |
             release/*.dmg
             release/*.zip
-            release/latest-mac.yml
+            release/*.AppImage
+            release/*.deb
+            release/*.exe
+            release/latest*.yml
+          if-no-files-found: warn
 
   release:
-    needs: build-macos-arm64
+    needs: build
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -78,8 +129,10 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           gh release create "$TAG" \
             --title "Debrief $TAG" \
-            --notes "Debrief $TAG — macOS arm64 build. See CHANGELOG for details." \
+            --notes "Debrief $TAG — multi-platform build. See CHANGELOG for details." \
             --draft || true
-          find release-artifacts -type f \( -name "*.dmg" -o -name "*.zip" -o -name "latest-mac.yml" \) \
-            -exec gh release upload "$TAG" {} --clobber \;
+          find release-artifacts -type f \( \
+            -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" \
+            -o -name "*.deb" -o -name "*.exe" -o -name "latest*.yml" \
+          \) -exec gh release upload "$TAG" {} --clobber \;
           gh release edit "$TAG" --draft=false --latest
