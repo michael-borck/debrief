@@ -155,11 +155,14 @@ class MainVectorStore {
 
       // Add filters
       if (options.transcriptId) {
-        query = query.where(`transcriptId = '${options.transcriptId}'`);
+        // Identifiers must be double-quoted — newer LanceDB's SQL parser
+        // lowercases unquoted identifiers, so `transcriptId` becomes
+        // `transcriptid` and fails to match the schema column.
+        query = query.where(`"transcriptId" = '${options.transcriptId}'`);
       }
 
       if (options.speaker) {
-        query = query.where(`speaker = '${options.speaker}'`);
+        query = query.where(`"speaker" = '${options.speaker}'`);
       }
 
       const results = await query.toArray();
@@ -199,7 +202,7 @@ class MainVectorStore {
         throw new Error('Vector store not initialized');
       }
 
-      await this.table.delete(`transcriptId = '${transcriptId}'`);
+      await this.table.delete(`"transcriptId" = '${transcriptId}'`);
       console.log(`Deleted chunks for transcript: ${transcriptId}`);
     } catch (error) {
       console.error('Failed to delete transcript chunks:', error);
@@ -213,9 +216,15 @@ class MainVectorStore {
         throw new Error('Vector store not initialized');
       }
 
-      // Use .query() (non-vector scan) — newer LanceDB rejects .search([])
-      // with "No vector column found to match with the query vector dimension: 0".
-      const results = await this.table.query().where(`transcriptId = '${transcriptId}'`).toArray();
+      // LanceDB 0.20's SQL filter via .where() silently returns 0 rows
+      // for string-equality predicates on our tables (verified locally:
+      // countRows=3, toArray()+JS-filter=3, .where("col = 'val'")=0).
+      // Looks like a Lance/DataFusion bug specific to this version. Until
+      // it's fixed upstream, fetch all rows and filter in JS — the
+      // dataset is small enough (hundreds of chunks per transcript max)
+      // that the cost is negligible compared to the vector-search path.
+      const all = await this.table.query().toArray();
+      const results = all.filter(r => r.transcriptId === transcriptId);
 
       return results.map(result => ({
         id: result.id,
