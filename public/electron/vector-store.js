@@ -213,7 +213,9 @@ class MainVectorStore {
         throw new Error('Vector store not initialized');
       }
 
-      const results = await this.table.search([]).where(`transcriptId = '${transcriptId}'`).toArray();
+      // Use .query() (non-vector scan) — newer LanceDB rejects .search([])
+      // with "No vector column found to match with the query vector dimension: 0".
+      const results = await this.table.query().where(`transcriptId = '${transcriptId}'`).toArray();
 
       return results.map(result => ({
         id: result.id,
@@ -261,7 +263,7 @@ class MainVectorStore {
         };
       }
 
-      const allChunks = await this.table.search([]).toArray();
+      const allChunks = await this.table.query().toArray();
       const transcriptIds = [...new Set(allChunks.map(c => c.transcriptId))];
       const speakers = [...new Set(allChunks.flatMap(c => JSON.parse(c.speakers || '[]')))];
 
