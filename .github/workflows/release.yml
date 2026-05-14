@@ -10,7 +10,45 @@ permissions:
   contents: write
 
 jobs:
+  # Gate the release on known CVEs in production npm deps and the runtime
+  # pip install specs (what setup-venv.py will pip-install on the user's
+  # machine). Fails the build for any High/Critical npm vuln in the prod
+  # tree, or any pip-audit finding. Detection-only — doesn't prevent
+  # zero-day attacks, but catches anything publicly disclosed by build
+  # time. Costs ~5 min per release.
+  security-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: npm audit (production deps only, high+)
+        run: |
+          npm ci --ignore-scripts
+          npm audit --omit=dev --audit-level=high
+
+      - name: pip-audit (runtime install specs)
+        run: |
+          # Match what setup-venv.py installs at runtime so users + CI
+          # are looking at the same dependency graph. Keep this list in
+          # sync with INSTALL_SPECS in embedded-server/setup-venv.py.
+          python -m venv /tmp/audit-venv
+          /tmp/audit-venv/bin/pip install --quiet --upgrade pip
+          /tmp/audit-venv/bin/pip install --quiet \
+            'speech-analyser[diarization]>=0.2.0' \
+            'sentence-transformers>=2.7,<6'
+          /tmp/audit-venv/bin/pip install --quiet pip-audit
+          /tmp/audit-venv/bin/pip-audit --strict
+
   build:
+    needs: security-audit
     strategy:
       fail-fast: false  # one platform failing must not cancel the others
       matrix:
