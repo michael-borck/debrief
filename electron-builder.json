@@ -4,7 +4,13 @@
   "directories": {
     "output": "release"
   },
-  "publish": null,
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "michael-borck",
+      "repo": "debrief"
+    }
+  ],
   "npmRebuild": true,
   "buildDependenciesFromSource": false,
   "nodeGypRebuild": false,

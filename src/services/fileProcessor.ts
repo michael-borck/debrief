@@ -246,13 +246,27 @@ export class FileProcessor {
 
       console.error('Processing error:', error);
 
-      // Update transcript with error
-      await window.electronAPI.database.run(
-        `UPDATE transcripts
-         SET status = ?, error_message = ?
-         WHERE id = ?`,
-        ['error', (error as Error).message, transcriptId]
-      );
+      // Same expectation as cancel: a failed import should not leave a
+      // ghost row in the library. The error is surfaced via the
+      // onError callback (toast/queue UI), then we wipe the partial
+      // transcript + any segments already created. Without this, the
+      // user sees a permanent "Error" entry they can't act on.
+      try {
+        await window.electronAPI.database.run(
+          'DELETE FROM transcript_segments WHERE transcript_id = ?',
+          [transcriptId]
+        );
+      } catch (segErr) {
+        console.warn('Failed to delete failed-import segments:', segErr);
+      }
+      try {
+        await window.electronAPI.database.run(
+          'DELETE FROM transcripts WHERE id = ?',
+          [transcriptId]
+        );
+      } catch (dbErr) {
+        console.error('Failed to delete failed-import transcript:', dbErr);
+      }
 
       callbacks.onError?.(error as Error);
     }

@@ -1834,15 +1834,18 @@ function calculateConfidence(sentence, wordCount, estimatedDuration) {
 
 // Helper function to get FFmpeg path
 function getFFmpegPath() {
-  if (app.isPackaged) {
-    // In production, use resourcesPath
-    const platform = process.platform;
-    const ffmpegName = platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
-    return path.join(process.resourcesPath, 'bin', ffmpegName);
-  } else {
-    // In development, use ffmpeg-static
-    return require('ffmpeg-static');
+  // ffmpeg-static returns an absolute path to the bundled binary. In dev
+  // that path is inside node_modules and works as-is. In a packaged app
+  // node_modules lives inside app.asar — but our electron-builder config
+  // asarUnpacks ffmpeg-static, so the actual binary is at the parallel
+  // app.asar.unpacked path. Without this swap the transcode silently
+  // falls back to the original MP3 and pyannote then hits its frame
+  // alignment bug ("441000 samples").
+  const p = require('ffmpeg-static');
+  if (app.isPackaged && p.includes('app.asar' + path.sep)) {
+    return p.replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
   }
+  return p;
 }
 
 // Audio extraction handler
