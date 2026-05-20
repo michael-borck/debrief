@@ -75,7 +75,12 @@ let db;
 // check skips migration even on a clean install. We detect "real" data by
 // looking for our app's DB file — if it's not there, the new dir is just
 // Electron's scaffolding and is safe to clobber.
-const APP_DATA_MARKER = 'audio-scribe.db';
+// The DB filename also doubles as the "this is a real userData dir" marker
+// during legacy-dir migration. Used by hasRealAppData, initDatabase, and
+// change-database-location — single source of truth so a future rename
+// can't desync one site from another.
+const DB_FILENAME = 'audio-scribe.db';
+const APP_DATA_MARKER = DB_FILENAME;
 
 function hasRealAppData(dir) {
   try {
@@ -194,7 +199,7 @@ async function initDatabase() {
     if (fs.existsSync(settingsPath)) {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
       if (settings.databaseLocation) {
-        dbPath = path.join(settings.databaseLocation, 'audio-scribe.db');
+        dbPath = path.join(settings.databaseLocation, DB_FILENAME);
       }
     }
   } catch (error) {
@@ -204,7 +209,7 @@ async function initDatabase() {
   // Default location if not set
   if (!dbPath) {
     const userDataPath = app.getPath('userData');
-    dbPath = path.join(userDataPath, 'audio-scribe.db');
+    dbPath = path.join(userDataPath, DB_FILENAME);
   }
   
   // Ensure directory exists
@@ -967,7 +972,7 @@ ipcMain.handle('get-database-info', async () => {
 ipcMain.handle('change-database-location', async (event, newPath) => {
   try {
     const oldDbPath = global.dbPath;
-    const newDbPath = path.join(newPath, 'locallisten.db');
+    const newDbPath = path.join(newPath, DB_FILENAME);
     
     // Ensure new directory exists
     if (!fs.existsSync(newPath)) {
