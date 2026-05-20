@@ -215,7 +215,13 @@ async function initDatabase() {
   
   console.log('Database location:', dbPath);
   db = new Database(dbPath);
-  
+
+  // Schema declares ON DELETE CASCADE on project_transcripts,
+  // project_chat_*, project_analysis, transcript_segments, transcript_topics.
+  // SQLite defaults to foreign_keys=OFF per connection, so without this
+  // every cascade is a no-op and deletes leave orphan rows.
+  db.pragma('foreign_keys = ON');
+
   // Load and execute schema
   const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
