@@ -1,6 +1,43 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import { Transcript } from '../types';
 
+// Safe per-field JSON parse: a single corrupt blob column used to throw out
+// of the surrounding .map(), which the outer try/catch swallowed — the user
+// saw an empty library with no error. Now a bad field falls back to a
+// default and logs a warning so the rest of the row still hydrates.
+function parseJsonOr<T>(raw: unknown, fallback: T, field: string, rowId?: string): T {
+  if (raw === null || raw === undefined || raw === '') return fallback;
+  if (typeof raw !== 'string') return fallback;
+  try {
+    return JSON.parse(raw) as T;
+  } catch (err) {
+    console.warn(
+      `transcript[${rowId ?? '?'}].${field}: malformed JSON, using default`,
+      err instanceof Error ? err.message : err
+    );
+    return fallback;
+  }
+}
+
+function hydrateTranscriptRow(t: any): Transcript {
+  const id = t?.id;
+  return {
+    ...t,
+    action_items: parseJsonOr(t.action_items, [], 'action_items', id),
+    key_topics: parseJsonOr(t.key_topics, [], 'key_topics', id),
+    tags: parseJsonOr(t.tags, [], 'tags', id),
+    validation_changes: parseJsonOr(t.validation_changes, [], 'validation_changes', id),
+    processed_text: t.processed_text || t.full_text || '',
+    speakers: parseJsonOr(t.speakers, [], 'speakers', id),
+    emotions: parseJsonOr(t.emotions, {}, 'emotions', id),
+    notable_quotes: parseJsonOr(t.notable_quotes, [], 'notable_quotes', id),
+    research_themes: parseJsonOr(t.research_themes, [], 'research_themes', id),
+    qa_pairs: parseJsonOr(t.qa_pairs, [], 'qa_pairs', id),
+    concept_frequency: parseJsonOr(t.concept_frequency, {}, 'concept_frequency', id),
+    starred: !!t.starred,
+  };
+}
+
 interface TranscriptContextType {
   transcripts: Transcript[];
   recentTranscripts: Transcript[];
@@ -45,23 +82,8 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
         'SELECT * FROM transcripts WHERE is_deleted != 1 OR is_deleted IS NULL ORDER BY created_at DESC'
       );
       
-      // Parse JSON fields
-      const parsed = allTranscripts.map((t: any) => ({
-        ...t,
-        action_items: t.action_items ? JSON.parse(t.action_items) : [],
-        key_topics: t.key_topics ? JSON.parse(t.key_topics) : [],
-        tags: t.tags ? JSON.parse(t.tags) : [],
-        validation_changes: t.validation_changes ? JSON.parse(t.validation_changes) : [],
-        processed_text: t.processed_text || t.full_text || '',
-        speakers: t.speakers ? JSON.parse(t.speakers) : [],
-        emotions: t.emotions ? JSON.parse(t.emotions) : {},
-        notable_quotes: t.notable_quotes ? JSON.parse(t.notable_quotes) : [],
-        research_themes: t.research_themes ? JSON.parse(t.research_themes) : [],
-        qa_pairs: t.qa_pairs ? JSON.parse(t.qa_pairs) : [],
-        concept_frequency: t.concept_frequency ? JSON.parse(t.concept_frequency) : {},
-        starred: !!t.starred
-      }));
-      
+      const parsed = allTranscripts.map(hydrateTranscriptRow);
+
       setTranscripts(parsed);
       setRecentTranscripts(parsed.slice(0, 10));
     } catch (error) {
@@ -77,22 +99,9 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
       );
       
       if (transcript) {
-        return {
-          ...transcript,
-          action_items: transcript.action_items ? JSON.parse(transcript.action_items) : [],
-          key_topics: transcript.key_topics ? JSON.parse(transcript.key_topics) : [],
-          tags: transcript.tags ? JSON.parse(transcript.tags) : [],
-          validation_changes: transcript.validation_changes ? JSON.parse(transcript.validation_changes) : [],
-          speakers: transcript.speakers ? JSON.parse(transcript.speakers) : [],
-          emotions: transcript.emotions ? JSON.parse(transcript.emotions) : {},
-          notable_quotes: transcript.notable_quotes ? JSON.parse(transcript.notable_quotes) : [],
-          research_themes: transcript.research_themes ? JSON.parse(transcript.research_themes) : [],
-          qa_pairs: transcript.qa_pairs ? JSON.parse(transcript.qa_pairs) : [],
-          concept_frequency: transcript.concept_frequency ? JSON.parse(transcript.concept_frequency) : {},
-          starred: !!transcript.starred
-        };
+        return hydrateTranscriptRow(transcript);
       }
-      
+
       return null;
     } catch (error) {
       console.error('Error getting transcript:', error);
@@ -166,21 +175,7 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
         [`%${query}%`, `%${query}%`, `%${query}%`]
       );
       
-      return results.map((t: any) => ({
-        ...t,
-        action_items: t.action_items ? JSON.parse(t.action_items) : [],
-        key_topics: t.key_topics ? JSON.parse(t.key_topics) : [],
-        tags: t.tags ? JSON.parse(t.tags) : [],
-        validation_changes: t.validation_changes ? JSON.parse(t.validation_changes) : [],
-        processed_text: t.processed_text || t.full_text || '',
-        speakers: t.speakers ? JSON.parse(t.speakers) : [],
-        emotions: t.emotions ? JSON.parse(t.emotions) : {},
-        notable_quotes: t.notable_quotes ? JSON.parse(t.notable_quotes) : [],
-        research_themes: t.research_themes ? JSON.parse(t.research_themes) : [],
-        qa_pairs: t.qa_pairs ? JSON.parse(t.qa_pairs) : [],
-        concept_frequency: t.concept_frequency ? JSON.parse(t.concept_frequency) : {},
-        starred: !!t.starred
-      }));
+      return results.map(hydrateTranscriptRow);
     } catch (error) {
       console.error('Error searching transcripts:', error);
       return [];
