@@ -66,10 +66,22 @@ module.exports = {
     }),
     new webpack.DefinePlugin({
       global: 'window',
-      'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
+      // NODE_ENV is intentionally NOT defined here — webpack's `mode` already
+      // injects the correct value ('production' for `--mode production`, else
+      // 'development'). Defining it manually read the OS env var (unset in the
+      // build script), so it injected 'development' into production builds and
+      // collided with webpack's own define.
       'process.platform': JSON.stringify(process.platform)
     }),
   ],
+  // The renderer ships as one bundle loaded from local disk inside Electron,
+  // not fetched over a network — so the default 244 KiB web budget doesn't
+  // apply. We still keep a budget (just a realistic one) so a runaway jump in
+  // bundle size still surfaces as a warning instead of going unnoticed.
+  performance: {
+    maxAssetSize: 2_621_440, // 2.5 MiB
+    maxEntrypointSize: 2_621_440,
+  },
   devServer: {
     static: false,
     compress: true,
