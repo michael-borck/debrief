@@ -932,7 +932,27 @@ function createMenu() {
 // closes and reopens the db, which would otherwise leave the RPC layer
 // pointing at a closed connection.
 const dbRpc = require('./electron/db-rpc');
+const maintenance = require('./electron/db-rpc/maintenance');
+const { autoUpdater } = require('electron-updater');
 let dbRpcRegistered = false;
+
+// Wire GitHub-releases auto-update. electron-updater reads the feed from the
+// app-update.yml that electron-builder generates from electron-builder.json's
+// `publish` block (github / michael-borck / debrief). Only meaningful in a
+// packaged build — dev has no update feed — so we no-op otherwise. This is
+// what makes the published latest*.yml manifests actually do something.
+function setupAutoUpdater() {
+  if (!app.isPackaged) return;
+  autoUpdater.logger = console;
+  autoUpdater.on('update-available', (info) => console.log(`[updater] update available: ${info.version}`));
+  autoUpdater.on('update-not-available', () => console.log('[updater] up to date'));
+  autoUpdater.on('download-progress', (p) => console.log(`[updater] downloading ${Math.round(p.percent)}%`));
+  autoUpdater.on('update-downloaded', (info) => console.log(`[updater] ${info.version} downloaded; installs on quit`));
+  autoUpdater.on('error', (err) => console.error('[updater] error:', err == null ? 'unknown' : (err.stack || err).toString()));
+  // Downloads in the background and shows a native notification when ready;
+  // the update is applied on next quit.
+  autoUpdater.checkForUpdatesAndNotify().catch((err) => console.error('[updater] check failed:', err));
+}
 function ensureDbRpcRegistered() {
   if (dbRpcRegistered) return;
   dbRpc.registerAll(ipcMain, () => db);
@@ -1740,8 +1760,23 @@ app.whenReady().then(async () => {
   migrateLegacyUserDataDir();
   await initDatabase();
   ensureDbRpcRegistered();
+
+  // Make the "trash auto-deletes after 30 days" promise real: purge expired
+  // trash once per launch. FK cascade cleans up children.
+  try {
+    const swept = maintenance.makeMaintenance(() => db).sweepExpiredTrash();
+    if (swept.transcripts || swept.projects) {
+      console.log(
+        `[trash sweep] purged ${swept.transcripts} transcript(s) + ${swept.projects} project(s) deleted before ${swept.cutoff}`
+      );
+    }
+  } catch (err) {
+    console.error('[trash sweep] failed:', err);
+  }
+
   createWindow();
   createMenu();
+  setupAutoUpdater();
   // Fire-and-forget; sidecar status is queryable via the sidecar:status IPC.
   sidecar.start().catch((err) => console.error('[sidecar] start failed:', err));
 });

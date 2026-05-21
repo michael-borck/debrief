@@ -344,7 +344,7 @@ export const SettingsPage: React.FC = () => {
       const changeResult = await window.electronAPI.changeDatabaseLocation(newPath);
       
       if (changeResult.success) {
-        alert('Database location changed successfully. The app will reload.');
+        alert('Database file moved successfully. The app will reload.');
         window.location.reload();
       } else {
         alert(`Failed to change location: ${changeResult.error}`);
@@ -1380,8 +1380,12 @@ export const SettingsPage: React.FC = () => {
                     {databaseInfo?.path || 'Loading...'}
                   </p>
                   <p className="text-xs text-surface-500 mt-1">
-                    Size: {databaseInfo ? formatFileSize(databaseInfo.size) : '...'} | 
+                    Size: {databaseInfo ? formatFileSize(databaseInfo.size) : '...'} |
                     Modified: {databaseInfo ? new Date(databaseInfo.modified).toLocaleDateString() : '...'}
+                  </p>
+                  <p className="text-xs text-surface-400 mt-1">
+                    "Change Location" moves the database file only. Audio models, the
+                    Python environment, and the chat search index stay in the app's data folder.
                   </p>
                 </div>
                 
