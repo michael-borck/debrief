@@ -7,19 +7,20 @@
 //   - settings (was: 27 raw-SQL call sites)
 //   - transcripts (single-table transcripts reads/writes)
 //   - projects (single-table projects reads/writes)
+//   - projectTranscripts (junction + project⇄transcript JOIN reads)
 //
 // Remaining (will be added as migrations land — see docs/AUDIT-2026-05-21.md
 // Tier 0.6 entry for the full inventory):
-//   - project_transcripts
 //   - segments, topics
 //   - chat (conversations + messages + memory)
 //   - project_chat (conversations + messages)
 //   - project_analysis
-//   - ai_prompts, model_metadata
+//   - model_metadata
 
 const settings = require('./settings');
 const transcripts = require('./transcripts');
 const projects = require('./projects');
+const projectTranscripts = require('./projectTranscripts');
 
 // getDb is a function returning the current db handle. We pass a getter
 // (not the handle directly) because change-database-location closes and
@@ -28,6 +29,7 @@ function registerAll(ipcMain, getDb) {
   settings.register(ipcMain, getDb);
   transcripts.register(ipcMain, getDb);
   projects.register(ipcMain, getDb);
+  projectTranscripts.register(ipcMain, getDb);
 }
 
 module.exports = { registerAll };

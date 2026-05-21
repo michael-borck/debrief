@@ -275,12 +275,10 @@ export class ProjectChatService {
 
       if (!project) return null;
 
-      const transcripts = await window.electronAPI.database.all(`
-        SELECT t.* FROM transcripts t
-        JOIN project_transcripts pt ON t.id = pt.transcript_id
-        WHERE pt.project_id = ? AND t.is_deleted = 0
-        ORDER BY t.created_at DESC
-      `, [projectId]);
+      const transcripts =
+        await window.electronAPI.db.projectTranscripts.listTranscriptsForProject(projectId, {
+          orderBy: 'created_desc',
+        });
 
       return { project, transcripts };
     } catch (error) {
@@ -857,15 +855,13 @@ export class ProjectChatService {
         WHERE pcc.project_id = ?
       `, [projectId]);
 
-      const transcriptCount = await window.electronAPI.database.get(
-        'SELECT COUNT(*) as count FROM project_transcripts WHERE project_id = ?',
-        [projectId]
-      );
+      const transcriptCount =
+        await window.electronAPI.db.projectTranscripts.countForProject(projectId);
 
       return {
         conversationCount: stats?.conversation_count || 0,
         messageCount: stats?.message_count || 0,
-        transcriptCount: transcriptCount?.count || 0,
+        transcriptCount: transcriptCount || 0,
         lastActivity: stats?.last_activity
       };
     } catch (error) {

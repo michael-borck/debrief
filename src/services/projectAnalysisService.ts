@@ -187,14 +187,10 @@ export class ProjectAnalysisService {
    */
   private async getProjectTranscripts(projectId: string): Promise<Transcript[]> {
     try {
-      return await window.electronAPI.database.all(`
-        SELECT t.* FROM transcripts t
-        JOIN project_transcripts pt ON t.id = pt.transcript_id
-        WHERE pt.project_id = ? 
-          AND t.status = 'completed' 
-          AND t.is_deleted = 0
-        ORDER BY t.created_at ASC
-      `, [projectId]);
+      return await window.electronAPI.db.projectTranscripts.listTranscriptsForProject(projectId, {
+        completedOnly: true,
+        orderBy: 'created_asc',
+      });
     } catch (error) {
       console.error('Failed to get project transcripts:', error);
       return [];

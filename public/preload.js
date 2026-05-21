@@ -58,6 +58,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
       restore: (id) => ipcRenderer.invoke('projects:restore', id),
       remove: (id) => ipcRenderer.invoke('projects:remove', id),
     },
+    projectTranscripts: {
+      listProjectsWithStats: () =>
+        ipcRenderer.invoke('project-transcripts:list-projects-with-stats'),
+      getProjectWithStats: (id) =>
+        ipcRenderer.invoke('project-transcripts:get-project-with-stats', id),
+      listTranscriptsForProject: (projectId, options) =>
+        ipcRenderer.invoke('project-transcripts:list-transcripts-for-project', {
+          projectId,
+          options,
+        }),
+      listProjectIdsForTranscript: (transcriptId) =>
+        ipcRenderer.invoke('project-transcripts:list-project-ids-for-transcript', transcriptId),
+      countForProject: (projectId) =>
+        ipcRenderer.invoke('project-transcripts:count-for-project', projectId),
+      listTrashedTranscriptIdsForProject: (projectId) =>
+        ipcRenderer.invoke(
+          'project-transcripts:list-trashed-transcript-ids-for-project',
+          projectId
+        ),
+      link: (projectId, transcriptId) =>
+        ipcRenderer.invoke('project-transcripts:link', { projectId, transcriptId }),
+      unlink: (projectId, transcriptId) =>
+        ipcRenderer.invoke('project-transcripts:unlink', { projectId, transcriptId }),
+    },
   },
 
   // Dialog operations

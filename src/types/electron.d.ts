@@ -150,6 +150,38 @@ export interface ElectronAPI {
       restore: (id: string) => Promise<{ success: true }>;
       remove: (id: string) => Promise<{ changes: number }>;
     };
+
+    /**
+     * The project_transcripts junction plus the cross-table reads that join
+     * projects ⇄ transcripts. The JOIN SQL lives in main; the renderer only
+     * names the read it wants. Rows are returned RAW (JSON columns are still
+     * strings) — the renderer hydrates.
+     */
+    projectTranscripts: {
+      /** Live, non-archived projects + rollup stats (transcript_count, etc). */
+      listProjectsWithStats: () => Promise<any[]>;
+      /** One project + rollup stats (includes archived/trashed), or null. */
+      getProjectWithStats: (id: string) => Promise<any | null>;
+      /** A project's transcripts (raw rows + added_at). */
+      listTranscriptsForProject: (
+        projectId: string,
+        options?: {
+          includeDeleted?: boolean;
+          completedOnly?: boolean;
+          orderBy?: 'added_desc' | 'created_desc' | 'created_asc';
+        }
+      ) => Promise<any[]>;
+      /** [{ project_id }] for each project a transcript is filed under. */
+      listProjectIdsForTranscript: (transcriptId: string) => Promise<{ project_id: string }[]>;
+      /** Number of transcripts filed under a project. */
+      countForProject: (projectId: string) => Promise<number>;
+      /** [{ id }] of a project's still-trashed transcripts (cascade-restore). */
+      listTrashedTranscriptIdsForProject: (projectId: string) => Promise<{ id: string }[]>;
+      /** Files a transcript under a project (INSERT OR IGNORE). */
+      link: (projectId: string, transcriptId: string) => Promise<{ changes: number }>;
+      /** Removes a transcript from a project. */
+      unlink: (projectId: string, transcriptId: string) => Promise<{ changes: number }>;
+    };
   };
 
   dialog: {

@@ -37,13 +37,10 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
       // Get project transcripts if requested
       let transcripts = [];
       if (exportSections.transcripts) {
-        transcripts = await window.electronAPI.database.all(`
-          SELECT t.*, pt.added_at
-          FROM transcripts t
-          JOIN project_transcripts pt ON t.id = pt.transcript_id
-          WHERE pt.project_id = ?
-          ORDER BY t.created_at ASC
-        `, [project.id]);
+        transcripts = await window.electronAPI.db.projectTranscripts.listTranscriptsForProject(
+          project.id,
+          { includeDeleted: true, orderBy: 'created_asc' }
+        );
       }
       
       // Build export data

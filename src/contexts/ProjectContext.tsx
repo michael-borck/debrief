@@ -48,22 +48,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       setIsLoading(true);
       setError(null);
       
-      const result = await window.electronAPI.database.all(`
-        SELECT 
-          p.*,
-          COUNT(DISTINCT pt.transcript_id) as transcript_count,
-          SUM(t.duration) as total_duration,
-          MIN(t.created_at) as earliest_transcript,
-          MAX(t.created_at) as latest_transcript
-        FROM projects p
-        LEFT JOIN project_transcripts pt ON p.id = pt.project_id
-        LEFT JOIN transcripts t ON pt.transcript_id = t.id AND (t.is_deleted != 1 OR t.is_deleted IS NULL)
-        WHERE (p.is_deleted != 1 OR p.is_deleted IS NULL) 
-          AND (p.is_archived != 1 OR p.is_archived IS NULL)
-        GROUP BY p.id
-        ORDER BY p.updated_at DESC
-      `);
-      
+      const result = await window.electronAPI.db.projectTranscripts.listProjectsWithStats();
+
       const projectsWithMetadata = result.map((row: any) => ({
         ...row,
         themes: row.themes ? JSON.parse(row.themes) : [],
@@ -185,20 +171,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Load a specific project
   const loadProject = async (id: string) => {
     try {
-      const project = await window.electronAPI.database.get(`
-        SELECT 
-          p.*,
-          COUNT(DISTINCT pt.transcript_id) as transcript_count,
-          SUM(t.duration) as total_duration,
-          MIN(t.created_at) as earliest_transcript,
-          MAX(t.created_at) as latest_transcript
-        FROM projects p
-        LEFT JOIN project_transcripts pt ON p.id = pt.project_id
-        LEFT JOIN transcripts t ON pt.transcript_id = t.id
-        WHERE p.id = ?
-        GROUP BY p.id
-      `, [id]);
-      
+      const project = await window.electronAPI.db.projectTranscripts.getProjectWithStats(id);
+
       if (project) {
         const projectWithMetadata = {
           ...project,
@@ -222,11 +196,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Add transcript to project
   const addTranscriptToProject = async (projectId: string, transcriptId: string) => {
     try {
-      await window.electronAPI.database.run(
-        'INSERT OR IGNORE INTO project_transcripts (project_id, transcript_id) VALUES (?, ?)',
-        [projectId, transcriptId]
-      );
-      
+      await window.electronAPI.db.projectTranscripts.link(projectId, transcriptId);
+
       // Refresh project data
       if (currentProject?.id === projectId) {
         await loadProject(projectId);
@@ -241,11 +212,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Remove transcript from project
   const removeTranscriptFromProject = async (projectId: string, transcriptId: string) => {
     try {
-      await window.electronAPI.database.run(
-        'DELETE FROM project_transcripts WHERE project_id = ? AND transcript_id = ?',
-        [projectId, transcriptId]
-      );
-      
+      await window.electronAPI.db.projectTranscripts.unlink(projectId, transcriptId);
+
       // Refresh project data
       if (currentProject?.id === projectId) {
         await loadProject(projectId);
@@ -260,14 +228,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Get all transcripts for a project
   const getProjectTranscripts = async (projectId: string): Promise<Transcript[]> => {
     try {
-      const result = await window.electronAPI.database.all(`
-        SELECT t.*, pt.added_at
-        FROM transcripts t
-        JOIN project_transcripts pt ON t.id = pt.transcript_id
-        WHERE pt.project_id = ?
-        ORDER BY pt.added_at DESC
-      `, [projectId]);
-      
+      const result = await window.electronAPI.db.projectTranscripts.listTranscriptsForProject(
+        projectId,
+        { includeDeleted: true, orderBy: 'added_desc' }
+      );
+
       return result.map((row: any) => ({
         ...row,
         action_items: row.action_items ? JSON.parse(row.action_items) : [],

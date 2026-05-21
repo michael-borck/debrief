@@ -60,10 +60,8 @@ export const TranscriptDetailPage: React.FC = () => {
       return;
     }
     try {
-      const projectRelations = await window.electronAPI.database.all(
-        `SELECT project_id FROM project_transcripts WHERE transcript_id = ?`,
-        [transcript.id]
-      );
+      const projectRelations =
+        await window.electronAPI.db.projectTranscripts.listProjectIdsForTranscript(transcript.id);
       const relatedProjects = projects.filter((project) =>
         projectRelations.some((relation) => relation.project_id === project.id)
       );

@@ -49,10 +49,8 @@ export const EnhancedDeleteModal: React.FC<EnhancedDeleteModalProps> = ({
       setLoading(true);
       
       // Get project IDs that this transcript belongs to
-      const relations = await window.electronAPI.database.all(
-        `SELECT project_id FROM project_transcripts WHERE transcript_id = ?`,
-        [item.id]
-      );
+      const relations =
+        await window.electronAPI.db.projectTranscripts.listProjectIdsForTranscript(item.id);
       
       // Find the corresponding project objects and set selection
       const relatedProjects = projects
