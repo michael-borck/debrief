@@ -118,6 +118,38 @@ export interface ElectronAPI {
       restore: (id: string) => Promise<{ success: true }>;
       remove: (id: string) => Promise<{ changes: number }>;
     };
+
+    /**
+     * Single-table projects operations. Rows are returned RAW (themes/
+     * key_insights/tags are still JSON strings) — the renderer parses them.
+     * The aggregate list/detail reads that JOIN project_transcripts +
+     * transcripts live in their own domain, not here.
+     */
+    projects: {
+      /** Full row by id (excludes trashed), or null. */
+      get: (id: string) => Promise<any | null>;
+      /** Archived projects, newest archived first. */
+      listArchived: () => Promise<any[]>;
+      /** Trashed projects, newest deleted first. */
+      listTrashed: () => Promise<any[]>;
+      /** Inserts a new project; created_at/updated_at set in main. */
+      create: (input: {
+        id: string;
+        name: string;
+        description?: string | null;
+        themes?: unknown;
+        key_insights?: unknown;
+        tags?: unknown;
+        color?: string | null;
+        icon?: string | null;
+      }) => Promise<{ id: string }>;
+      /** Updates allow-listed columns only; rejects unknown column names. */
+      update: (id: string, fields: Record<string, unknown>) => Promise<{ changes: number }>;
+      archive: (id: string) => Promise<{ success: true }>;
+      unarchive: (id: string) => Promise<{ success: true }>;
+      restore: (id: string) => Promise<{ success: true }>;
+      remove: (id: string) => Promise<{ changes: number }>;
+    };
   };
 
   dialog: {

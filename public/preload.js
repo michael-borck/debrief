@@ -47,6 +47,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
       restore: (id) => ipcRenderer.invoke('transcripts:restore', id),
       remove: (id) => ipcRenderer.invoke('transcripts:remove', id),
     },
+    projects: {
+      get: (id) => ipcRenderer.invoke('projects:get', id),
+      listArchived: () => ipcRenderer.invoke('projects:list-archived'),
+      listTrashed: () => ipcRenderer.invoke('projects:list-trashed'),
+      create: (input) => ipcRenderer.invoke('projects:create', input),
+      update: (id, fields) => ipcRenderer.invoke('projects:update', { id, fields }),
+      archive: (id) => ipcRenderer.invoke('projects:archive', id),
+      unarchive: (id) => ipcRenderer.invoke('projects:unarchive', id),
+      restore: (id) => ipcRenderer.invoke('projects:restore', id),
+      remove: (id) => ipcRenderer.invoke('projects:remove', id),
+    },
   },
 
   // Dialog operations
