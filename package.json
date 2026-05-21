@@ -59,7 +59,7 @@
     "@lancedb/lancedb": "^0.20.0",
     "apache-arrow": "^18.1.0",
     "autoprefixer": "^10.4.21",
-    "better-sqlite3": "^11.10.0",
+    "better-sqlite3": "^12.10.0",
     "docx": "^9.6.1",
     "electron-updater": "^6.8.3",
     "ffmpeg-static": "^5.2.0",
