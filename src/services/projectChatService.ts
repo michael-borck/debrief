@@ -770,10 +770,11 @@ export class ProjectChatService {
    */
   private async storeProjectChatMessage(conversationId: string, message: ProjectChatMessage): Promise<void> {
     try {
-      await window.electronAPI.database.run(
-        'INSERT INTO project_chat_messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)',
-        [conversationId, message.role, message.content, message.timestamp]
-      );
+      await window.electronAPI.db.projectChat.addMessage(conversationId, {
+        role: message.role,
+        content: message.content,
+        created_at: message.timestamp,
+      });
     } catch (error) {
       console.error('Failed to store project chat message:', error);
     }
@@ -784,21 +785,16 @@ export class ProjectChatService {
    */
   async getOrCreateProjectConversation(projectId: string): Promise<string> {
     try {
-      const existing = await window.electronAPI.database.get(
-        'SELECT id FROM project_chat_conversations WHERE project_id = ? ORDER BY created_at DESC LIMIT 1',
-        [projectId]
-      );
-      
+      const existing =
+        await window.electronAPI.db.projectChat.getLatestConversationId(projectId);
+
       if (existing) {
         return existing.id;
       }
-      
+
       const conversationId = `proj_conv_${projectId}_${Date.now()}`;
-      await window.electronAPI.database.run(
-        'INSERT INTO project_chat_conversations (id, project_id) VALUES (?, ?)',
-        [conversationId, projectId]
-      );
-      
+      await window.electronAPI.db.projectChat.createConversation(conversationId, projectId);
+
       return conversationId;
     } catch (error) {
       console.error('Failed to get or create project conversation:', error);
@@ -811,11 +807,8 @@ export class ProjectChatService {
    */
   async loadProjectConversationHistory(conversationId: string): Promise<ProjectChatMessage[]> {
     try {
-      const messages = await window.electronAPI.database.all(
-        'SELECT * FROM project_chat_messages WHERE conversation_id = ? ORDER BY created_at ASC',
-        [conversationId]
-      );
-      
+      const messages = await window.electronAPI.db.projectChat.listMessages(conversationId);
+
       return messages.map((row: any) => ({
         id: row.id.toString(),
         role: row.role,
@@ -845,15 +838,7 @@ export class ProjectChatService {
     lastActivity?: string;
   }> {
     try {
-      const stats = await window.electronAPI.database.get(`
-        SELECT 
-          COUNT(DISTINCT pcc.id) as conversation_count,
-          COUNT(pcm.id) as message_count,
-          MAX(pcm.created_at) as last_activity
-        FROM project_chat_conversations pcc
-        LEFT JOIN project_chat_messages pcm ON pcc.id = pcm.conversation_id
-        WHERE pcc.project_id = ?
-      `, [projectId]);
+      const stats = await window.electronAPI.db.projectChat.getStats(projectId);
 
       const transcriptCount =
         await window.electronAPI.db.projectTranscripts.countForProject(projectId);
@@ -862,7 +847,7 @@ export class ProjectChatService {
         conversationCount: stats?.conversation_count || 0,
         messageCount: stats?.message_count || 0,
         transcriptCount: transcriptCount || 0,
-        lastActivity: stats?.last_activity
+        lastActivity: stats?.last_activity ?? undefined
       };
     } catch (error) {
       console.error('Failed to get project chat stats:', error);

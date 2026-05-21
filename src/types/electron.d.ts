@@ -218,6 +218,32 @@ export interface ElectronAPI {
       /** Clears a conversation's memory row. */
       deleteMemory: (conversationId: string) => Promise<{ changes: number }>;
     };
+
+    /**
+     * Project-level chat (project_chat_conversations + project_chat_messages).
+     * Mirrors `chat` but keyed on a project. Reads return raw rows.
+     */
+    projectChat: {
+      /** { id } of a project's most recent conversation, or null. */
+      getLatestConversationId: (projectId: string) => Promise<{ id: string } | null>;
+      /** Inserts a new project conversation. */
+      createConversation: (id: string, projectId: string) => Promise<{ id: string }>;
+      /** Deletes a conversation; messages cascade. */
+      deleteConversation: (id: string) => Promise<{ changes: number }>;
+      /** { conversation_count, message_count, last_activity } for a project. */
+      getStats: (projectId: string) => Promise<{
+        conversation_count: number;
+        message_count: number;
+        last_activity: string | null;
+      }>;
+      /** Messages for a conversation, oldest first (raw rows). */
+      listMessages: (conversationId: string) => Promise<any[]>;
+      /** Appends a message; role must be 'user' or 'assistant'. */
+      addMessage: (
+        conversationId: string,
+        message: { role: string; content: string; created_at?: string }
+      ) => Promise<{ id: number | bigint }>;
+    };
   };
 
   dialog: {

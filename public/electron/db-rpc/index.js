@@ -22,6 +22,7 @@ const transcripts = require('./transcripts');
 const projects = require('./projects');
 const projectTranscripts = require('./projectTranscripts');
 const chat = require('./chat');
+const projectChat = require('./projectChat');
 
 // getDb is a function returning the current db handle. We pass a getter
 // (not the handle directly) because change-database-location closes and
@@ -32,6 +33,7 @@ function registerAll(ipcMain, getDb) {
   projects.register(ipcMain, getDb);
   projectTranscripts.register(ipcMain, getDb);
   chat.register(ipcMain, getDb);
+  projectChat.register(ipcMain, getDb);
 }
 
 module.exports = { registerAll };

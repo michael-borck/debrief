@@ -98,6 +98,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('chat:set-memory', { conversationId, memory }),
       deleteMemory: (conversationId) => ipcRenderer.invoke('chat:delete-memory', conversationId),
     },
+    projectChat: {
+      getLatestConversationId: (projectId) =>
+        ipcRenderer.invoke('project-chat:get-latest-conversation-id', projectId),
+      createConversation: (id, projectId) =>
+        ipcRenderer.invoke('project-chat:create-conversation', { id, projectId }),
+      deleteConversation: (id) => ipcRenderer.invoke('project-chat:delete-conversation', id),
+      getStats: (projectId) => ipcRenderer.invoke('project-chat:get-stats', projectId),
+      listMessages: (conversationId) =>
+        ipcRenderer.invoke('project-chat:list-messages', conversationId),
+      addMessage: (conversationId, message) =>
+        ipcRenderer.invoke('project-chat:add-message', { conversationId, message }),
+    },
   },
 
   // Dialog operations

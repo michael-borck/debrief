@@ -63,7 +63,7 @@ export const ChatHistoryPage: React.FC = () => {
     if (!window.confirm('Delete this conversation? This cannot be undone.')) return;
     try {
       await window.electronAPI.db.chat.deleteConversation(conversationId);
-      await window.electronAPI.database.run('DELETE FROM project_chat_conversations WHERE id = ?', [conversationId]);
+      await window.electronAPI.db.projectChat.deleteConversation(conversationId);
       await loadConversations();
     } catch (error) { console.error('Failed to delete conversation:', error); alert('Failed to delete conversation.'); }
   };
