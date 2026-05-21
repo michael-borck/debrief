@@ -182,6 +182,42 @@ export interface ElectronAPI {
       /** Removes a transcript from a project. */
       unlink: (projectId: string, transcriptId: string) => Promise<{ changes: number }>;
     };
+
+    /**
+     * Transcript-chat tables (chat_conversations + chat_messages +
+     * conversation_memory). Project-level chat lives in its own domain.
+     * Reads return raw rows; the renderer maps them.
+     */
+    chat: {
+      /** Chat-history list: conversations + message_count/last_message/title. */
+      listConversationsWithMeta: () => Promise<any[]>;
+      /** { id } of a transcript's most recent conversation, or null. */
+      getLatestConversationId: (transcriptId: string) => Promise<{ id: string } | null>;
+      /** Inserts a new conversation row. */
+      createConversation: (id: string, transcriptId: string) => Promise<{ id: string }>;
+      /** Deletes a conversation; messages + memory cascade. */
+      deleteConversation: (id: string) => Promise<{ changes: number }>;
+      /** Messages for a conversation, oldest first (raw rows). */
+      listMessages: (conversationId: string) => Promise<any[]>;
+      /** Appends a message; role must be 'user' or 'assistant'. */
+      addMessage: (
+        conversationId: string,
+        message: { role: string; content: string; created_at?: string }
+      ) => Promise<{ id: number | bigint }>;
+      /** Compacted memory row for a conversation, or null. */
+      getMemory: (conversationId: string) => Promise<any | null>;
+      /** Upserts the compacted memory row (INSERT OR REPLACE). */
+      setMemory: (
+        conversationId: string,
+        memory: {
+          compactedSummary?: string;
+          totalExchanges?: number;
+          lastCompactionAt?: string;
+        }
+      ) => Promise<{ success: true }>;
+      /** Clears a conversation's memory row. */
+      deleteMemory: (conversationId: string) => Promise<{ changes: number }>;
+    };
   };
 
   dialog: {

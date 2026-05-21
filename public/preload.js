@@ -82,6 +82,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
       unlink: (projectId, transcriptId) =>
         ipcRenderer.invoke('project-transcripts:unlink', { projectId, transcriptId }),
     },
+    chat: {
+      listConversationsWithMeta: () =>
+        ipcRenderer.invoke('chat:list-conversations-with-meta'),
+      getLatestConversationId: (transcriptId) =>
+        ipcRenderer.invoke('chat:get-latest-conversation-id', transcriptId),
+      createConversation: (id, transcriptId) =>
+        ipcRenderer.invoke('chat:create-conversation', { id, transcriptId }),
+      deleteConversation: (id) => ipcRenderer.invoke('chat:delete-conversation', id),
+      listMessages: (conversationId) => ipcRenderer.invoke('chat:list-messages', conversationId),
+      addMessage: (conversationId, message) =>
+        ipcRenderer.invoke('chat:add-message', { conversationId, message }),
+      getMemory: (conversationId) => ipcRenderer.invoke('chat:get-memory', conversationId),
+      setMemory: (conversationId, memory) =>
+        ipcRenderer.invoke('chat:set-memory', { conversationId, memory }),
+      deleteMemory: (conversationId) => ipcRenderer.invoke('chat:delete-memory', conversationId),
+    },
   },
 
   // Dialog operations

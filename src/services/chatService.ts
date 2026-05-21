@@ -580,11 +580,8 @@ export class ChatService {
    */
   private async getConversationMemory(conversationId: string): Promise<ConversationMemory | null> {
     try {
-      const result = await window.electronAPI.database.get(
-        'SELECT * FROM conversation_memory WHERE conversation_id = ?',
-        [conversationId]
-      );
-      
+      const result = await window.electronAPI.db.chat.getMemory(conversationId);
+
       if (result) {
         return {
           activeMessages: [], // Will be populated separately
@@ -606,17 +603,11 @@ export class ChatService {
    */
   private async storeConversationMemory(conversationId: string, memory: ConversationMemory): Promise<void> {
     try {
-      await window.electronAPI.database.run(
-        `INSERT OR REPLACE INTO conversation_memory 
-         (conversation_id, compacted_summary, total_exchanges, last_compaction_at) 
-         VALUES (?, ?, ?, ?)`,
-        [
-          conversationId,
-          memory.compactedSummary,
-          memory.totalExchanges,
-          memory.lastCompactionAt || new Date().toISOString()
-        ]
-      );
+      await window.electronAPI.db.chat.setMemory(conversationId, {
+        compactedSummary: memory.compactedSummary,
+        totalExchanges: memory.totalExchanges,
+        lastCompactionAt: memory.lastCompactionAt,
+      });
     } catch (error) {
       console.error('Failed to store conversation memory:', error);
     }
@@ -877,10 +868,11 @@ export class ChatService {
 
   private async storeChatMessage(conversationId: string, message: ChatMessage): Promise<void> {
     try {
-      await window.electronAPI.database.run(
-        'INSERT INTO chat_messages (conversation_id, role, content, created_at) VALUES (?, ?, ?, ?)',
-        [conversationId, message.role, message.content, message.timestamp]
-      );
+      await window.electronAPI.db.chat.addMessage(conversationId, {
+        role: message.role,
+        content: message.content,
+        created_at: message.timestamp,
+      });
     } catch (error) {
       console.error('Failed to store chat message:', error);
     }
@@ -914,11 +906,8 @@ export class ChatService {
    */
   async loadConversationHistory(conversationId: string): Promise<ChatMessage[]> {
     try {
-      const messages = await window.electronAPI.database.all(
-        'SELECT * FROM chat_messages WHERE conversation_id = ? ORDER BY created_at ASC',
-        [conversationId]
-      );
-      
+      const messages = await window.electronAPI.db.chat.listMessages(conversationId);
+
       return messages.map((row: any) => ({
         id: row.id.toString(),
         role: row.role,
@@ -939,10 +928,7 @@ export class ChatService {
   async startNewConversation(transcriptId: string): Promise<string> {
     const conversationId = `conv_${transcriptId}_${Date.now()}`;
     try {
-      await window.electronAPI.database.run(
-        'INSERT INTO chat_conversations (id, transcript_id) VALUES (?, ?)',
-        [conversationId, transcriptId]
-      );
+      await window.electronAPI.db.chat.createConversation(conversationId, transcriptId);
     } catch (error) {
       console.error('Failed to create new conversation:', error);
     }
@@ -955,22 +941,16 @@ export class ChatService {
   async getOrCreateConversation(transcriptId: string): Promise<string> {
     try {
       // Try to find existing conversation
-      const existing = await window.electronAPI.database.get(
-        'SELECT id FROM chat_conversations WHERE transcript_id = ? ORDER BY created_at DESC LIMIT 1',
-        [transcriptId]
-      );
-      
+      const existing = await window.electronAPI.db.chat.getLatestConversationId(transcriptId);
+
       if (existing) {
         return existing.id;
       }
-      
+
       // Create new conversation
       const conversationId = `conv_${transcriptId}_${Date.now()}`;
-      await window.electronAPI.database.run(
-        'INSERT INTO chat_conversations (id, transcript_id) VALUES (?, ?)',
-        [conversationId, transcriptId]
-      );
-      
+      await window.electronAPI.db.chat.createConversation(conversationId, transcriptId);
+
       return conversationId;
     } catch (error) {
       console.error('Failed to get or create conversation:', error);
@@ -984,10 +964,7 @@ export class ChatService {
    */
   async resetConversationMemory(conversationId: string): Promise<void> {
     try {
-      await window.electronAPI.database.run(
-        'DELETE FROM conversation_memory WHERE conversation_id = ?',
-        [conversationId]
-      );
+      await window.electronAPI.db.chat.deleteMemory(conversationId);
     } catch (error) {
       console.error('Failed to reset conversation memory:', error);
     }

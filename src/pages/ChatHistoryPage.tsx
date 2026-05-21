@@ -31,16 +31,7 @@ export const ChatHistoryPage: React.FC = () => {
   const loadConversations = async () => {
     try {
       setLoading(true);
-      const conversationsData = await window.electronAPI.database.all(`
-        SELECT c.id, c.transcript_id, NULL as project_id, c.created_at, c.updated_at,
-          COUNT(m.id) as message_count, MAX(m.content) as last_message,
-          t.title as entity_title, 'transcript' as entity_type
-        FROM chat_conversations c
-        LEFT JOIN chat_messages m ON c.id = m.conversation_id
-        LEFT JOIN transcripts t ON c.transcript_id = t.id
-        WHERE (t.is_deleted != 1 OR t.is_deleted IS NULL)
-        GROUP BY c.id ORDER BY c.updated_at DESC
-      `);
+      const conversationsData = await window.electronAPI.db.chat.listConversationsWithMeta();
       setConversations(conversationsData);
     } catch (error) { console.error('Failed to load conversations:', error); }
     finally { setLoading(false); }
@@ -71,7 +62,7 @@ export const ChatHistoryPage: React.FC = () => {
   const handleDeleteConversation = async (conversationId: string) => {
     if (!window.confirm('Delete this conversation? This cannot be undone.')) return;
     try {
-      await window.electronAPI.database.run('DELETE FROM chat_conversations WHERE id = ?', [conversationId]);
+      await window.electronAPI.db.chat.deleteConversation(conversationId);
       await window.electronAPI.database.run('DELETE FROM project_chat_conversations WHERE id = ?', [conversationId]);
       await loadConversations();
     } catch (error) { console.error('Failed to delete conversation:', error); alert('Failed to delete conversation.'); }
