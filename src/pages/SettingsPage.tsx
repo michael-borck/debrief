@@ -22,6 +22,9 @@ export const SettingsPage: React.FC = () => {
   const [aiProvider, setAiProvider] = useState('ollama');
   const [aiAnalysisUrl, setAiAnalysisUrl] = useState('http://localhost:11434/v1');
   const [aiApiKey, setAiApiKey] = useState('');
+  // We never load the decrypted key into the renderer; this just tracks whether
+  // one is stored so the field can show a "saved" placeholder.
+  const [hasStoredApiKey, setHasStoredApiKey] = useState(false);
   const [aiModel, setAiModel] = useState('');
   const [aiProviderList, setAiProviderList] = useState<Array<{
     id: string;
@@ -116,24 +119,12 @@ export const SettingsPage: React.FC = () => {
       setLocalTranscriptionModel(settingsMap.localTranscriptionModel || 'Xenova/whisper-tiny.en');
       setAiProvider(settingsMap.aiProvider || 'ollama');
       setAiAnalysisUrl(settingsMap.aiAnalysisUrl || 'http://localhost:11434/v1');
-      // API key is stored encrypted via Electron safeStorage. The decrypt
-      // IPC handles legacy plain-text values too (passes them through).
-      const rawKey = settingsMap.aiApiKey || '';
-      if (rawKey) {
-        const decryptResult = await window.electronAPI.crypto.decrypt(rawKey);
-        const plainKey = decryptResult?.success ? (decryptResult.plain || '') : '';
-        setAiApiKey(plainKey);
-        // If the value was stored as plain text, re-save it encrypted
-        // so the next time it lives encrypted in the database
-        if (decryptResult?.wasPlain && plainKey) {
-          const encResult = await window.electronAPI.crypto.encrypt(plainKey);
-          if (encResult?.success && encResult.encrypted) {
-            await window.electronAPI.db.settings.set('aiApiKey', encResult.encrypted);
-          }
-        }
-      } else {
-        setAiApiKey('');
-      }
+      // The API key is stored encrypted. We deliberately do NOT decrypt it
+      // into the renderer — main resolves it itself for outbound calls. We only
+      // record whether one exists so the field shows a "saved" placeholder. The
+      // user re-types to change it; leaving it blank keeps the stored key.
+      setHasStoredApiKey(!!(settingsMap.aiApiKey || ''));
+      setAiApiKey('');
       setAiModel(settingsMap.aiModel || '');
       setTheme(settingsMap.theme || 'system');
       
@@ -654,12 +645,25 @@ export const SettingsPage: React.FC = () => {
                         type="password"
                         value={aiApiKey}
                         onChange={(e) => setAiApiKey(e.target.value)}
-                        onBlur={(e) => saveSensitiveSetting('aiApiKey', e.target.value)}
-                        placeholder={info?.requiresKey ? 'Required for this provider' : 'Leave blank if not needed'}
+                        onBlur={(e) => {
+                          // Only persist when the user actually typed a key.
+                          // Blank means "keep the stored key" — saving '' would
+                          // wipe it, since the field never loads the saved value.
+                          if (e.target.value) {
+                            saveSensitiveSetting('aiApiKey', e.target.value);
+                            setHasStoredApiKey(true);
+                          }
+                        }}
+                        placeholder={
+                          hasStoredApiKey
+                            ? '•••••••• saved — type to replace, blank keeps it'
+                            : info?.requiresKey ? 'Required for this provider' : 'Leave blank if not needed'
+                        }
                         className="input"
                       />
                       <p className="text-[11px] text-surface-500 mt-1">
                         Stored encrypted via your OS keychain (macOS Keychain, Windows DPAPI, or libsecret on Linux).
+                        The saved key never leaves the main process.
                       </p>
                     </div>
                   );

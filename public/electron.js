@@ -1183,7 +1183,7 @@ ipcMain.handle('ai-list-models', async (event, { provider, url, apiKey }) => {
   try {
     const info = aiProviders.getProviderInfo(provider);
     const effectiveUrl = url || info.defaultUrl;
-    return await aiProviders.listModels(provider, effectiveUrl, apiKey);
+    return await aiProviders.listModels(provider, effectiveUrl, resolveApiKey(apiKey));
   } catch (error) {
     return { success: false, models: [], error: error.message };
   }
@@ -1196,7 +1196,7 @@ ipcMain.handle('ai-test-connection', async (event, { provider, url, apiKey }) =>
   try {
     const info = aiProviders.getProviderInfo(provider);
     const effectiveUrl = url || info.defaultUrl;
-    return await aiProviders.testConnection(provider, effectiveUrl, apiKey);
+    return await aiProviders.testConnection(provider, effectiveUrl, resolveApiKey(apiKey));
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -1355,6 +1355,21 @@ const ENC_PREFIX = 'enc:v1:';
  * API key) from the database. Plain-text legacy values pass through
  * unchanged so the auto-migration on next save can pick them up.
  */
+// Resolve the API key to use for an outbound call. If the renderer supplied a
+// key (the user just typed one to test before saving), use it. Otherwise read
+// the stored key and decrypt it HERE, in main — so the renderer never has to
+// receive the cleartext stored key.
+function resolveApiKey(passed) {
+  if (typeof passed === 'string' && passed.length > 0) return passed;
+  try {
+    const row = db && db.prepare('SELECT value FROM settings WHERE key = ?').get('aiApiKey');
+    return decryptIfNeeded(row && row.value ? row.value : '');
+  } catch (err) {
+    console.error('resolveApiKey failed:', err.message);
+    return '';
+  }
+}
+
 function decryptIfNeeded(value) {
   if (typeof value !== 'string' || value.length === 0) return '';
   if (!value.startsWith(ENC_PREFIX)) return value; // legacy plain-text
@@ -1397,26 +1412,9 @@ ipcMain.handle('crypto-encrypt-string', async (event, { plain }) => {
   }
 });
 
-ipcMain.handle('crypto-decrypt-string', async (event, { encrypted }) => {
-  try {
-    if (typeof encrypted !== 'string' || encrypted.length === 0) {
-      return { success: true, plain: '' };
-    }
-    if (!encrypted.startsWith(ENC_PREFIX)) {
-      // Legacy plain-text value — return as-is so the renderer can
-      // re-save it through the encrypted path on next change
-      return { success: true, plain: encrypted, wasPlain: true };
-    }
-    if (!safeStorage.isEncryptionAvailable()) {
-      return { success: false, error: 'OS encryption not available — cannot decrypt stored value' };
-    }
-    const buffer = Buffer.from(encrypted.slice(ENC_PREFIX.length), 'base64');
-    const plain = safeStorage.decryptString(buffer);
-    return { success: true, plain };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
+// NOTE: there is intentionally no crypto-decrypt-string IPC. The renderer can
+// encrypt+store a secret but never reads it back in cleartext — main decrypts
+// stored secrets itself (decryptIfNeeded / resolveApiKey) for outbound calls.
 
 ipcMain.handle('validate-transcript', async (event, { text }) => {
   try {

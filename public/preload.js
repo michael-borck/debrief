@@ -169,11 +169,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     aiResetUsageStats: (scope) => ipcRenderer.invoke('ai-reset-usage-stats', { scope })
   },
 
-  // Sensitive value encryption (uses Electron safeStorage / OS keychain)
+  // Sensitive value encryption (uses Electron safeStorage / OS keychain).
+  // Encrypt-only: the renderer can store a secret but never reads it back in
+  // cleartext — main decrypts stored secrets itself for outbound calls.
   crypto: {
     isAvailable: () => ipcRenderer.invoke('crypto-is-available'),
-    encrypt: (plain) => ipcRenderer.invoke('crypto-encrypt-string', { plain }),
-    decrypt: (encrypted) => ipcRenderer.invoke('crypto-decrypt-string', { encrypted })
+    encrypt: (plain) => ipcRenderer.invoke('crypto-encrypt-string', { plain })
   },
 
   // Vector store operations (delegated to main process)

@@ -368,18 +368,14 @@ export interface ElectronAPI {
     aiResetUsageStats: (scope?: 'session' | 'lifetime' | 'both') => Promise<{ success: boolean }>;
   };
 
+  // Encrypt-only: no decrypt is exposed. Stored secrets are decrypted in main
+  // (resolveApiKey / decryptIfNeeded) and never returned to the renderer.
   crypto: {
     isAvailable: () => Promise<boolean>;
     encrypt: (plain: string) => Promise<{
       success: boolean;
       encrypted?: string;
       fallback?: boolean;
-      error?: string;
-    }>;
-    decrypt: (encrypted: string) => Promise<{
-      success: boolean;
-      plain?: string;
-      wasPlain?: boolean;
       error?: string;
     }>;
   };
