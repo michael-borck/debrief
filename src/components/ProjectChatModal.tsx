@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { logger } from '../utils/logger';
 import { createPortal } from 'react-dom';
 import { X, Send, MessageSquare, Users, BarChart3, Loader } from 'lucide-react';
 import { Project } from '../types';
@@ -64,9 +65,9 @@ export const ProjectChatModal: React.FC<ProjectChatModalProps> = ({
       if (!isMountedRef.current) return;
       setMessages(history);
 
-      console.log('Project chat initialized successfully');
+      logger.log('Project chat initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize project chat:', error);
+      logger.error('Failed to initialize project chat:', error);
     } finally {
       if (isMountedRef.current) setIsInitializing(false);
     }
@@ -101,7 +102,7 @@ export const ProjectChatModal: React.FC<ProjectChatModalProps> = ({
       setMessages(prev => [...prev.slice(0, -1), tempUserMessage, response]);
       
     } catch (error) {
-      console.error('Failed to send message:', error);
+      logger.error('Failed to send message:', error);
       
       // Add error message
       const errorMessage: ProjectChatMessage = {

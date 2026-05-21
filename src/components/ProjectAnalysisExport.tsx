@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { logger } from '../utils/logger';
 import { Project } from '../types';
 
 interface ProjectAnalysisExportProps {
@@ -127,7 +128,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
       URL.revokeObjectURL(url);
       
     } catch (error) {
-      console.error('Export failed:', error);
+      logger.error('Export failed:', error);
       alert('Export failed. Please try again.');
     } finally {
       setIsExporting(false);

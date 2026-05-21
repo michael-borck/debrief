@@ -1,4 +1,5 @@
 import React from 'react';
+import { logger } from '../utils/logger';
 
 interface ErrorBoundaryState {
   error: Error | null;
@@ -18,7 +19,7 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     this.setState({ errorInfo });
-    console.error('[ErrorBoundary] Renderer crash:', error, errorInfo);
+    logger.error('[ErrorBoundary] Renderer crash:', error, errorInfo);
   }
 
   handleReload = (): void => {

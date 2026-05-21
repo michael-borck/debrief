@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { logger } from '../utils/logger';
 import { Clock, Copy, ExternalLink, User } from 'lucide-react';
 import { sentenceSegmentsService } from '../services/sentenceSegmentsService';
 import { SentenceSegment } from '../types';
@@ -61,43 +62,43 @@ export const TimestampedTranscript: React.FC<TimestampedTranscriptProps> = ({
     const loadSegments = async () => {
       if (transcriptId) {
         setLoadingSegments(true);
-        console.log(`Loading segments for transcript ${transcriptId}, version ${version}`);
+        logger.log(`Loading segments for transcript ${transcriptId}, version ${version}`);
         
         let segments = await sentenceSegmentsService.getSegments(transcriptId, version);
-        console.log(`Found ${segments.length} existing segments for version ${version}`);
+        logger.log(`Found ${segments.length} existing segments for version ${version}`);
         
         // If no segments found for the requested version, try 'original' as fallback
         if (segments.length === 0 && version !== 'original') {
-          console.log(`No segments found for version ${version}, trying 'original' as fallback`);
+          logger.log(`No segments found for version ${version}, trying 'original' as fallback`);
           segments = await sentenceSegmentsService.getSegments(transcriptId, 'original');
-          console.log(`Found ${segments.length} original segments as fallback`);
+          logger.log(`Found ${segments.length} original segments as fallback`);
         }
         
         if (segments.length > 0) {
           setSentenceSegments(segments);
           setUseSegments(true);
-          console.log('Using existing segments with timestamps:', segments.some(s => s.start_time != null));
+          logger.log('Using existing segments with timestamps:', segments.some(s => s.start_time != null));
         } else {
           // Try to create segments on-demand for existing transcripts
           if (version === 'original' && transcript) {
-            console.log('No segments found, attempting to create segments on-demand for existing transcript');
+            logger.log('No segments found, attempting to create segments on-demand for existing transcript');
             try {
               // For existing transcripts, we create basic segments without chunk timing
               const created = await sentenceSegmentsService.createBasicSegments(transcriptId, transcript);
               if (created) {
                 // Reload segments after creation
                 const newSegments = await sentenceSegmentsService.getSegments(transcriptId, version);
-                console.log(`Created ${newSegments.length} new basic segments`);
+                logger.log(`Created ${newSegments.length} new basic segments`);
                 if (newSegments.length > 0) {
                   setSentenceSegments(newSegments);
                   setUseSegments(true);
-                  console.log('Successfully created and loaded basic segments');
+                  logger.log('Successfully created and loaded basic segments');
                   setLoadingSegments(false);
                   return;
                 }
               }
             } catch (error) {
-              console.warn('Failed to create segments on-demand:', error);
+              logger.warn('Failed to create segments on-demand:', error);
             }
           }
           setUseSegments(false);
@@ -122,7 +123,7 @@ export const TimestampedTranscript: React.FC<TimestampedTranscriptProps> = ({
   };
 
   const segments = useMemo(() => {
-    console.log('Processing segments:', { useSegments, sentenceSegmentsLength: sentenceSegments.length });
+    logger.log('Processing segments:', { useSegments, sentenceSegmentsLength: sentenceSegments.length });
     
     // Use sentence segments if available
     if (useSegments && sentenceSegments.length > 0) {
@@ -133,7 +134,7 @@ export const TimestampedTranscript: React.FC<TimestampedTranscriptProps> = ({
         speaker: segment.speaker,
       }));
       
-      console.log('Processed sentence segments:', {
+      logger.log('Processed sentence segments:', {
         total: processedSegments.length,
         withTimestamps: processedSegments.filter(s => s.timestamp).length,
         firstSegment: processedSegments[0]
@@ -273,7 +274,7 @@ export const TimestampedTranscript: React.FC<TimestampedTranscriptProps> = ({
 
   // Count segments with actual timestamps
   const segmentsWithTimestamps = segments.filter(s => s.timestamp && s.timestamp.length > 0);
-  console.log('Segments analysis:', { 
+  logger.log('Segments analysis:', { 
     total: segments.length, 
     withTimestamps: segmentsWithTimestamps.length,
     showTimestamps

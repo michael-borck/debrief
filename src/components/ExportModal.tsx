@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { logger } from '../utils/logger';
 import { X, Download, FileText, CheckCircle, Edit3, Users } from 'lucide-react';
 import { Transcript } from '../types';
 import { buildDocx, buildPdf } from '../services/exportService';
@@ -252,7 +253,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       downloadBlob(blob, extension);
       onClose();
     } catch (error) {
-      console.error('Export failed:', error);
+      logger.error('Export failed:', error);
       alert(`Export failed: ${(error as Error).message}`);
     }
   };

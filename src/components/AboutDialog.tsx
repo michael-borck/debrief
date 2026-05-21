@@ -1,4 +1,5 @@
 import React from 'react';
+import { logger } from '../utils/logger';
 import { URLS } from '../constants/urls';
 import { Modal } from './Modal';
 
@@ -89,7 +90,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose, onSho
           {/* Links */}
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => console.log('Documentation coming soon')}
+              onClick={() => logger.log('Documentation coming soon')}
               disabled
               className="flex items-center justify-center space-x-2 px-4 py-3 border border-surface-200 rounded-lg bg-surface-100 text-surface-400 cursor-not-allowed"
               title="Documentation will be available when the app is feature-complete"
@@ -120,7 +121,7 @@ export const AboutDialog: React.FC<AboutDialogProps> = ({ isOpen, onClose, onSho
 
           {/* Check for Updates */}
           <button
-            onClick={() => console.log('Check for updates')}
+            onClick={() => logger.log('Check for updates')}
             className="btn-primary w-full px-4 py-3 flex items-center justify-center space-x-2"
           >
             <span>🔄</span>

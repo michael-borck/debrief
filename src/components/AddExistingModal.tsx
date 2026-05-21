@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { logger } from '../utils/logger';
 import { Search, Filter, Calendar, Clock, Palette, CheckSquare, Square, X } from 'lucide-react';
 import { TranscriptContext } from '../contexts/TranscriptContext';
 import { Transcript } from '../types';
@@ -79,7 +80,7 @@ export const AddExistingModal: React.FC<AddExistingModalProps> = ({
 
       setResults(searchResults);
     } catch (error) {
-      console.error('Search error:', error);
+      logger.error('Search error:', error);
     } finally {
       setLoading(false);
     }

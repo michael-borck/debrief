@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import { CheckCircle, Edit3, AlertTriangle, Settings, RefreshCw } from 'lucide-react';
 import { Transcript } from '../types';
 import { sentenceSegmentsService } from '../services/sentenceSegmentsService';
@@ -65,13 +66,13 @@ export const CorrectionTrigger: React.FC<CorrectionTriggerProps> = ({
         try {
           options = JSON.parse(settingsMap.validationOptions);
         } catch (e) {
-          console.error('Error parsing validation options:', e);
+          logger.error('Error parsing validation options:', e);
         }
       }
 
       setValidationSettings({ enabled, options });
     } catch (error) {
-      console.error('Failed to load validation settings:', error);
+      logger.error('Failed to load validation settings:', error);
       onError('Failed to load validation settings');
     }
   };
@@ -131,15 +132,15 @@ export const CorrectionTrigger: React.FC<CorrectionTriggerProps> = ({
           transcript.id, 
           validationResult.validatedText
         );
-        console.log('Created corrected sentence segments');
+        logger.log('Created corrected sentence segments');
       } catch (segmentError) {
-        console.warn('Failed to create corrected sentence segments:', segmentError);
+        logger.warn('Failed to create corrected sentence segments:', segmentError);
         // Don't fail the whole correction process for this
       }
 
       onCorrectionComplete(updatedTranscript);
     } catch (error) {
-      console.error('Correction failed:', error);
+      logger.error('Correction failed:', error);
       const errorMessage = (error as Error).message;
       // Truncate very long error messages (like HTML responses)
       const truncatedMessage = errorMessage.length > 200 

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { logger } from '../utils/logger';
 import { Save, X, Search, RotateCcw, Type, Clock, AlertCircle } from 'lucide-react';
 import { Transcript } from '../types';
 import { TimestampedTranscript } from './TimestampedTranscript';
@@ -79,7 +80,7 @@ export const TranscriptEditor: React.FC<TranscriptEditorProps> = ({
       localStorage.setItem(`transcript_edit_${transcript.id}`, editedText);
       setLastSaved(new Date());
     } catch (error) {
-      console.error('Auto-save failed:', error);
+      logger.error('Auto-save failed:', error);
     }
   };
 

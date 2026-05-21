@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { logger } from '../utils/logger';
 import { AlertCircle, Save, RotateCcw, Copy, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { AIPrompt } from '../services/promptService';
 
@@ -38,7 +39,7 @@ export const PromptEditor: React.FC<PromptEditorProps> = ({
       });
       setIsEditing(false);
     } catch (error) {
-      console.error('Error saving prompt:', error);
+      logger.error('Error saving prompt:', error);
       alert('Failed to save prompt. Please try again.');
     } finally {
       setIsSaving(false);

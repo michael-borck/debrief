@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { logger } from '../utils/logger';
 import { createPortal } from 'react-dom';
 import { X, Send, MessageCircle, User, Bot, AlertCircle, Plus } from 'lucide-react';
 import { Transcript } from '../types';
@@ -93,7 +94,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       setIsProcessingTranscript(false);
       setProcessingProgress(null);
     } catch (error) {
-      console.error('Failed to initialize chat:', error);
+      logger.error('Failed to initialize chat:', error);
       setError('Failed to initialize chat. Please try again.');
       setIsProcessingTranscript(false);
     }
@@ -112,7 +113,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       setMessages([]);
       setError(null);
     } catch (e) {
-      console.error('Failed to start new chat:', e);
+      logger.error('Failed to start new chat:', e);
       setError('Failed to start a new chat. Please try again.');
     }
   };
@@ -123,7 +124,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       const transcriptChunks = stats.vectorStats.transcripts.includes(transcript.id);
       return transcriptChunks;
     } catch (error) {
-      console.error('Failed to check chat readiness:', error);
+      logger.error('Failed to check chat readiness:', error);
       return false;
     }
   };
@@ -145,7 +146,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       
       setChatReady(true);
     } catch (error) {
-      console.error('Failed to process transcript for chat:', error);
+      logger.error('Failed to process transcript for chat:', error);
       setError('Failed to prepare transcript for chat. Please try again.');
       throw error;
     }
@@ -180,7 +181,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       // Add assistant message to UI
       setMessages(prev => [...prev, assistantMessage]);
     } catch (error) {
-      console.error('Failed to get chat response:', error);
+      logger.error('Failed to get chat response:', error);
       
       // Add error message
       const errorMessage: ChatMessage = {
@@ -210,9 +211,9 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       // Update local state
       setCurrentMode(newMode);
       
-      console.log(`Conversation mode changed to: ${newMode}`);
+      logger.log(`Conversation mode changed to: ${newMode}`);
     } catch (error) {
-      console.error('Failed to change conversation mode:', error);
+      logger.error('Failed to change conversation mode:', error);
     }
   };
 

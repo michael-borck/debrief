@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import { X, Wand2, Save, Plus, Trash2, Sparkles, Check, Loader2 } from 'lucide-react';
 import {
   suggestSpeakerImprovements,
@@ -321,8 +322,8 @@ etc.`;
       const aiUrl = ai.aiAnalysisUrl || 'http://localhost:11434';
       const aiModel = ai.aiModel || 'llama3.2';
 
-      console.log('AI Prompt:', aiPrompt);
-      console.log('AI URL:', aiUrl, 'Model:', aiModel);
+      logger.log('AI Prompt:', aiPrompt);
+      logger.log('AI URL:', aiUrl, 'Model:', aiModel);
 
       // Call AI service through Electron API
       const result = await window.electronAPI.services.chatWithOllama({
@@ -331,7 +332,7 @@ etc.`;
         context: ''
       });
 
-      console.log('AI Result:', result);
+      logger.log('AI Result:', result);
 
       if (!result.success) {
         throw new Error(`AI service error: ${result.error}`);
@@ -365,7 +366,7 @@ etc.`;
         setSegments(updatedSegments);
       }
     } catch (error) {
-      console.error('Error applying AI suggestions:', error);
+      logger.error('Error applying AI suggestions:', error);
       alert(`Failed to apply AI suggestions: ${error instanceof Error ? error.message : 'Unknown error'}. Check console for details.`);
     }
     

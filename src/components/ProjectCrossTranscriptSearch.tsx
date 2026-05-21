@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useMemo } from 'react';
+import { logger } from '../utils/logger';
 import { Transcript } from '../types';
 
 interface SearchResult {
@@ -267,7 +268,7 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
       
       setResults(searchResults);
     } catch (error) {
-      console.error('Search failed:', error);
+      logger.error('Search failed:', error);
     } finally {
       setIsSearching(false);
     }

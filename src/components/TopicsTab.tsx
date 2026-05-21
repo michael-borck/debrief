@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { logger } from '../utils/logger';
 import { Sparkles, Loader, RefreshCw, AlertCircle, ChevronRight, ChevronDown, Clock } from 'lucide-react';
 import { topicsService, Topic } from '../services/topicsService';
 import { chatService } from '../services/chatService';
@@ -36,7 +37,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ transcript, onSeek }) => {
         const existing = await topicsService.load(transcript.id);
         if (!cancelled) setTopics(existing);
       } catch (e) {
-        console.error('Failed to load topics:', e);
+        logger.error('Failed to load topics:', e);
       } finally {
         if (!cancelled) setLoading(false);
       }

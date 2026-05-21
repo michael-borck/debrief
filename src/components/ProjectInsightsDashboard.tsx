@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import { Project } from '../types';
 import { ProjectAnalysisExport } from './ProjectAnalysisExport';
 
@@ -125,7 +126,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
         setDetailedAnalysis(JSON.parse(result.results));
       }
     } catch (error) {
-      console.error('Failed to load detailed analysis:', error);
+      logger.error('Failed to load detailed analysis:', error);
     }
   };
 

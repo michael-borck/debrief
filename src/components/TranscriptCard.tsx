@@ -1,4 +1,5 @@
 import React, { useContext, useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import { useNavigate } from 'react-router-dom';
 import { FileText, Calendar, Clock, HardDrive, Eye, MessageCircle, Download, Archive, Trash2, Star, Loader } from 'lucide-react';
 import { Transcript, Project } from '../types';
@@ -42,7 +43,7 @@ export const TranscriptCard: React.FC<TranscriptCardProps> = ({
 
         setTranscriptProjects(relatedProjects);
       } catch (error) {
-        console.error('Error loading transcript projects:', error);
+        logger.error('Error loading transcript projects:', error);
       }
     };
 
@@ -68,7 +69,7 @@ export const TranscriptCard: React.FC<TranscriptCardProps> = ({
       await window.electronAPI.db.transcripts.archive(transcript.id);
       window.location.reload();
     } catch (error) {
-      console.error('Error archiving transcript:', error);
+      logger.error('Error archiving transcript:', error);
       alert('Failed to archive transcript. Please try again.');
     }
   };
@@ -105,7 +106,7 @@ export const TranscriptCard: React.FC<TranscriptCardProps> = ({
       }
       setShowDeleteModal(false);
     } catch (error) {
-      console.error('Error performing delete action:', error);
+      logger.error('Error performing delete action:', error);
       alert('Failed to perform the action. Please try again.');
     }
   };
@@ -115,7 +116,7 @@ export const TranscriptCard: React.FC<TranscriptCardProps> = ({
       await window.electronAPI.db.transcripts.softDelete(transcriptId);
       window.location.reload();
     } catch (error) {
-      console.error('Error moving transcript to trash:', error);
+      logger.error('Error moving transcript to trash:', error);
       throw error;
     }
   };

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import { X, AlertTriangle, Trash2, FolderMinus } from 'lucide-react';
 import { Transcript, Project } from '../types';
 import { useProjects } from '../contexts/ProjectContext';
@@ -73,7 +74,7 @@ export const EnhancedDeleteModal: React.FC<EnhancedDeleteModalProps> = ({
         setSelectedAction('remove-from-all');
       }
     } catch (error) {
-      console.error('Error loading project relations:', error);
+      logger.error('Error loading project relations:', error);
     } finally {
       setLoading(false);
     }

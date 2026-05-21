@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from '../utils/logger';
 import { MessageCircle, Search, Sparkles, Users, CheckCircle, AlertTriangle, Download, Upload } from 'lucide-react';
 import { PromptEditor } from './PromptEditor';
 import { AIPrompt } from '../services/promptService';
@@ -61,7 +62,7 @@ export const PromptsSettings: React.FC = () => {
       const categoryPrompts = await window.electronAPI.aiPrompts.getByCategory(activeCategory);
       setPrompts(categoryPrompts);
     } catch (error) {
-      console.error('Error loading prompts:', error);
+      logger.error('Error loading prompts:', error);
     } finally {
       setLoading(false);
     }
@@ -145,7 +146,7 @@ export const PromptsSettings: React.FC = () => {
         alert('Prompts imported successfully!');
       } catch (error) {
         alert('Failed to import prompts. Please check the file format.');
-        console.error('Import error:', error);
+        logger.error('Import error:', error);
       }
     };
 
