@@ -1,4 +1,5 @@
 """debrief embedded sidecar — mounts lens/speech-analyser's FastAPI app."""
+import hmac
 import os
 import sys
 from pathlib import Path
@@ -52,7 +53,8 @@ os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
 
 from speech_analyser.app import app
 from speech_analyser.diarizer import Diarizer
-from fastapi import HTTPException, UploadFile, File, Form
+from fastapi import HTTPException, UploadFile, File, Form, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import tempfile
 from pathlib import Path as _Path
@@ -60,6 +62,32 @@ from pathlib import Path as _Path
 from embedder import Embedder
 
 VERSION = "0.0.1-spike"
+
+# Per-launch shared secret set by the Electron SidecarManager. Loopback isn't a
+# trust boundary on a multi-process desktop — without this, any local process
+# could POST audio to /analyse or read /embed. Every request must carry
+# `Authorization: Bearer <token>`. If the env var is unset (e.g. a manual dev
+# run), we log and allow, so the app's normal path always sets it and is always
+# enforced.
+_SIDECAR_TOKEN = os.environ.get("DEBRIEF_SIDECAR_TOKEN")
+if not _SIDECAR_TOKEN:
+    print(
+        "WARNING: DEBRIEF_SIDECAR_TOKEN unset — sidecar auth disabled (dev mode)",
+        file=sys.stderr,
+        flush=True,
+    )
+
+
+@app.middleware("http")
+async def _require_bearer_token(request: Request, call_next):
+    if _SIDECAR_TOKEN:
+        expected = f"Bearer {_SIDECAR_TOKEN}"
+        provided = request.headers.get("authorization", "")
+        # constant-time compare so a wrong token can't be guessed via timing
+        if not hmac.compare_digest(provided, expected):
+            return JSONResponse({"detail": "unauthorized"}, status_code=401)
+    return await call_next(request)
+
 
 _embedder = Embedder()
 _diarizer = Diarizer()

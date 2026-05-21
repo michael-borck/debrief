@@ -5,6 +5,7 @@
 
 const { app } = require('electron');
 const { spawn } = require('child_process');
+const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const net = require('net');
@@ -53,6 +54,11 @@ class SidecarManager {
     this.setupSteps = [];
     this._shuttingDown = false;
     this._restartAttempt = 0;
+    // Per-launch shared secret. Loopback isn't a trust boundary on a
+    // multi-process desktop — any local process can hit 127.0.0.1:<port>.
+    // Every request to the sidecar must carry this as a Bearer token; the
+    // Python server rejects anything else. Generated once per app launch.
+    this.token = crypto.randomBytes(32).toString('hex');
   }
 
   getStatus() {
@@ -163,7 +169,12 @@ class SidecarManager {
   async _spawnServer(paths) {
     this.state = 'starting';
     this.port = await findAvailablePort(8765);
-    const env = { ...process.env, HOST: '127.0.0.1', PORT: String(this.port) };
+    const env = {
+      ...process.env,
+      HOST: '127.0.0.1',
+      PORT: String(this.port),
+      DEBRIEF_SIDECAR_TOKEN: this.token,
+    };
     console.log(`[sidecar] spawning server.py via user-data venv on port ${this.port}`);
 
     this.proc = spawn(paths.userVenvPython, [paths.serverScript], {
@@ -265,7 +276,7 @@ class SidecarManager {
     while (Date.now() < deadline) {
       if (!this.proc) return false;
       try {
-        const res = await fetch(url);
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${this.token}` } });
         if (res.ok) return true;
       } catch (_) {
         // not bound yet

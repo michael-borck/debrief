@@ -22,6 +22,16 @@ try {
 // Safe parse for the `speakers` JSON-string column. A single malformed
 // chunk row used to throw out of the surrounding .map() and tank the
 // whole RAG retrieval / stats call. Now bad rows fall back to [] and log.
+// Render a value as a single-quoted SQL string literal for a LanceDB /
+// DataFusion `.where()` / `.delete()` filter, doubling any embedded single
+// quotes. Without this, a value like  x' OR '1'='1  would break out of the
+// literal and inject filter logic. Quote-doubling is standard SQL escaping and
+// preserves legitimate data — e.g. a speaker named "John O'Brien" stays intact,
+// which a strict charset whitelist would have rejected.
+function sqlStringLiteral(value) {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
 function parseSpeakers(raw, chunkId) {
   if (raw === null || raw === undefined || raw === '') return [];
   if (typeof raw !== 'string') return Array.isArray(raw) ? raw : [];
@@ -175,11 +185,11 @@ class MainVectorStore {
         // Identifiers must be double-quoted — newer LanceDB's SQL parser
         // lowercases unquoted identifiers, so `transcriptId` becomes
         // `transcriptid` and fails to match the schema column.
-        query = query.where(`"transcriptId" = '${options.transcriptId}'`);
+        query = query.where(`"transcriptId" = ${sqlStringLiteral(options.transcriptId)}`);
       }
 
       if (options.speaker) {
-        query = query.where(`"speaker" = '${options.speaker}'`);
+        query = query.where(`"speaker" = ${sqlStringLiteral(options.speaker)}`);
       }
 
       const results = await query.toArray();
@@ -219,7 +229,7 @@ class MainVectorStore {
         throw new Error('Vector store not initialized');
       }
 
-      await this.table.delete(`"transcriptId" = '${transcriptId}'`);
+      await this.table.delete(`"transcriptId" = ${sqlStringLiteral(transcriptId)}`);
       console.log(`Deleted chunks for transcript: ${transcriptId}`);
     } catch (error) {
       console.error('Failed to delete transcript chunks:', error);
@@ -267,7 +277,7 @@ class MainVectorStore {
     try {
       // Delete existing chunks with same IDs
       for (const chunk of chunks) {
-        await this.table.delete(`id = '${chunk.id}'`);
+        await this.table.delete(`id = ${sqlStringLiteral(chunk.id)}`);
       }
 
       // Add updated chunks

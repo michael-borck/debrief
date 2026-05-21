@@ -3,9 +3,13 @@ const { pathToFileURL } = require('url');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
-const { exec, spawn } = require('child_process');
+const { execFile, spawn } = require('child_process');
 const { promisify } = require('util');
-const execAsync = promisify(exec);
+// execFile (not exec) runs the binary directly without a shell, so file paths
+// containing spaces or shell metacharacters can't inject commands. maxBuffer is
+// raised because the duration-probe calls read ffmpeg's full stderr log.
+const execFileAsync = promisify(execFile);
+const FFMPEG_MAX_BUFFER = 1024 * 1024 * 16;
 const aiProviders = require('./ai-providers');
 const URLS = require('./electron-urls');
 const { MainVectorStore } = require('./electron/vector-store');
@@ -156,9 +160,12 @@ const os = require('os');
 async function transcodeToWav16kMono(inputPath) {
   const ffmpegPath = getFFmpegPath();
   const tmp = path.join(os.tmpdir(), `debrief-${Date.now()}-${path.basename(inputPath, path.extname(inputPath))}.wav`);
-  const cmd = `"${ffmpegPath}" -y -i "${inputPath}" -vn -ar 16000 -ac 1 "${tmp}" 2>&1`;
   try {
-    await execAsync(cmd);
+    await execFileAsync(
+      ffmpegPath,
+      ['-y', '-i', inputPath, '-vn', '-ar', '16000', '-ac', '1', tmp],
+      { maxBuffer: FFMPEG_MAX_BUFFER }
+    );
     return tmp;
   } catch (err) {
     try { fs.unlinkSync(tmp); } catch (_) { /* never created */ }
@@ -171,8 +178,11 @@ async function transcodeToWav16kMono(inputPath) {
 async function getAudioDurationSec(audioPath) {
   try {
     const ffmpegPath = getFFmpegPath();
-    const cmd = `"${ffmpegPath}" -i "${audioPath}" -f null - 2>&1`;
-    const { stdout, stderr } = await execAsync(cmd).catch((e) => ({ stdout: '', stderr: e.stderr || e.message }));
+    const { stdout, stderr } = await execFileAsync(
+      ffmpegPath,
+      ['-i', audioPath, '-f', 'null', '-'],
+      { maxBuffer: FFMPEG_MAX_BUFFER }
+    ).catch((e) => ({ stdout: '', stderr: e.stderr || e.message }));
     const output = stdout + stderr;
     const m = output.match(/Duration: (\d{2}):(\d{2}):(\d{2})\.(\d+)/);
     if (m) {
@@ -1700,6 +1710,23 @@ app.whenReady().then(async () => {
       if (process.platform === 'win32' && filePath.startsWith('/')) {
         filePath = filePath.slice(1);
       }
+      // Allow-list: only stream files the app actually imported, i.e. paths
+      // present in transcripts.file_path. The scheme is registered with
+      // bypassCSP, so without this any XSS in the renderer could
+      // fetch('safe-file:///Users/me/.ssh/id_rsa') and exfiltrate arbitrary
+      // files. Normalise both sides so separators/./.. don't sneak past.
+      if (!db) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      const requested = path.resolve(filePath);
+      const known = db
+        .prepare('SELECT file_path FROM transcripts WHERE file_path IS NOT NULL')
+        .all();
+      const allowed = known.some((r) => path.resolve(r.file_path) === requested);
+      if (!allowed) {
+        console.warn('[safe-file protocol] rejected non-media path:', filePath);
+        return new Response('Forbidden', { status: 403 });
+      }
       if (!fs.existsSync(filePath)) {
         return new Response('Not Found', { status: 404 });
       }
@@ -1866,10 +1893,11 @@ ipcMain.handle('extract-audio', async (event, { inputPath, outputPath }) => {
       throw new Error('FFmpeg not found. Please run: npm run download-ffmpeg');
     }
     
-    // Build FFmpeg command
-    const command = `"${ffmpegPath}" -i "${inputPath}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${outputPath}" -y`;
-    
-    await execAsync(command);
+    await execFileAsync(
+      ffmpegPath,
+      ['-i', inputPath, '-vn', '-acodec', 'pcm_s16le', '-ar', '16000', '-ac', '1', outputPath, '-y'],
+      { maxBuffer: FFMPEG_MAX_BUFFER }
+    );
     return { success: true };
   } catch (error) {
     console.error('Audio extraction error:', error);
@@ -1882,8 +1910,11 @@ ipcMain.handle('get-media-info', async (event, { filePath }) => {
   const ffmpegPath = getFFmpegPath();
   
   try {
-    const command = `"${ffmpegPath}" -i "${filePath}" -f null - 2>&1`;
-    const { stdout, stderr } = await execAsync(command).catch(e => ({ stdout: '', stderr: e.stderr || e.message }));
+    const { stdout, stderr } = await execFileAsync(
+      ffmpegPath,
+      ['-i', filePath, '-f', 'null', '-'],
+      { maxBuffer: FFMPEG_MAX_BUFFER }
+    ).catch(e => ({ stdout: '', stderr: e.stderr || e.message }));
     const output = stdout + stderr;
     
     // Parse duration

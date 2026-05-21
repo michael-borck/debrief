@@ -35,6 +35,12 @@ function baseUrl() {
   return `http://127.0.0.1:${sidecar.port}`;
 }
 
+// Per-launch Bearer token the sidecar requires on every request (see
+// SidecarManager.token). Read live so it tracks the current manager instance.
+function authHeader() {
+  return { Authorization: `Bearer ${sidecar.token}` };
+}
+
 // POST /analyse with the audio file. Returns the parsed JSON response from
 // speech-analyser: { transcript, language, duration, segments[], speakers[],
 // talk_time, speech_metrics, diarization_available, file_path, file_size }.
@@ -54,6 +60,7 @@ async function analyse({ audioPath, diarize = true, model = 'base' }) {
 
   const res = await fetch(`${baseUrl()}/analyse`, {
     method: 'POST',
+    headers: authHeader(),
     body: form,
     dispatcher: localhostAgent,
   });
@@ -79,6 +86,7 @@ async function rediarise({ audioPath, numSpeakers = null }) {
   if (numSpeakers != null) form.append('num_speakers', String(numSpeakers));
   const res = await fetch(`${baseUrl()}/rediarise`, {
     method: 'POST',
+    headers: authHeader(),
     body: form,
     dispatcher: localhostAgent,
   });
@@ -103,7 +111,7 @@ async function embed(texts, { normalize = true } = {}) {
   }
   const res = await fetch(`${baseUrl()}/embed`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...authHeader() },
     body: JSON.stringify({ texts, normalize }),
     dispatcher: localhostAgent,
   });
