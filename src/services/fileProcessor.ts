@@ -212,10 +212,7 @@ export class FileProcessor {
         // transcript row outright (plus any segments already created) so
         // the library doesn't carry around a 'cancelled / error' ghost.
         try {
-          await window.electronAPI.database.run(
-            'DELETE FROM transcript_segments WHERE transcript_id = ?',
-            [transcriptId]
-          );
+          await window.electronAPI.db.transcriptSegments.deleteByTranscript(transcriptId);
         } catch (segErr) {
           console.warn('Failed to delete cancelled transcript segments:', segErr);
         }
@@ -236,10 +233,7 @@ export class FileProcessor {
       // transcript + any segments already created. Without this, the
       // user sees a permanent "Error" entry they can't act on.
       try {
-        await window.electronAPI.database.run(
-          'DELETE FROM transcript_segments WHERE transcript_id = ?',
-          [transcriptId]
-        );
+        await window.electronAPI.db.transcriptSegments.deleteByTranscript(transcriptId);
       } catch (segErr) {
         console.warn('Failed to delete failed-import segments:', segErr);
       }

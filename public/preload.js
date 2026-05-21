@@ -110,6 +110,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
       addMessage: (conversationId, message) =>
         ipcRenderer.invoke('project-chat:add-message', { conversationId, message }),
     },
+    transcriptSegments: {
+      listByTranscript: (transcriptId) =>
+        ipcRenderer.invoke('transcript-segments:list-by-transcript', transcriptId),
+      deleteByTranscript: (transcriptId) =>
+        ipcRenderer.invoke('transcript-segments:delete-by-transcript', transcriptId),
+    },
   },
 
   // Dialog operations

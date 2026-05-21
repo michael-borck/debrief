@@ -244,6 +244,18 @@ export interface ElectronAPI {
         message: { role: string; content: string; created_at?: string }
       ) => Promise<{ id: number | bigint }>;
     };
+
+    /**
+     * The raw-SQL transcript_segments reads/deletes that used to go through
+     * db-query. Distinct from the version-aware `electronAPI.segments` API:
+     * this is an all-versions read (start_time order) + all-versions delete.
+     */
+    transcriptSegments: {
+      /** All segments for a transcript (every version), ordered by start_time. */
+      listByTranscript: (transcriptId: string) => Promise<any[]>;
+      /** Deletes every segment for a transcript (all versions). */
+      deleteByTranscript: (transcriptId: string) => Promise<{ changes: number }>;
+    };
   };
 
   dialog: {

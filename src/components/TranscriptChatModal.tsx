@@ -120,10 +120,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       setIsProcessingTranscript(true);
       
       // Get transcript segments
-      const segments = await window.electronAPI.database.all(
-        'SELECT * FROM transcript_segments WHERE transcript_id = ? ORDER BY start_time',
-        [transcript.id]
-      );
+      const segments = await window.electronAPI.db.transcriptSegments.listByTranscript(transcript.id);
 
       await chatService.processTranscriptForChat(
         transcript,

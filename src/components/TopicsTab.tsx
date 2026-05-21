@@ -55,10 +55,7 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ transcript, onSeek }) => {
     if (existing && existing.length > 0) return;
 
     setProgress('Preparing passages (one-time)');
-    const segments = await window.electronAPI.database.all(
-      'SELECT * FROM transcript_segments WHERE transcript_id = ? ORDER BY start_time',
-      [transcript.id]
-    );
+    const segments = await window.electronAPI.db.transcriptSegments.listByTranscript(transcript.id);
     if (!segments || segments.length === 0) {
       throw new Error(
         'This transcript has no segments to analyse. Open the transcript and run diarisation, then try again.'

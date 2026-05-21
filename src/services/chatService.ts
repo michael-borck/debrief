@@ -891,10 +891,7 @@ export class ChatService {
     // Get transcript data
     const transcript = await window.electronAPI.db.transcripts.get(transcriptId);
 
-    const segments = await window.electronAPI.database.all(
-      'SELECT * FROM transcript_segments WHERE transcript_id = ? ORDER BY start_time',
-      [transcriptId]
-    );
+    const segments = await window.electronAPI.db.transcriptSegments.listByTranscript(transcriptId);
 
     // Reprocess
     await this.processTranscriptForChat(transcript, segments, onProgress);
