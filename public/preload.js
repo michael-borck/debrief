@@ -124,6 +124,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
       deleteByTranscript: (transcriptId) =>
         ipcRenderer.invoke('topics:delete-by-transcript', transcriptId),
     },
+    projectAnalysis: {
+      insert: (input) => ipcRenderer.invoke('project-analysis:insert', input),
+      getLatestResults: (projectId) =>
+        ipcRenderer.invoke('project-analysis:get-latest-results', projectId),
+    },
   },
 
   // Dialog operations

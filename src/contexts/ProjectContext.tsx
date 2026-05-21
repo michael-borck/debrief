@@ -264,17 +264,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       // Store detailed analysis results
       const analysisId = generateId();
-      await window.electronAPI.database.run(
-        `INSERT INTO project_analysis (id, project_id, analysis_type, results, created_at)
-         VALUES (?, ?, ?, ?, ?)`,
-        [
-          analysisId,
-          projectId,
-          'comprehensive_analysis',
-          JSON.stringify(analysisResult),
-          new Date().toISOString()
-        ]
-      );
+      await window.electronAPI.db.projectAnalysis.insert({
+        id: analysisId,
+        projectId,
+        analysisType: 'comprehensive_analysis',
+        results: analysisResult,
+        createdAt: new Date().toISOString(),
+      });
       
       console.log('Project analysis completed successfully');
       

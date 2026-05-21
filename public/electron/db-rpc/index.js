@@ -25,6 +25,7 @@ const chat = require('./chat');
 const projectChat = require('./projectChat');
 const transcriptSegments = require('./transcriptSegments');
 const topics = require('./topics');
+const projectAnalysis = require('./projectAnalysis');
 
 // getDb is a function returning the current db handle. We pass a getter
 // (not the handle directly) because change-database-location closes and
@@ -38,6 +39,7 @@ function registerAll(ipcMain, getDb) {
   projectChat.register(ipcMain, getDb);
   transcriptSegments.register(ipcMain, getDb);
   topics.register(ipcMain, getDb);
+  projectAnalysis.register(ipcMain, getDb);
 }
 
 module.exports = { registerAll };

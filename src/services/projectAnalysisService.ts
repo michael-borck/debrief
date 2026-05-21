@@ -352,10 +352,12 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
   private async cacheAnalysisResult(projectId: string, analysisType: string, result: any): Promise<void> {
     try {
       const id = `${projectId}_${analysisType}_${Date.now()}`;
-      await window.electronAPI.database.run(
-        'INSERT INTO project_analysis (id, project_id, analysis_type, results) VALUES (?, ?, ?, ?)',
-        [id, projectId, analysisType, JSON.stringify(result)]
-      );
+      await window.electronAPI.db.projectAnalysis.insert({
+        id,
+        projectId,
+        analysisType,
+        results: result,
+      });
     } catch (error) {
       console.error('Failed to cache analysis result:', error);
     }

@@ -280,6 +280,24 @@ export interface ElectronAPI {
       /** Deletes all cached topics for a transcript. */
       deleteByTranscript: (transcriptId: string) => Promise<{ changes: number }>;
     };
+
+    /**
+     * Cached cross-transcript analysis (project_analysis). `results` is
+     * serialized in main if an object is passed; reads return the raw row
+     * (results still a JSON string) for the renderer to parse.
+     */
+    projectAnalysis: {
+      /** Inserts one analysis row; createdAt optional (schema default else). */
+      insert: (input: {
+        id: string;
+        projectId: string;
+        analysisType: string;
+        results: unknown;
+        createdAt?: string;
+      }) => Promise<{ id: string }>;
+      /** Most recent { results } for a project, or null. */
+      getLatestResults: (projectId: string) => Promise<{ results: string } | null>;
+    };
   };
 
   dialog: {

@@ -27,11 +27,8 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     
     try {
       // Get detailed analysis data
-      const analysisResult = await window.electronAPI.database.get(
-        'SELECT results FROM project_analysis WHERE project_id = ? ORDER BY created_at DESC LIMIT 1',
-        [project.id]
-      );
-      
+      const analysisResult = await window.electronAPI.db.projectAnalysis.getLatestResults(project.id);
+
       const detailedAnalysis = analysisResult?.results ? JSON.parse(analysisResult.results) : null;
       
       // Get project transcripts if requested

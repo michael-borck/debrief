@@ -119,11 +119,8 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
 
   const loadDetailedAnalysis = async () => {
     try {
-      const result = await window.electronAPI.database.get(
-        'SELECT results FROM project_analysis WHERE project_id = ? ORDER BY created_at DESC LIMIT 1',
-        [project.id]
-      );
-      
+      const result = await window.electronAPI.db.projectAnalysis.getLatestResults(project.id);
+
       if (result?.results) {
         setDetailedAnalysis(JSON.parse(result.results));
       }
