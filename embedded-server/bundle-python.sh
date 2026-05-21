@@ -58,6 +58,43 @@ TMPFILE="$(mktemp -t debrief-pbs.XXXXXX.tar.gz 2>/dev/null || mktemp /tmp/debrie
 echo "Downloading ${PBS_ASSET}..."
 curl -fsSL "${PBS_URL}" -o "${TMPFILE}"
 
+# Verify the tarball against the publisher's checksum before extracting.
+# python-build-standalone publishes one aggregate SHA256SUMS file per release
+# (`<sha>  <asset>` lines). Fail closed: if we can't fetch or match the
+# checksum, we do NOT extract — a tampered or truncated download must never
+# become the bundled interpreter.
+echo "Verifying checksum..."
+SHAFILE="${TMPFILE}.SHA256SUMS"
+SUMS_URL="https://github.com/astral-sh/python-build-standalone/releases/download/${PBS_TAG}/SHA256SUMS"
+curl -fsSL "${SUMS_URL}" -o "${SHAFILE}"
+# Match the exact asset in field 2 ($2 == ...) so we don't pick up the
+# *_stripped variant, which shares our filename as a prefix.
+EXPECTED="$(awk -v f="${PBS_ASSET}" '$2 == f {print $1}' "${SHAFILE}" | head -1 | tr 'A-Z' 'a-z')"
+if [ -z "${EXPECTED}" ]; then
+  echo "ERROR: ${PBS_ASSET} not found in ${SUMS_URL}" >&2
+  rm -f "${TMPFILE}" "${SHAFILE}"
+  exit 1
+fi
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL="$(sha256sum "${TMPFILE}" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL="$(shasum -a 256 "${TMPFILE}" | awk '{print $1}')"
+else
+  echo "ERROR: no sha256sum/shasum tool available to verify download" >&2
+  rm -f "${TMPFILE}" "${SHAFILE}"
+  exit 1
+fi
+ACTUAL="$(echo "${ACTUAL}" | tr 'A-Z' 'a-z')"
+if [ "${EXPECTED}" != "${ACTUAL}" ]; then
+  echo "ERROR: SHA-256 mismatch for ${PBS_ASSET}" >&2
+  echo "  expected: ${EXPECTED}" >&2
+  echo "  actual:   ${ACTUAL}" >&2
+  rm -f "${TMPFILE}" "${SHAFILE}"
+  exit 1
+fi
+rm -f "${SHAFILE}"
+echo "Checksum OK (${ACTUAL})"
+
 echo "Extracting..."
 tar -xzf "${TMPFILE}" -C .
 rm "${TMPFILE}"
