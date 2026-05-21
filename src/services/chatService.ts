@@ -752,10 +752,7 @@ export class ChatService {
   ): Promise<string> {
     try {
       // Get full transcript
-      const transcript = await window.electronAPI.database.get(
-        'SELECT title, full_text, processed_text FROM transcripts WHERE id = ?',
-        [transcriptId]
-      );
+      const transcript = await window.electronAPI.db.transcripts.getForChat(transcriptId);
 
       if (!transcript) {
         return "I couldn't find the transcript. Please make sure it has been processed.";
@@ -871,10 +868,7 @@ export class ChatService {
 
   private async getTranscriptMetadata(transcriptId: string): Promise<any> {
     try {
-      return await window.electronAPI.database.get(
-        'SELECT title, duration, speaker_count FROM transcripts WHERE id = ?',
-        [transcriptId]
-      );
+      return await window.electronAPI.db.transcripts.getMetadata(transcriptId);
     } catch (error) {
       console.error('Failed to get transcript metadata:', error);
       return null;
@@ -903,11 +897,8 @@ export class ChatService {
     await vectorStoreService.deleteTranscriptChunks(transcriptId);
     
     // Get transcript data
-    const transcript = await window.electronAPI.database.get(
-      'SELECT * FROM transcripts WHERE id = ?',
-      [transcriptId]
-    );
-    
+    const transcript = await window.electronAPI.db.transcripts.get(transcriptId);
+
     const segments = await window.electronAPI.database.all(
       'SELECT * FROM transcript_segments WHERE transcript_id = ? ORDER BY start_time',
       [transcriptId]

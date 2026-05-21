@@ -111,17 +111,11 @@ export const CorrectionTrigger: React.FC<CorrectionTriggerProps> = ({
       }
 
       // Update the transcript in the database
-      await window.electronAPI.database.run(
-        `UPDATE transcripts 
-         SET validated_text = ?, validation_changes = ?, updated_at = ?
-         WHERE id = ?`,
-        [
-          validationResult.validatedText,
-          JSON.stringify(validationResult.changes || []),
-          new Date().toISOString(),
-          transcript.id
-        ]
-      );
+      await window.electronAPI.db.transcripts.update(transcript.id, {
+        validated_text: validationResult.validatedText,
+        validation_changes: validationResult.changes || [],
+        updated_at: new Date().toISOString(),
+      });
 
       // Create updated transcript object
       const updatedTranscript = {

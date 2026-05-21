@@ -78,10 +78,8 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
 
   const loadTranscripts = async () => {
     try {
-      const allTranscripts = await window.electronAPI.database.all(
-        'SELECT * FROM transcripts WHERE is_deleted != 1 OR is_deleted IS NULL ORDER BY created_at DESC'
-      );
-      
+      const allTranscripts = await window.electronAPI.db.transcripts.list();
+
       const parsed = allTranscripts.map(hydrateTranscriptRow);
 
       setTranscripts(parsed);
@@ -93,11 +91,8 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
 
   const getTranscript = async (id: string): Promise<Transcript | null> => {
     try {
-      const transcript = await window.electronAPI.database.get(
-        'SELECT * FROM transcripts WHERE id = ?',
-        [id]
-      );
-      
+      const transcript = await window.electronAPI.db.transcripts.get(id);
+
       if (transcript) {
         return hydrateTranscriptRow(transcript);
       }
@@ -113,28 +108,10 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
 
   const updateTranscript = async (id: string, updates: Partial<Transcript>): Promise<boolean> => {
     try {
-      const sets = [];
-      const values = [];
-      
-      for (const [key, value] of Object.entries(updates)) {
-        if (key === 'action_items' || key === 'key_topics' || key === 'tags' || 
-            key === 'speakers' || key === 'emotions' || key === 'notable_quotes' ||
-            key === 'research_themes' || key === 'qa_pairs' || key === 'concept_frequency') {
-          sets.push(`${key} = ?`);
-          values.push(JSON.stringify(value));
-        } else {
-          sets.push(`${key} = ?`);
-          values.push(value);
-        }
-      }
-      
-      values.push(id);
-      
-      await window.electronAPI.database.run(
-        `UPDATE transcripts SET ${sets.join(', ')} WHERE id = ?`,
-        values
-      );
-      
+      // The RPC validates each key against a column allow-list and serializes
+      // JSON columns itself, so the renderer no longer builds any SQL.
+      await window.electronAPI.db.transcripts.update(id, updates);
+
       await loadTranscripts();
       return true;
     } catch (error) {
@@ -146,11 +123,8 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
   const deleteTranscript = async (id: string) => {
     try {
       // Delete transcript from database
-      await window.electronAPI.database.run(
-        'DELETE FROM transcripts WHERE id = ?',
-        [id]
-      );
-      
+      await window.electronAPI.db.transcripts.remove(id);
+
       // Also delete chunks from vector store
       try {
         await window.electronAPI.vectorStore.deleteTranscriptChunks(id);
@@ -168,13 +142,8 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
 
   const searchTranscripts = async (query: string): Promise<Transcript[]> => {
     try {
-      const results = await window.electronAPI.database.all(
-        `SELECT * FROM transcripts 
-         WHERE title LIKE ? OR full_text LIKE ? OR summary LIKE ?
-         ORDER BY created_at DESC`,
-        [`%${query}%`, `%${query}%`, `%${query}%`]
-      );
-      
+      const results = await window.electronAPI.db.transcripts.searchByText(query);
+
       return results.map(hydrateTranscriptRow);
     } catch (error) {
       console.error('Error searching transcripts:', error);

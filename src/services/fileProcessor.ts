@@ -140,37 +140,27 @@ export class FileProcessor {
         analysisCompleted: !!analysisResult
       });
       
-      const updateResult = await window.electronAPI.database.run(
-        `UPDATE transcripts 
-         SET status = ?, duration = ?, full_text = ?, validated_text = ?, validation_changes = ?, processed_text = ?,
-             summary = ?, key_topics = ?, action_items = ?, 
-             sentiment_overall = ?, sentiment_score = ?, emotions = ?, speaker_count = ?, speakers = ?, 
-             notable_quotes = ?, research_themes = ?, qa_pairs = ?, concept_frequency = ?,
-             processing_completed_at = ?
-         WHERE id = ?`,
-        [
-          'completed', 
-          mediaInfo.duration || 0, 
-          transcriptResult.text || '', 
-          validationResult.validatedText || transcriptResult.text || '',
-          JSON.stringify(validationResult.changes || []),
-          advancedAnalysisResult.processedText || transcriptResult.text || '',
-          analysisResult.summary || '',
-          JSON.stringify(analysisResult.keyTopics || []),
-          JSON.stringify(analysisResult.actionItems || []),
-          advancedAnalysisResult.sentiment || 'neutral',
-          advancedAnalysisResult.sentimentScore || 0,
-          JSON.stringify(advancedAnalysisResult.emotions || {}),
-          advancedAnalysisResult.speakerCount || 1,
-          JSON.stringify(advancedAnalysisResult.speakers || []),
-          JSON.stringify(researchAnalysisResult.notableQuotes || []),
-          JSON.stringify(researchAnalysisResult.researchThemes || []),
-          JSON.stringify(researchAnalysisResult.qaPairs || []),
-          JSON.stringify(researchAnalysisResult.conceptFrequency || {}),
-          new Date().toISOString(), 
-          transcriptId
-        ]
-      );
+      const updateResult = await window.electronAPI.db.transcripts.update(transcriptId, {
+        status: 'completed',
+        duration: mediaInfo.duration || 0,
+        full_text: transcriptResult.text || '',
+        validated_text: validationResult.validatedText || transcriptResult.text || '',
+        validation_changes: validationResult.changes || [],
+        processed_text: advancedAnalysisResult.processedText || transcriptResult.text || '',
+        summary: analysisResult.summary || '',
+        key_topics: analysisResult.keyTopics || [],
+        action_items: analysisResult.actionItems || [],
+        sentiment_overall: advancedAnalysisResult.sentiment || 'neutral',
+        sentiment_score: advancedAnalysisResult.sentimentScore || 0,
+        emotions: advancedAnalysisResult.emotions || {},
+        speaker_count: advancedAnalysisResult.speakerCount || 1,
+        speakers: advancedAnalysisResult.speakers || [],
+        notable_quotes: researchAnalysisResult.notableQuotes || [],
+        research_themes: researchAnalysisResult.researchThemes || [],
+        qa_pairs: researchAnalysisResult.qaPairs || [],
+        concept_frequency: researchAnalysisResult.conceptFrequency || {},
+        processing_completed_at: new Date().toISOString(),
+      });
       
       console.log('Database update result:', updateResult);
       
@@ -230,10 +220,7 @@ export class FileProcessor {
           console.warn('Failed to delete cancelled transcript segments:', segErr);
         }
         try {
-          await window.electronAPI.database.run(
-            'DELETE FROM transcripts WHERE id = ?',
-            [transcriptId]
-          );
+          await window.electronAPI.db.transcripts.remove(transcriptId);
         } catch (dbErr) {
           console.error('Failed to delete cancelled transcript:', dbErr);
         }
@@ -257,10 +244,7 @@ export class FileProcessor {
         console.warn('Failed to delete failed-import segments:', segErr);
       }
       try {
-        await window.electronAPI.database.run(
-          'DELETE FROM transcripts WHERE id = ?',
-          [transcriptId]
-        );
+        await window.electronAPI.db.transcripts.remove(transcriptId);
       } catch (dbErr) {
         console.error('Failed to delete failed-import transcript:', dbErr);
       }
