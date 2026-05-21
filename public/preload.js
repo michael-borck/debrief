@@ -8,11 +8,25 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 // it is the canonical type definition for window.electronAPI.
 contextBridge.exposeInMainWorld('electronAPI', {
   // Database operations
+  // LEGACY: generic SQL passthrough. Being migrated to electronAPI.db.*
+  // per-domain RPCs (see settings below). Do not add new callers.
   database: {
     query: (type, sql, params) => ipcRenderer.invoke('db-query', { type, sql, params }),
     all: (sql, params) => ipcRenderer.invoke('db-query', { type: 'all', sql, params }),
     get: (sql, params) => ipcRenderer.invoke('db-query', { type: 'get', sql, params }),
     run: (sql, params) => ipcRenderer.invoke('db-query', { type: 'run', sql, params })
+  },
+
+  // Per-domain DB RPCs. New code should call these instead of
+  // electronAPI.database.* — no SQL crosses the IPC boundary.
+  db: {
+    settings: {
+      get: (key) => ipcRenderer.invoke('settings:get', key),
+      getMany: (keys) => ipcRenderer.invoke('settings:get-many', keys),
+      getAll: () => ipcRenderer.invoke('settings:get-all'),
+      set: (key, value) => ipcRenderer.invoke('settings:set', { key, value }),
+      setMany: (entries) => ipcRenderer.invoke('settings:set-many', entries),
+    },
   },
 
   // Dialog operations
