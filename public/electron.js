@@ -737,6 +737,11 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // Run the renderer in the OS/Chromium sandbox. The preload is
+      // sandbox-safe — it only uses contextBridge/ipcRenderer/webUtils and
+      // process.platform/versions, all available in a sandboxed preload, and
+      // delegates every privileged op (DB, fs, ffmpeg, sidecar) over IPC.
+      sandbox: true,
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
