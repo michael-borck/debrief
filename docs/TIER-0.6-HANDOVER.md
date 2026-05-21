@@ -13,12 +13,13 @@ handler gets deleted.
 
 ## Status snapshot (as of 2026-05-21)
 
-- **Branch:** Phase 1 is on `main`. Phase 2 work is on `tier0-db-query-phase2` (not yet merged) — start a fresh branch off it (or off `main` once merged) for Phase 3.
+- **Branch:** Phases 1 & 2 are on `main`. Phase 3 work is on `tier0-db-query-phase3` (not yet merged) — start a fresh branch off it (or off `main` once merged) for Phase 4.
 - **Done:**
   - Phase 1 (infrastructure + `settings` domain). Merged in `787e628`.
-  - **Phase 2 (`transcripts` + `projects` single-table domains).** On `tier0-db-query-phase2`. 4 commits: transcripts module+tests, transcripts call sites, projects module+tests, projects call sites. Migrated 36 single-table sites (80 → 44 remaining).
-- **Remaining:** Phases 3-4 below. **44 `electronAPI.database.*` calls** left — all are cross-table JOIN reads or other-domain (chat/segments/topics/analysis/metadata) calls. No single-table transcripts/projects SQL remains in `src/`.
-- **Tests:** 101 passing (added `db-rpc-transcripts.test.ts` 20 + `db-rpc-projects.test.ts` 14). `npx vitest run`. Health: 18 pre-existing TSC errors (react-router-dom v7 + docx — Tier 2, unrelated).
+  - Phase 2 (`transcripts` + `projects` single-table domains). Merged in `21e03cf`.
+  - **Phase 3 (the 8 small domains).** On `tier0-db-query-phase3`. 7 commits, one per domain: `projectTranscripts`, `chat`, `projectChat`, `transcriptSegments`, `topics`, `projectAnalysis`, `modelMetadata`. Migrated all 44 remaining sites.
+- **Remaining:** Phase 4 only (delete the generic handler + CI guard). **Zero `electronAPI.database.*` callers remain in `src/`** — confirmed by `grep -rn "electronAPI\.database\." --include="*.ts" --include="*.tsx" src/` (empty). The `db-query` handler in `public/electron.js` and the `database:` preload key are now dead and ready to delete.
+- **Tests:** 145 passing. Phase 3 added: project-transcripts 14, chat 7, project-chat 7, transcript-segments 3, topics 5, project-analysis 4, model-metadata 4. `npx vitest run`. Health: 18 pre-existing TSC errors (react-router-dom v7 + docx — Tier 2, unrelated) — unchanged throughout.
 
 ### Phase 2 notes for the Phase 3 implementer
 - `transcripts.update` / `projects.update` are the H-1 allow-list gates. Their column allow-lists live in the module files; the renderer no longer builds any SET clause.
@@ -198,9 +199,28 @@ stays colocated with the Transcript type).
 
 ---
 
-## Phase 3 — 8 small domains (~33 sites)
+## Phase 3 — 8 small domains (~33 sites) — ✅ DONE (branch `tier0-db-query-phase3`)
 
-Inventory by table (run the survey command at the bottom to refresh line numbers):
+> Shipped as `projectTranscripts`, `chat`, `projectChat`, `transcriptSegments`,
+> `topics`, `projectAnalysis`, `modelMetadata` (7 modules — chat folded the
+> three chat tables together as planned; project_chat became its own module).
+> Notes on what differed from the plan below:
+> - **projectTranscripts** absorbed the project list/detail aggregate JOINs,
+>   the per-project transcript lists (one `listTranscriptsForProject(projectId,
+>   {includeDeleted,completedOnly,orderBy})` with a whitelisted orderBy enum
+>   covering all 4 call-site variants), link/unlink, project-id lookups, the
+>   trashed-id cascade, and `countForProject`.
+> - **transcriptSegments** (not `segments`) — named to avoid colliding with the
+>   pre-existing version-aware `electronAPI.segments` IPC, which was left
+>   untouched. Only the all-versions read (start_time order) + all-versions
+>   delete that used db-query were moved.
+> - **topics** `replaceForTranscript` made the old DELETE+N-INSERT save atomic
+>   (transaction). `transcript_topics` is created in electron.js, not
+>   schema.sql, so its test creates the table itself.
+> - **projectAnalysis** `insert` keeps both original write paths (explicit
+>   created_at vs schema default) to preserve "latest" ordering byte-for-byte.
+
+Original inventory by table (kept for reference):
 
 | Domain / table(s) | Sites | Notable files |
 |---|---|---|
@@ -246,9 +266,9 @@ needed unless the survey turns up callers.
 
 ## Suggested cadence
 One branch + one merge per phase (matches how Phase 1 landed):
-- `tier0-db-query-phase2` → transcripts + projects ✅ done (awaiting merge)
-- `tier0-db-query-phase3` → the 8 small domains (can split further if a session runs long)
-- `tier0-db-query-phase4` → delete + guard
+- `tier0-db-query-phase2` → transcripts + projects ✅ merged (`21e03cf`)
+- `tier0-db-query-phase3` → the 8 small domains ✅ done (awaiting merge)
+- `tier0-db-query-phase4` → delete + guard (next; unblocked — zero callers remain)
 
 Commit per domain within a phase. Keep `npx tsc --noEmit` at 18 errors and
 `npx vitest run` green before each commit.
