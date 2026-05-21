@@ -911,6 +911,28 @@ function createMenu() {
 }
 
 // IPC Handlers
+
+// Per-domain DB RPC modules. These replace the generic db-query handler
+// below; each migrated domain validates inputs and uses prepared statements
+// so the renderer can't smuggle in SQL. Migration is incremental — see
+// docs/AUDIT-2026-05-21.md Tier 0.6.
+//
+// We pass a `() => db` getter rather than `db` itself so the handlers
+// resolve the current handle on each call — change-database-location
+// closes and reopens the db, which would otherwise leave the RPC layer
+// pointing at a closed connection.
+const dbRpc = require('./electron/db-rpc');
+let dbRpcRegistered = false;
+function ensureDbRpcRegistered() {
+  if (dbRpcRegistered) return;
+  dbRpc.registerAll(ipcMain, () => db);
+  dbRpcRegistered = true;
+}
+
+// LEGACY: generic db-query handler. Accepts raw SQL strings from the
+// renderer and runs them against better-sqlite3. Being migrated to
+// per-domain RPCs above; remove this once renderer call sites are all gone.
+// Tracked as Tier 0.6 / C-SEC-3 in docs/AUDIT-2026-05-21.md.
 ipcMain.handle('db-query', async (event, { type, sql, params }) => {
   try {
     switch (type) {
@@ -1688,7 +1710,7 @@ ipcMain.handle('local-transcription-rediarise', async (event, { audioPath, overr
 
 
 // App event handlers
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   // Register the safe-file:// protocol handler — streams local files to
   // the renderer for the audio/video player without full-file buffering.
   // URL format: safe-file:///absolute/path/to/file.mp4
@@ -1711,7 +1733,8 @@ app.whenReady().then(() => {
   });
 
   migrateLegacyUserDataDir();
-  initDatabase();
+  await initDatabase();
+  ensureDbRpcRegistered();
   createWindow();
   createMenu();
   // Fire-and-forget; sidecar status is queryable via the sidecar:status IPC.

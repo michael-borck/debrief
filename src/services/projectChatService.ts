@@ -111,20 +111,12 @@ export class ProjectChatService {
    */
   private async loadProjectConfig(): Promise<void> {
     try {
-      const settings = await window.electronAPI.database.all(
-        'SELECT key, value FROM settings WHERE key IN (?, ?, ?, ?)',
-        [
-          'projectCrossTranscriptAnalysis',
-          'projectMaxTranscriptsInContext',
-          'projectTranscriptSelectionStrategy',
-          'projectAnalysisMode'
-        ]
-      );
-
-      const settingsMap = settings.reduce((acc: any, { key, value }: any) => {
-        acc[key] = value;
-        return acc;
-      }, {});
+      const settingsMap = await window.electronAPI.db.settings.getMany([
+        'projectCrossTranscriptAnalysis',
+        'projectMaxTranscriptsInContext',
+        'projectTranscriptSelectionStrategy',
+        'projectAnalysisMode',
+      ]);
 
       this.config = {
         ...this.config,
@@ -145,11 +137,7 @@ export class ProjectChatService {
    */
   private async initializeModelMetadata(): Promise<void> {
     try {
-      const aiModelSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?', 
-        ['aiModel']
-      );
-      const modelName = aiModelSetting?.value || 'llama2';
+      const modelName = (await window.electronAPI.db.settings.get('aiModel')) || 'llama2';
 
       this.currentModelMetadata = await modelMetadataService.getModelMetadata(modelName);
       this.currentContextBudget = modelMetadataService.calculateContextBudget(

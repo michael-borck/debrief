@@ -48,15 +48,10 @@ export const CorrectionTrigger: React.FC<CorrectionTriggerProps> = ({
 
   const loadValidationSettings = async () => {
     try {
-      const settings = await window.electronAPI.database.all(
-        'SELECT key, value FROM settings WHERE key IN (?, ?)',
-        ['enableTranscriptValidation', 'validationOptions']
-      );
-
-      const settingsMap = settings.reduce((acc: any, { key, value }: any) => {
-        acc[key] = value;
-        return acc;
-      }, {});
+      const settingsMap = await window.electronAPI.db.settings.getMany([
+        'enableTranscriptValidation',
+        'validationOptions',
+      ]);
 
       const enabled = settingsMap.enableTranscriptValidation !== 'false';
       let options = {

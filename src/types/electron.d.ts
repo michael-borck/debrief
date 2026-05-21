@@ -45,11 +45,35 @@ export interface AIProviderInfo {
 }
 
 export interface ElectronAPI {
+  /**
+   * LEGACY: generic SQL passthrough. Being migrated to `db.*` per-domain
+   * RPCs — do NOT add new callers. Tracked as Tier 0.6 / C-SEC-3 in
+   * docs/AUDIT-2026-05-21.md.
+   */
   database: {
     query: (type: string, sql: string, params?: any[]) => Promise<any>;
     all: (sql: string, params?: any[]) => Promise<any[]>;
     get: (sql: string, params?: any[]) => Promise<any>;
     run: (sql: string, params?: any[]) => Promise<any>;
+  };
+
+  /**
+   * Per-domain DB RPCs. No SQL crosses the IPC boundary. New code should
+   * use these instead of `database.*`.
+   */
+  db: {
+    settings: {
+      /** Returns the value for `key`, or null if not set. */
+      get: (key: string) => Promise<string | null>;
+      /** Returns a map of the keys that exist. Missing keys are omitted. */
+      getMany: (keys: string[]) => Promise<Record<string, string>>;
+      /** Returns every key/value pair in the settings table. */
+      getAll: () => Promise<Record<string, string>>;
+      /** Upserts a single key/value pair. Both must be strings. */
+      set: (key: string, value: string) => Promise<{ success: true }>;
+      /** Atomically upserts each key/value pair in `entries`. */
+      setMany: (entries: Record<string, string>) => Promise<{ success: true }>;
+    };
   };
 
   dialog: {

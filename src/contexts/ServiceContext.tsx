@@ -68,13 +68,10 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({ children }) =>
         // electronAPI.sidecar unavailable (very early / test env)
       }
 
-      const aiUrl = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiAnalysisUrl']
-      );
+      const aiUrl = await window.electronAPI.db.settings.get('aiAnalysisUrl');
 
       const aiResult = await window.electronAPI.services.testConnection(
-        aiUrl?.value || 'http://localhost:11434'
+        aiUrl || 'http://localhost:11434'
       );
 
       setServiceStatus({
