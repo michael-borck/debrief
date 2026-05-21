@@ -19,6 +19,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
+    "lint": "biome lint",
+    "lint:fix": "biome lint --write",
+    "format": "biome format --write",
     "postinstall": "electron-builder install-app-deps",
     "download-ffmpeg": "node scripts/download-ffmpeg.js"
   },
@@ -30,6 +33,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
     "@electron/notarize": "^3.1.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
