@@ -9,7 +9,16 @@
 
 const path = require('path');
 const fs = require('fs');
-const { app } = require('electron');
+// electron is only needed to resolve the default userData path. Guard the
+// require so the module can load (and be unit-tested) outside Electron, where
+// require('electron') throws — callers that pass an explicit dbPath never need
+// app at all.
+let app;
+try {
+  ({ app } = require('electron'));
+} catch {
+  app = null;
+}
 
 let lancedb;
 try {
@@ -22,15 +31,46 @@ try {
 // Safe parse for the `speakers` JSON-string column. A single malformed
 // chunk row used to throw out of the surrounding .map() and tank the
 // whole RAG retrieval / stats call. Now bad rows fall back to [] and log.
-// Render a value as a single-quoted SQL string literal for a LanceDB /
-// DataFusion `.where()` / `.delete()` filter, doubling any embedded single
-// quotes. Without this, a value like  x' OR '1'='1  would break out of the
-// literal and inject filter logic. Quote-doubling is standard SQL escaping and
-// preserves legitimate data — e.g. a speaker named "John O'Brien" stays intact,
-// which a strict charset whitelist would have rejected.
-function sqlStringLiteral(value) {
-  return `'${String(value).replace(/'/g, "''")}'`;
+// LanceDB 0.20 has a confirmed bug: string-equality `.where()` predicates on
+// Utf8 columns return ZERO rows (numeric predicates work fine; unquoted
+// identifiers get lowercased and error; correctly-quoted ones still match
+// nothing). So we cannot filter or delete by transcriptId/id/speaker via SQL.
+// Every read filters in JS and every delete rebuilds the table without the
+// dropped rows. If LanceDB is upgraded to a version where Utf8 `.where()`
+// works, these can all revert to simple predicates.
+
+// Convert a row read back from LanceDB into a plain object suitable for
+// re-insertion (the vector comes back as an Arrow Vector, not a JS array).
+function rowToPlain(row) {
+  const out = { ...row };
+  if (out.vector != null && typeof out.vector.length === 'number') {
+    out.vector = Array.from(out.vector);
+  }
+  return out;
 }
+
+// Schema-defining seed row. LanceDB infers column types from the first row, so
+// every field must be present with a representative value (no nulls, JSON list
+// fields stringified to match storeChunks). Used to (re)create the empty table.
+const SEED_ROW = {
+  id: 'sample',
+  transcriptId: 'sample',
+  text: 'sample text',
+  vector: new Array(384).fill(0),
+  startTime: 0,
+  endTime: 1,
+  speaker: '',
+  chunkIndex: 0,
+  wordCount: 2,
+  speakers: JSON.stringify([]),
+  method: 'sample',
+  transcriptTitle: 'sample',
+  transcriptSummary: 'sample',
+  keyTopics: JSON.stringify([]),
+  actionItems: JSON.stringify([]),
+  totalSpeakers: 1,
+  createdAt: new Date().toISOString(),
+};
 
 function parseSpeakers(raw, chunkId) {
   if (raw === null || raw === undefined || raw === '') return [];
@@ -82,35 +122,11 @@ class MainVectorStore {
         this.table = await this.db.openTable('chunks');
         console.log('Opened existing chunks table');
       } catch (error) {
-        // Create table if it doesn't exist
-        // Schema-defining seed. LanceDB infers types from this row, so
-        // every field must be present with a value of the type we'll
-        // actually store. Nulls and raw arrays break inference — use
-        // empty strings, and JSON-stringify list fields to match the
-        // format produced by storeChunks().
-        const sampleData = [{
-          id: 'sample',
-          transcriptId: 'sample',
-          text: 'sample text',
-          vector: new Array(384).fill(0),
-          startTime: 0,
-          endTime: 1,
-          speaker: '',
-          chunkIndex: 0,
-          wordCount: 2,
-          speakers: JSON.stringify([]),
-          method: 'sample',
-          transcriptTitle: 'sample',
-          transcriptSummary: 'sample',
-          keyTopics: JSON.stringify([]),
-          actionItems: JSON.stringify([]),
-          totalSpeakers: 1,
-          createdAt: new Date().toISOString()
-        }];
-
-        this.table = await this.db.createTable('chunks', sampleData);
-        // Remove sample data
-        await this.table.delete('id = "sample"');
+        // Create table from the schema-defining seed row. The seed row stays
+        // in the table (LanceDB 0.20's string `.where()` can't delete it — see
+        // the note at the top), but it carries transcriptId 'sample' so the
+        // JS transcript filter in searchSimilar excludes it from real results.
+        this.table = await this.db.createTable('chunks', [{ ...SEED_ROW }]);
         console.log('Created new chunks table');
       }
 
@@ -178,29 +194,30 @@ class MainVectorStore {
         return [];
       }
 
-      let query = this.table.search(queryEmbedding).limit(options.limit || 10);
+      const limit = options.limit || 10;
+      const needsFilter = !!(options.transcriptId || options.speaker);
+      // String `.where()` is broken in LanceDB 0.20, so filter in JS. When a
+      // transcript/speaker filter is requested we over-fetch by vector distance
+      // (the matching chunks may not be in the global top-N) and trim after.
+      const fetchLimit = needsFilter ? Math.max(limit * 20, 200) : limit;
 
-      // Add filters
+      let results = await this.table.search(queryEmbedding).limit(fetchLimit).toArray();
+
+      // Exclude the schema seed row, then apply the requested filters in JS.
+      results = results.filter((r) => r.transcriptId !== 'sample');
       if (options.transcriptId) {
-        // Identifiers must be double-quoted — newer LanceDB's SQL parser
-        // lowercases unquoted identifiers, so `transcriptId` becomes
-        // `transcriptid` and fails to match the schema column.
-        query = query.where(`"transcriptId" = ${sqlStringLiteral(options.transcriptId)}`);
+        results = results.filter((r) => r.transcriptId === options.transcriptId);
       }
-
       if (options.speaker) {
-        query = query.where(`"speaker" = ${sqlStringLiteral(options.speaker)}`);
+        results = results.filter((r) => r.speaker === options.speaker);
       }
-
-      const results = await query.toArray();
-
-      // Filter by minimum score if specified
-      const filteredResults = options.minScore
-        ? results.filter(r => r._distance <= (1 - options.minScore))
-        : results;
+      if (options.minScore) {
+        results = results.filter((r) => r._distance <= (1 - options.minScore));
+      }
+      results = results.slice(0, limit);
 
       // Transform to expected format
-      return filteredResults.map((result, i) => ({
+      return results.map((result, i) => ({
         chunk: {
           id: result.id,
           transcriptId: result.transcriptId,
@@ -223,14 +240,35 @@ class MainVectorStore {
     }
   }
 
+  // Rebuild the chunks table keeping only rows for which keepFn returns true.
+  // This is how we "delete" — LanceDB 0.20's string `.where()` can't match
+  // Utf8 columns, so predicate deletes are no-ops. Read all, filter in JS, drop
+  // and recreate. Returns the number of rows removed.
+  async _rebuildKeeping(keepFn) {
+    if (!this.db || !this.table) return 0;
+    const all = await this.table.query().toArray();
+    const remaining = all.filter(keepFn);
+    const removed = all.length - remaining.length;
+    if (removed === 0) return 0;
+    await this.db.dropTable('chunks');
+    if (remaining.length > 0) {
+      this.table = await this.db.createTable('chunks', remaining.map(rowToPlain));
+    } else {
+      // Keep an empty (seed-only) table so future adds still work.
+      this.table = await this.db.createTable('chunks', [{ ...SEED_ROW }]);
+    }
+    return removed;
+  }
+
   async deleteTranscriptChunks(transcriptId) {
     try {
       if (!this.isInitialized) {
         throw new Error('Vector store not initialized');
       }
+      if (!this.db || !this.table) return;
 
-      await this.table.delete(`"transcriptId" = ${sqlStringLiteral(transcriptId)}`);
-      console.log(`Deleted chunks for transcript: ${transcriptId}`);
+      const removed = await this._rebuildKeeping((r) => r.transcriptId !== transcriptId);
+      console.log(`Deleted ${removed} chunks for transcript: ${transcriptId}`);
     } catch (error) {
       console.error('Failed to delete transcript chunks:', error);
       throw error;
@@ -275,12 +313,12 @@ class MainVectorStore {
 
   async updateChunks(chunks, embeddings) {
     try {
-      // Delete existing chunks with same IDs
-      for (const chunk of chunks) {
-        await this.table.delete(`id = ${sqlStringLiteral(chunk.id)}`);
+      // Remove existing rows with the same ids (one table rebuild), then add
+      // the updated versions. Predicate deletes don't work in LanceDB 0.20.
+      const ids = new Set(chunks.map((c) => c.id));
+      if (this.db && this.table) {
+        await this._rebuildKeeping((r) => !ids.has(r.id));
       }
-
-      // Add updated chunks
       await this.storeChunks(chunks, embeddings);
     } catch (error) {
       console.error('Failed to update chunks:', error);
