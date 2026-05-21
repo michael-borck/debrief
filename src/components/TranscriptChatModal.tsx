@@ -30,6 +30,16 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Chat init is a long async chain (service warm-up, embedding, history load).
+  // If the modal closes mid-init, don't setState on the unmounted component.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       initializeChat();
@@ -52,17 +62,19 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
       if (!chatService.isReady()) {
         setIsProcessingTranscript(true);
         await chatService.initialize(undefined, (progress) => {
-          setProcessingProgress(progress);
+          if (isMountedRef.current) setProcessingProgress(progress);
         });
       }
 
       // Create or load conversation
       const newConvId = existingConversationId || await chatService.getOrCreateConversation(transcript.id);
+      if (!isMountedRef.current) return;
       setConversationId(newConvId);
 
       // Check if transcript has been processed for chat
       const hasEmbeddings = await checkTranscriptChatReady();
-      
+      if (!isMountedRef.current) return;
+
       if (!hasEmbeddings) {
         await processTranscriptForChat();
       } else {
@@ -71,12 +83,13 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
 
       // Load existing messages
       const existingMessages = await chatService.loadConversationHistory(newConvId);
+      if (!isMountedRef.current) return;
       setMessages(existingMessages);
 
       // Load current conversation mode
       const config = chatService.getConfig();
       setCurrentMode(config.conversationMode);
-      
+
       setIsProcessingTranscript(false);
       setProcessingProgress(null);
     } catch (error) {

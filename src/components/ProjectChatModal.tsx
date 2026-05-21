@@ -22,6 +22,15 @@ export const ProjectChatModal: React.FC<ProjectChatModalProps> = ({
   const [isInitializing, setIsInitializing] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Don't setState after the modal closes/unmounts mid-initialization.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Initialize project chat when modal opens
   useEffect(() => {
     if (isOpen && project.id) {
@@ -47,17 +56,19 @@ export const ProjectChatModal: React.FC<ProjectChatModalProps> = ({
       
       // Get or create conversation
       const convId = await projectChatService.getOrCreateProjectConversation(project.id);
+      if (!isMountedRef.current) return;
       setConversationId(convId);
-      
+
       // Load conversation history
       const history = await projectChatService.loadProjectConversationHistory(convId);
+      if (!isMountedRef.current) return;
       setMessages(history);
-      
+
       console.log('Project chat initialized successfully');
     } catch (error) {
       console.error('Failed to initialize project chat:', error);
     } finally {
-      setIsInitializing(false);
+      if (isMountedRef.current) setIsInitializing(false);
     }
   };
 

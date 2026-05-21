@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useContext, useMemo } from 'react';
+import React, { useState, useEffect, useContext, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { TranscriptContext } from '../contexts/TranscriptContext';
 import { useProjects } from '../contexts/ProjectContext';
@@ -50,6 +50,18 @@ export const TranscriptDetailPage: React.FC = () => {
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editedNotes, setEditedNotes] = useState('');
 
+  // Tracks whether the component is still mounted. The loaders below are async
+  // and also fire on rapid id/prop changes, so a slow load resolving after the
+  // user navigated away (or to a different transcript) must not setState. Guard
+  // is a no-op while mounted, so the happy path is unchanged.
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     loadTranscript();
   }, [id]);
@@ -65,7 +77,7 @@ export const TranscriptDetailPage: React.FC = () => {
       const relatedProjects = projects.filter((project) =>
         projectRelations.some((relation) => relation.project_id === project.id)
       );
-      setTranscriptProjects(relatedProjects);
+      if (isMountedRef.current) setTranscriptProjects(relatedProjects);
     } catch (error) {
       console.error('Error loading transcript projects:', error);
     }
@@ -110,7 +122,7 @@ export const TranscriptDetailPage: React.FC = () => {
       if (segs.length === 0 && version !== 'original') {
         segs = await sentenceSegmentsService.getSegments(transcript.id, 'original');
       }
-      setPageSegments(segs);
+      if (isMountedRef.current) setPageSegments(segs);
     };
     loadSegments();
   }, [transcript?.id, transcript?.processed_text, transcript?.validated_text]);
@@ -136,13 +148,14 @@ export const TranscriptDetailPage: React.FC = () => {
     
     try {
       const transcriptData = await getTranscriptById(id);
+      if (!isMountedRef.current) return;
       setTranscript(transcriptData);
       setEditedTitle(transcriptData?.title || '');
       setEditedNotes(transcriptData?.personal_notes || '');
     } catch (error) {
       console.error('Error loading transcript:', error);
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) setLoading(false);
     }
   };
 

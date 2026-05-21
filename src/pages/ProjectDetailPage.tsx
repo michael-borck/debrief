@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useProjects } from '../contexts/ProjectContext';
 import { Transcript } from '../types';
@@ -23,6 +23,16 @@ export const ProjectDetailPage: React.FC = () => {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
+  // No setState after the component unmounts or projectId changes mid-load
+  // (no-op while mounted; only skips stale updates).
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   useEffect(() => {
     if (projectId) {
       loadProjectData();
@@ -31,16 +41,16 @@ export const ProjectDetailPage: React.FC = () => {
 
   const loadProjectData = async () => {
     if (!projectId) return;
-    
+
     try {
       setIsLoading(true);
       await loadProject(projectId);
       const transcripts = await getProjectTranscripts(projectId);
-      setProjectTranscripts(transcripts);
+      if (isMountedRef.current) setProjectTranscripts(transcripts);
     } catch (err) {
       console.error('Failed to load project:', err);
     } finally {
-      setIsLoading(false);
+      if (isMountedRef.current) setIsLoading(false);
     }
   };
 
