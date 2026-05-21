@@ -29,6 +29,18 @@ jobs:
         with:
           python-version: '3.13'
 
+      - name: No generic db-query passthrough (Tier 0.6 / C-SEC-3)
+        run: |
+          # The arbitrary-SQL db-query IPC was removed in Tier 0.6; every DB
+          # access goes through a validated per-domain RPC. Fail the release
+          # if either canary call shape reappears. Doc comments may mention
+          # "db-query" in prose, so we match the precise call shapes only.
+          if grep -rnE "electronAPI\.database\b|ipcMain\.handle\(\s*['\"]db-query['\"]" \
+               --include="*.ts" --include="*.tsx" --include="*.js" --include="*.jsx" src public; then
+            echo "::error::Generic db-query passthrough reintroduced — use a per-domain db.* RPC instead."
+            exit 1
+          fi
+
       - name: npm audit (production deps only, high+)
         run: |
           npm ci --ignore-scripts

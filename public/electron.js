@@ -912,10 +912,10 @@ function createMenu() {
 
 // IPC Handlers
 
-// Per-domain DB RPC modules. These replace the generic db-query handler
-// below; each migrated domain validates inputs and uses prepared statements
-// so the renderer can't smuggle in SQL. Migration is incremental — see
-// docs/AUDIT-2026-05-21.md Tier 0.6.
+// Per-domain DB RPC modules. Every renderer DB read/write goes through one
+// of these — each domain validates inputs and uses prepared statements, so
+// no SQL crosses the IPC boundary. This fully replaced the old generic
+// db-query handler (removed in Tier 0.6 / C-SEC-3 — see docs/AUDIT-2026-05-21.md).
 //
 // We pass a `() => db` getter rather than `db` itself so the handlers
 // resolve the current handle on each call — change-database-location
@@ -928,28 +928,6 @@ function ensureDbRpcRegistered() {
   dbRpc.registerAll(ipcMain, () => db);
   dbRpcRegistered = true;
 }
-
-// LEGACY: generic db-query handler. Accepts raw SQL strings from the
-// renderer and runs them against better-sqlite3. Being migrated to
-// per-domain RPCs above; remove this once renderer call sites are all gone.
-// Tracked as Tier 0.6 / C-SEC-3 in docs/AUDIT-2026-05-21.md.
-ipcMain.handle('db-query', async (event, { type, sql, params }) => {
-  try {
-    switch (type) {
-      case 'all':
-        return db.prepare(sql).all(params || []);
-      case 'get':
-        return db.prepare(sql).get(params || []);
-      case 'run':
-        return db.prepare(sql).run(params || []);
-      default:
-        throw new Error('Unknown query type');
-    }
-  } catch (error) {
-    console.error('Database error:', error);
-    throw error;
-  }
-});
 
 ipcMain.handle('dialog-open-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {

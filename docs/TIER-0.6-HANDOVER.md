@@ -13,13 +13,17 @@ handler gets deleted.
 
 ## Status snapshot (as of 2026-05-21)
 
-- **Branch:** Phases 1 & 2 are on `main`. Phase 3 work is on `tier0-db-query-phase3` (not yet merged) — start a fresh branch off it (or off `main` once merged) for Phase 4.
+**✅ Tier 0.6 is COMPLETE.** All four phases done. The generic `db-query` IPC
+is gone; the renderer can no longer run arbitrary SQL.
+
+- **Branches:** Phases 1 & 2 are on `main`. Phase 3 is on `tier0-db-query-phase3`; Phase 4 is on `tier0-db-query-phase4` (branched off phase3). Neither is merged yet — merge phase3 then phase4 (or fast-forward, since phase4 contains phase3).
 - **Done:**
   - Phase 1 (infrastructure + `settings` domain). Merged in `787e628`.
   - Phase 2 (`transcripts` + `projects` single-table domains). Merged in `21e03cf`.
-  - **Phase 3 (the 8 small domains).** On `tier0-db-query-phase3`. 7 commits, one per domain: `projectTranscripts`, `chat`, `projectChat`, `transcriptSegments`, `topics`, `projectAnalysis`, `modelMetadata`. Migrated all 44 remaining sites.
-- **Remaining:** Phase 4 only (delete the generic handler + CI guard). **Zero `electronAPI.database.*` callers remain in `src/`** — confirmed by `grep -rn "electronAPI\.database\." --include="*.ts" --include="*.tsx" src/` (empty). The `db-query` handler in `public/electron.js` and the `database:` preload key are now dead and ready to delete.
-- **Tests:** 145 passing. Phase 3 added: project-transcripts 14, chat 7, project-chat 7, transcript-segments 3, topics 5, project-analysis 4, model-metadata 4. `npx vitest run`. Health: 18 pre-existing TSC errors (react-router-dom v7 + docx — Tier 2, unrelated) — unchanged throughout.
+  - Phase 3 (the 8 small domains): `projectTranscripts`, `chat`, `projectChat`, `transcriptSegments`, `topics`, `projectAnalysis`, `modelMetadata`. 7 commits on `tier0-db-query-phase3`.
+  - Phase 4 (delete + guard) on `tier0-db-query-phase4`: removed the `db-query` `ipcMain.handle` block in `public/electron.js`, the `database:` key in `public/preload.js`, and its type in `src/types/electron.d.ts`. Guard added (vitest + CI grep). Audit ticked.
+- **Verification:** `grep -rnE "electronAPI\.database\b|ipcMain\.handle\(\s*['\"]db-query['\"]" --include="*.ts" --include="*.tsx" --include="*.js" src public` → empty.
+- **Tests:** 148 passing (Phase 3 added 44 across 7 files; Phase 4 added the guard test). `npx vitest run`. Health: 18 pre-existing TSC errors (react-router-dom v7 + docx — Tier 2, unrelated) — unchanged throughout.
 
 ### Phase 2 notes for the Phase 3 implementer
 - `transcripts.update` / `projects.update` are the H-1 allow-list gates. Their column allow-lists live in the module files; the renderer no longer builds any SET clause.
@@ -246,21 +250,25 @@ needed unless the survey turns up callers.
 
 ---
 
-## Phase 4 — delete the generic handler + guard
+## Phase 4 — delete the generic handler + guard — ✅ DONE (branch `tier0-db-query-phase4`)
 
-1. Confirm zero remaining callers:
-   ```bash
-   grep -rn "electronAPI\.database\." --include="*.ts" --include="*.tsx" src/   # must be empty
-   ```
-2. Remove the `db-query` `ipcMain.handle` block in `public/electron.js`
-   (search for `LEGACY: generic db-query handler`).
-3. Remove the `database:` key from `public/preload.js` and its type in
-   `src/types/electron.d.ts`.
-4. Add a CI guard so it can't come back. Options:
-   - a grep step in `.github/workflows/release.yml` that fails if
-     `electronAPI.database.` or `ipcMain.handle('db-query'` appears in `src/`/`public/`.
-   - or a vitest test that asserts the string is absent from the bundle.
-5. Tick C-SEC-3 / Tier 0.6 complete in `docs/AUDIT-2026-05-21.md`.
+What shipped:
+1. Removed the `db-query` `ipcMain.handle` block in `public/electron.js` (and
+   reworded the surrounding RPC-modules comment).
+2. Removed the `database:` key from `public/preload.js` and its `database`
+   member from `src/types/electron.d.ts`.
+3. Added the guard **both** ways (defense in depth — release.yml doesn't run
+   the test suite, so the vitest test alone wouldn't gate CI):
+   - `tests/no-generic-db-query.test.ts` — runs every `npx vitest run`.
+   - a grep step in `release.yml`'s `security-audit` job.
+   Both fail if `electronAPI.database` or `ipcMain.handle('db-query'` reappear.
+   The regexes match precise call shapes, so doc-comment prose mentioning
+   "db-query" doesn't trip them.
+4. Ticked C-SEC-3 / H-1 complete in `docs/AUDIT-2026-05-21.md`.
+
+**`ai_prompts` / `processing_queue`:** confirmed 0 renderer SQL callers — no
+work needed (`ai_prompts` is behind `promptService`; `processing_queue` is
+main-process only).
 
 ---
 
@@ -268,7 +276,7 @@ needed unless the survey turns up callers.
 One branch + one merge per phase (matches how Phase 1 landed):
 - `tier0-db-query-phase2` → transcripts + projects ✅ merged (`21e03cf`)
 - `tier0-db-query-phase3` → the 8 small domains ✅ done (awaiting merge)
-- `tier0-db-query-phase4` → delete + guard (next; unblocked — zero callers remain)
+- `tier0-db-query-phase4` → delete + guard ✅ done (awaiting merge; built on phase3)
 
 Commit per domain within a phase. Keep `npx tsc --noEmit` at 18 errors and
 `npx vitest run` green before each commit.

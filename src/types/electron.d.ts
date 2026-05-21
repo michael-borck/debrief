@@ -46,20 +46,9 @@ export interface AIProviderInfo {
 
 export interface ElectronAPI {
   /**
-   * LEGACY: generic SQL passthrough. Being migrated to `db.*` per-domain
-   * RPCs — do NOT add new callers. Tracked as Tier 0.6 / C-SEC-3 in
-   * docs/AUDIT-2026-05-21.md.
-   */
-  database: {
-    query: (type: string, sql: string, params?: any[]) => Promise<any>;
-    all: (sql: string, params?: any[]) => Promise<any[]>;
-    get: (sql: string, params?: any[]) => Promise<any>;
-    run: (sql: string, params?: any[]) => Promise<any>;
-  };
-
-  /**
-   * Per-domain DB RPCs. No SQL crosses the IPC boundary. New code should
-   * use these instead of `database.*`.
+   * Per-domain DB RPCs — the only DB surface exposed to the renderer. No SQL
+   * crosses the IPC boundary; inputs are validated in the main process. (The
+   * generic db-query passthrough was removed in Tier 0.6 / C-SEC-3.)
    */
   db: {
     settings: {

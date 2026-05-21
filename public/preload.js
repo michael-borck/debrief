@@ -7,18 +7,9 @@ const { contextBridge, ipcRenderer, webUtils } = require('electron');
 // When you add, remove, or rename a method here, update electron.d.ts too —
 // it is the canonical type definition for window.electronAPI.
 contextBridge.exposeInMainWorld('electronAPI', {
-  // Database operations
-  // LEGACY: generic SQL passthrough. Being migrated to electronAPI.db.*
-  // per-domain RPCs (see settings below). Do not add new callers.
-  database: {
-    query: (type, sql, params) => ipcRenderer.invoke('db-query', { type, sql, params }),
-    all: (sql, params) => ipcRenderer.invoke('db-query', { type: 'all', sql, params }),
-    get: (sql, params) => ipcRenderer.invoke('db-query', { type: 'get', sql, params }),
-    run: (sql, params) => ipcRenderer.invoke('db-query', { type: 'run', sql, params })
-  },
-
-  // Per-domain DB RPCs. New code should call these instead of
-  // electronAPI.database.* — no SQL crosses the IPC boundary.
+  // Per-domain DB RPCs — the only DB surface exposed to the renderer. No SQL
+  // crosses the IPC boundary; each domain validates inputs in the main
+  // process. (The old generic db-query passthrough was removed in Tier 0.6.)
   db: {
     settings: {
       get: (key) => ipcRenderer.invoke('settings:get', key),
