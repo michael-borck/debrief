@@ -31,7 +31,8 @@ const REP_CHUNKS_PER_TOPIC = 3;
 // so dot product == cosine similarity. Squared euclidean distance over unit
 // vectors is a strict monotone of cosine distance, so k-means clustering is
 // equivalent — keep the simpler distance metric.
-function squaredDistance(a: number[], b: number[]): number {
+// Exported for unit testing (pure clustering helpers).
+export function squaredDistance(a: number[], b: number[]): number {
   let s = 0;
   for (let i = 0; i < a.length; i++) {
     const d = a[i] - b[i];
@@ -40,7 +41,7 @@ function squaredDistance(a: number[], b: number[]): number {
   return s;
 }
 
-function mean(vectors: number[][]): number[] {
+export function mean(vectors: number[][]): number[] {
   if (vectors.length === 0) return [];
   const dim = vectors[0].length;
   const out = new Array(dim).fill(0);
@@ -82,7 +83,7 @@ interface KMeansResult {
   centroids: number[][];
 }
 
-function kmeans(vectors: number[][], k: number): KMeansResult {
+export function kmeans(vectors: number[][], k: number): KMeansResult {
   let centroids = seed(vectors, k);
   let assignments = new Array(vectors.length).fill(0);
 
