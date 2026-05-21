@@ -74,6 +74,50 @@ export interface ElectronAPI {
       /** Atomically upserts each key/value pair in `entries`. */
       setMany: (entries: Record<string, string>) => Promise<{ success: true }>;
     };
+
+    /**
+     * Single-table transcripts operations. Rows are returned RAW (JSON
+     * columns are still strings, booleans are 0/1) — the renderer hydrates
+     * them via hydrateTranscriptRow. Cross-table reads (transcripts JOIN
+     * project_transcripts) live in their own domain, not here.
+     */
+    transcripts: {
+      /** Non-trashed transcripts, newest first. */
+      list: () => Promise<any[]>;
+      /** Archived transcripts, newest archived first. */
+      listArchived: () => Promise<any[]>;
+      /** Trashed transcripts, newest deleted first. */
+      listTrashed: () => Promise<any[]>;
+      /** Full row by id, or null. */
+      get: (id: string) => Promise<any | null>;
+      /** { title, full_text, processed_text } for direct-LLM chat, or null. */
+      getForChat: (id: string) => Promise<any | null>;
+      /** { title, duration, speaker_count } for chat sizing, or null. */
+      getMetadata: (id: string) => Promise<any | null>;
+      /** Rows matching filename or title (upload dedup check). */
+      findDuplicates: (filename: string, title: string) => Promise<any[]>;
+      /** Completed transcripts lacking 'original' segments (back-fill). */
+      listNeedingSegmentMigration: () => Promise<any[]>;
+      /** Full-text-ish search over title/full_text/summary. */
+      searchByText: (query: string) => Promise<any[]>;
+      /** Inserts a new transcript row; created_at/updated_at set in main. */
+      create: (input: {
+        id: string;
+        title: string;
+        filename: string;
+        file_path?: string | null;
+        file_size?: number | null;
+        status?: string;
+        starred?: boolean | number;
+      }) => Promise<{ id: string }>;
+      /** Updates allow-listed columns only; rejects unknown column names. */
+      update: (id: string, fields: Record<string, unknown>) => Promise<{ changes: number }>;
+      archive: (id: string) => Promise<{ success: true }>;
+      unarchive: (id: string) => Promise<{ success: true }>;
+      softDelete: (id: string) => Promise<{ success: true }>;
+      restore: (id: string) => Promise<{ success: true }>;
+      remove: (id: string) => Promise<{ changes: number }>;
+    };
   };
 
   dialog: {

@@ -27,6 +27,26 @@ contextBridge.exposeInMainWorld('electronAPI', {
       set: (key, value) => ipcRenderer.invoke('settings:set', { key, value }),
       setMany: (entries) => ipcRenderer.invoke('settings:set-many', entries),
     },
+    transcripts: {
+      list: () => ipcRenderer.invoke('transcripts:list'),
+      listArchived: () => ipcRenderer.invoke('transcripts:list-archived'),
+      listTrashed: () => ipcRenderer.invoke('transcripts:list-trashed'),
+      get: (id) => ipcRenderer.invoke('transcripts:get', id),
+      getForChat: (id) => ipcRenderer.invoke('transcripts:get-for-chat', id),
+      getMetadata: (id) => ipcRenderer.invoke('transcripts:get-metadata', id),
+      findDuplicates: (filename, title) =>
+        ipcRenderer.invoke('transcripts:find-duplicates', { filename, title }),
+      listNeedingSegmentMigration: () =>
+        ipcRenderer.invoke('transcripts:list-needing-segment-migration'),
+      searchByText: (query) => ipcRenderer.invoke('transcripts:search-by-text', query),
+      create: (input) => ipcRenderer.invoke('transcripts:create', input),
+      update: (id, fields) => ipcRenderer.invoke('transcripts:update', { id, fields }),
+      archive: (id) => ipcRenderer.invoke('transcripts:archive', id),
+      unarchive: (id) => ipcRenderer.invoke('transcripts:unarchive', id),
+      softDelete: (id) => ipcRenderer.invoke('transcripts:soft-delete', id),
+      restore: (id) => ipcRenderer.invoke('transcripts:restore', id),
+      remove: (id) => ipcRenderer.invoke('transcripts:remove', id),
+    },
   },
 
   // Dialog operations
