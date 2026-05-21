@@ -297,11 +297,8 @@ export class ModelMetadataService {
    */
   private async getModelMetadataFromDatabase(modelName: string): Promise<ModelMetadata | null> {
     try {
-      const result = await window.electronAPI.database.get(
-        'SELECT * FROM model_metadata WHERE model_name = ?',
-        [modelName]
-      );
-      
+      const result = await window.electronAPI.db.modelMetadata.get(modelName);
+
       if (result) {
         return {
           modelName: result.model_name,
@@ -327,21 +324,16 @@ export class ModelMetadataService {
    */
   private async storeModelMetadata(metadata: ModelMetadata): Promise<void> {
     try {
-      await window.electronAPI.database.run(
-        `INSERT OR REPLACE INTO model_metadata 
-         (model_name, provider, context_limit, capabilities, parameters, last_updated, user_override, is_available)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          metadata.modelName,
-          metadata.provider,
-          metadata.contextLimit,
-          JSON.stringify(metadata.capabilities),
-          JSON.stringify(metadata.parameters),
-          metadata.lastUpdated,
-          metadata.userOverride ? 1 : 0,
-          metadata.isAvailable ? 1 : 0
-        ]
-      );
+      await window.electronAPI.db.modelMetadata.upsert({
+        modelName: metadata.modelName,
+        provider: metadata.provider,
+        contextLimit: metadata.contextLimit,
+        capabilities: metadata.capabilities,
+        parameters: metadata.parameters,
+        lastUpdated: metadata.lastUpdated,
+        userOverride: metadata.userOverride,
+        isAvailable: metadata.isAvailable,
+      });
     } catch (error) {
       console.warn('Failed to store model metadata:', error);
     }

@@ -129,6 +129,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
       getLatestResults: (projectId) =>
         ipcRenderer.invoke('project-analysis:get-latest-results', projectId),
     },
+    modelMetadata: {
+      get: (modelName) => ipcRenderer.invoke('model-metadata:get', modelName),
+      upsert: (input) => ipcRenderer.invoke('model-metadata:upsert', input),
+    },
   },
 
   // Dialog operations

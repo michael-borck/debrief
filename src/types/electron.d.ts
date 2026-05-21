@@ -298,6 +298,27 @@ export interface ElectronAPI {
       /** Most recent { results } for a project, or null. */
       getLatestResults: (projectId: string) => Promise<{ results: string } | null>;
     };
+
+    /**
+     * Cached per-model context limits / capabilities (model_metadata). get
+     * returns the raw row (JSON columns still strings, flags still 0/1);
+     * upsert serializes + coerces in main.
+     */
+    modelMetadata: {
+      /** Raw model_metadata row by model_name, or null. */
+      get: (modelName: string) => Promise<any | null>;
+      /** Inserts or replaces a model's metadata. */
+      upsert: (input: {
+        modelName: string;
+        provider: string;
+        contextLimit?: number;
+        capabilities?: unknown;
+        parameters?: unknown;
+        lastUpdated?: string;
+        userOverride?: boolean;
+        isAvailable?: boolean;
+      }) => Promise<{ success: true }>;
+    };
   };
 
   dialog: {
