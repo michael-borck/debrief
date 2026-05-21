@@ -13,10 +13,19 @@ handler gets deleted.
 
 ## Status snapshot (as of 2026-05-21)
 
-- **Branch:** all merged work is on `main`. No active feature branch — start a fresh one for the next phase.
-- **Done:** Phase 1 (infrastructure + `settings` domain). Merged in `787e628`.
-- **Remaining:** Phases 2-4 below. **80 `electronAPI.database.*` calls across 23 files**, 12 domains.
-- **Tests:** 67 passing. `npx vitest run`. Health: 18 pre-existing TSC errors (react-router-dom v7 + docx — Tier 2, unrelated).
+- **Branch:** Phase 1 is on `main`. Phase 2 work is on `tier0-db-query-phase2` (not yet merged) — start a fresh branch off it (or off `main` once merged) for Phase 3.
+- **Done:**
+  - Phase 1 (infrastructure + `settings` domain). Merged in `787e628`.
+  - **Phase 2 (`transcripts` + `projects` single-table domains).** On `tier0-db-query-phase2`. 4 commits: transcripts module+tests, transcripts call sites, projects module+tests, projects call sites. Migrated 36 single-table sites (80 → 44 remaining).
+- **Remaining:** Phases 3-4 below. **44 `electronAPI.database.*` calls** left — all are cross-table JOIN reads or other-domain (chat/segments/topics/analysis/metadata) calls. No single-table transcripts/projects SQL remains in `src/`.
+- **Tests:** 101 passing (added `db-rpc-transcripts.test.ts` 20 + `db-rpc-projects.test.ts` 14). `npx vitest run`. Health: 18 pre-existing TSC errors (react-router-dom v7 + docx — Tier 2, unrelated).
+
+### Phase 2 notes for the Phase 3 implementer
+- `transcripts.update` / `projects.update` are the H-1 allow-list gates. Their column allow-lists live in the module files; the renderer no longer builds any SET clause.
+- The `transcripts` domain returns RAW rows; the renderer still hydrates via `hydrateTranscriptRow` / inline `JSON.parse`. Keep that contract for the JOIN reads you move in Phase 3.
+- **Booleans:** the modules coerce `boolean → 0/1` themselves (better-sqlite3 v11 would too, but `node:sqlite` in the tests rejects raw booleans). Reuse that `bindValue` pattern for any new domain that writes boolean/JSON columns.
+- `TrashPage` project cascade-restore: the per-transcript restore writes now use `transcripts.restore`; only the `SELECT DISTINCT t.id ... JOIN project_transcripts` read stays on the generic IPC — move it into the `project_transcripts` domain (`listTrashedIdsForProject(projectId)`).
+- The project list/detail aggregation reads (`ProjectContext` loadProjects/loadProject, `getProjectTranscripts`) are the big `project_transcripts` JOINs — they were intentionally left for Phase 3.
 
 ### Dev environment note
 `node_modules` was repaired this session (`npm install`). If `npx vitest run`
@@ -134,7 +143,14 @@ tags, color, icon, is_archived, archived_at, is_deleted, deleted_at, updated_at
 
 ---
 
-## Phase 2 — transcripts + projects (~39 sites)
+## Phase 2 — transcripts + projects (~39 sites) — ✅ DONE (branch `tier0-db-query-phase2`)
+
+> The tables below are kept as a record of the RPC surface that shipped.
+> Method names that landed: see `public/electron/db-rpc/transcripts.js` and
+> `projects.js`. (`getFields` shipped as the specific getters `getForChat` /
+> `getMetadata`; `listRecentForDup` shipped as `findDuplicates`;
+> `listTrashedIdsForProject` was deferred to the `project_transcripts` domain.)
+
 
 ### transcripts domain (31 sites)
 Proposed RPC surface (design against these actual call sites):
@@ -230,7 +246,7 @@ needed unless the survey turns up callers.
 
 ## Suggested cadence
 One branch + one merge per phase (matches how Phase 1 landed):
-- `tier0-db-query-phase2` → transcripts + projects
+- `tier0-db-query-phase2` → transcripts + projects ✅ done (awaiting merge)
 - `tier0-db-query-phase3` → the 8 small domains (can split further if a session runs long)
 - `tier0-db-query-phase4` → delete + guard
 
