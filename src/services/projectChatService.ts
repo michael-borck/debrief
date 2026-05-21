@@ -271,10 +271,7 @@ export class ProjectChatService {
     transcripts: Transcript[];
   } | null> {
     try {
-      const project = await window.electronAPI.database.get(
-        'SELECT * FROM projects WHERE id = ? AND is_deleted = 0',
-        [projectId]
-      );
+      const project = await window.electronAPI.db.projects.get(projectId);
 
       if (!project) return null;
 

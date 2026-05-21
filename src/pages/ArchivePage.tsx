@@ -27,12 +27,8 @@ export const ArchivePage: React.FC = () => {
   const loadArchivedItems = async () => {
     try {
       setLoading(true);
-      const archivedTranscripts = await window.electronAPI.database.all(
-        'SELECT * FROM transcripts WHERE is_archived = 1 ORDER BY archived_at DESC'
-      );
-      const archivedProjects = await window.electronAPI.database.all(
-        'SELECT * FROM projects WHERE is_archived = 1 ORDER BY archived_at DESC'
-      );
+      const archivedTranscripts = await window.electronAPI.db.transcripts.listArchived();
+      const archivedProjects = await window.electronAPI.db.projects.listArchived();
       const items: ArchiveItem[] = [];
       archivedTranscripts.forEach((transcript: any) => {
         items.push({
@@ -66,8 +62,11 @@ export const ArchivePage: React.FC = () => {
 
   const unarchiveItem = async (item: ArchiveItem) => {
     try {
-      const table = item.type === 'transcript' ? 'transcripts' : 'projects';
-      await window.electronAPI.database.run(`UPDATE ${table} SET is_archived = 0, archived_at = NULL WHERE id = ?`, [item.id]);
+      if (item.type === 'transcript') {
+        await window.electronAPI.db.transcripts.unarchive(item.id);
+      } else {
+        await window.electronAPI.db.projects.unarchive(item.id);
+      }
       await loadArchivedItems();
       alert(`${item.type === 'transcript' ? 'Transcript' : 'Project'} unarchived successfully`);
     } catch (error) {
