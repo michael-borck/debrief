@@ -2,6 +2,14 @@ export const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
 
+// Cross-platform basename for the renderer (no Node `path` module here).
+// Splits on both POSIX `/` and Windows `\` so a Windows path like
+// C:\Users\me\clip.mp4 yields "clip.mp4", not the whole string.
+export const getBasename = (filePath: string): string => {
+  const parts = filePath.split(/[\\/]/);
+  return parts[parts.length - 1] || filePath;
+};
+
 export const formatDuration = (seconds: number): string => {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);

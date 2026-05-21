@@ -20,6 +20,10 @@ export class FileProcessor {
     callbacks: ProcessingCallbacks = {}
   ): Promise<void> {
     const { signal } = callbacks;
+    // Hoisted above the try so the finally can clean up the extracted WAV on
+    // every exit path (success, error, cancel) — previously it only ran on the
+    // happy path, so failed/cancelled video imports leaked temp WAVs.
+    let audioPath = filePath;
     try {
       // Step 1: Get media info
       callbacks.onProgress?.('analyzing_media', 0);
@@ -29,8 +33,6 @@ export class FileProcessor {
       if (!mediaInfo.success) {
         throw new Error(mediaInfo.error || 'Failed to get media info');
       }
-
-      let audioPath = filePath;
 
       // Step 2: Extract audio if it's a video file
       if (mediaInfo.hasVideo) {
@@ -189,21 +191,6 @@ export class FileProcessor {
         console.warn('No chunk timings available for segment creation');
       }
       
-      // Cleanup temp files if audio was extracted from video
-      if (audioPath !== filePath) {
-        console.log('Cleaning up extracted audio file:', audioPath);
-        try {
-          const deleteResult = await window.electronAPI.fs.deleteFile(audioPath);
-          if (deleteResult.success) {
-            console.log('Successfully deleted temp file:', audioPath);
-          } else {
-            console.error('Failed to delete temp file:', deleteResult.error);
-          }
-        } catch (error) {
-          console.error('Error deleting temp file:', error);
-        }
-      }
-
       callbacks.onComplete?.();
     } catch (error) {
       if (isCancelled(error)) {
@@ -244,6 +231,19 @@ export class FileProcessor {
       }
 
       callbacks.onError?.(error as Error);
+    } finally {
+      // Always remove the extracted WAV if we made one — success, error, or
+      // cancel (the cancel branch above returns, but finally still runs).
+      if (audioPath !== filePath) {
+        try {
+          const deleteResult = await window.electronAPI.fs.deleteFile(audioPath);
+          if (!deleteResult.success) {
+            console.error('Failed to delete temp audio file:', deleteResult.error);
+          }
+        } catch (error) {
+          console.error('Error deleting temp audio file:', error);
+        }
+      }
     }
   }
 

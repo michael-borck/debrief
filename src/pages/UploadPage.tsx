@@ -5,7 +5,7 @@ import { ServiceContext } from '../contexts/ServiceContext';
 import { TranscriptContext } from '../contexts/TranscriptContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { useToast } from '../contexts/ToastContext';
-import { generateId } from '../utils/helpers';
+import { generateId, getBasename } from '../utils/helpers';
 import { fileProcessor } from '../services/fileProcessor';
 import { runSerial } from '../services/processingScheduler';
 import { useSidecarStatus } from '../hooks/useSidecarStatus';
@@ -119,7 +119,7 @@ export const UploadPage: React.FC = () => {
     filePath: string,
     signal: AbortSignal
   ) => {
-    const fileName = filePath.split('/').pop() || filePath;
+    const fileName = getBasename(filePath);
     try {
       // Wait our turn. While we wait, the queue UI shows status='queued'.
       // If the user cancels (signal.aborted) before our turn, skip entirely
@@ -231,7 +231,7 @@ export const UploadPage: React.FC = () => {
     if (selectedFiles.length === 0) return;
 
     for (const filePath of selectedFiles) {
-      const fileName = filePath.split('/').pop() || filePath;
+      const fileName = getBasename(filePath);
 
       if (!fileName.match(/\.(mp3|wav|mp4|avi|mov|m4a|webm|ogg)$/i)) {
         alert(`File type not supported: ${fileName}`);
@@ -373,7 +373,7 @@ export const UploadPage: React.FC = () => {
                 <div className="panel p-3">
                   <ul className="space-y-2">
                     {selectedFiles.map((filePath, index) => {
-                      const fileName = filePath.split('/').pop() || filePath;
+                      const fileName = getBasename(filePath);
                       return (
                         <li key={`${filePath}-${index}`} className="flex items-center gap-2.5 text-sm">
                           <FileAudio size={15} className="text-primary-400 flex-shrink-0" />

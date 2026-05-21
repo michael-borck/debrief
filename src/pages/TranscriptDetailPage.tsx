@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { TranscriptContext } from '../contexts/TranscriptContext';
 import { useProjects } from '../contexts/ProjectContext';
 import { Transcript, Project, SentenceSegment } from '../types';
-import { formatDate, formatDuration, formatFileSize } from '../utils/helpers';
+import { formatDate, formatDuration, formatFileSize, getBasename } from '../utils/helpers';
 import { ArrowLeft, Star, Download, Copy, Edit, Users, MessageCircle, Search, Clock, FileText, HardDrive, Calendar, FileAudio, Tag, ListChecks, FolderOpen, Quote, Lightbulb, X } from 'lucide-react';
 import { SpeakerTaggingModal } from '../components/SpeakerTaggingModal';
 import { TranscriptChatModal } from '../components/TranscriptChatModal';
@@ -1248,7 +1248,7 @@ export const TranscriptDetailPage: React.FC = () => {
           <span className="flex items-center gap-1.5"><Calendar size={12} />{formatDate(transcript.created_at)}</span>
           <span className="flex items-center gap-1.5"><Clock size={12} />{formatDuration(transcript.duration)}</span>
           <span className="flex items-center gap-1.5"><HardDrive size={12} />{formatFileSize(transcript.file_size)}</span>
-          <span className="flex items-center gap-1.5"><FileAudio size={12} />{transcript.file_path?.split('/').pop() || transcript.filename}</span>
+          <span className="flex items-center gap-1.5"><FileAudio size={12} />{transcript.file_path ? getBasename(transcript.file_path) : transcript.filename}</span>
         </div>
       </div>
 

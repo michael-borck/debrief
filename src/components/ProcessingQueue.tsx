@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState } from 'react';
 import { BarChart3, X, Ban } from 'lucide-react';
 import { ProcessingItem, TranscriptionStage } from '../types';
 import { ServiceContext } from '../contexts/ServiceContext';
+import { getBasename } from '../utils/helpers';
 
 interface ProcessingQueueProps {
   items: ProcessingItem[];
@@ -110,7 +111,7 @@ export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
 
       <div className="space-y-3">
         {items.map(item => {
-          const fileName = item.file_path.split('/').pop() || item.file_path;
+          const fileName = getBasename(item.file_path);
           const inProgress = isInProgress(item.status);
           const createdAt = new Date(item.created_at).getTime();
           const elapsedSec = inProgress && !Number.isNaN(createdAt)
