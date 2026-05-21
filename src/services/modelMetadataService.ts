@@ -175,11 +175,7 @@ export class ModelMetadataService {
    */
   private async getOllamaModels(): Promise<ModelMetadata[]> {
     try {
-      const aiUrlSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?', 
-        ['aiAnalysisUrl']
-      );
-      const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
+      const aiUrl = (await window.electronAPI.db.settings.get('aiAnalysisUrl')) || 'http://localhost:11434';
 
       const response = await window.electronAPI.services.getOllamaModels(aiUrl);
       
@@ -220,11 +216,7 @@ export class ModelMetadataService {
    */
   private async queryOllamaModelInfo(modelName: string): Promise<ModelMetadata | null> {
     try {
-      const aiUrlSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?', 
-        ['aiAnalysisUrl']
-      );
-      const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
+      const aiUrl = (await window.electronAPI.db.settings.get('aiAnalysisUrl')) || 'http://localhost:11434';
 
       const response = await window.electronAPI.getModelInfo({
         url: aiUrl,

@@ -317,18 +317,9 @@ Segment 1: Speaker Name
 etc.`;
 
       // Get AI settings
-      const aiUrlSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiAnalysisUrl']
-      );
-      
-      const aiModelSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiModel']
-      );
-      
-      const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
-      const aiModel = aiModelSetting?.value || 'llama3.2';
+      const ai = await window.electronAPI.db.settings.getMany(['aiAnalysisUrl', 'aiModel']);
+      const aiUrl = ai.aiAnalysisUrl || 'http://localhost:11434';
+      const aiModel = ai.aiModel || 'llama3.2';
 
       console.log('AI Prompt:', aiPrompt);
       console.log('AI URL:', aiUrl, 'Model:', aiModel);

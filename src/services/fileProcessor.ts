@@ -79,12 +79,9 @@ export class FileProcessor {
       callbacks.onProgress?.('validating', 100);
       
       // Determine which text to use for analysis
-      const analyzeValidatedSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['analyzeValidatedTranscript']
-      );
-      const textForAnalysis = (analyzeValidatedSetting?.value === 'true' && validationResult.validatedText) 
-        ? validationResult.validatedText 
+      const analyzeValidated = await window.electronAPI.db.settings.get('analyzeValidatedTranscript');
+      const textForAnalysis = (analyzeValidated === 'true' && validationResult.validatedText)
+        ? validationResult.validatedText
         : transcriptResult.text || '';
 
       // Step 4: AI Analysis
@@ -98,7 +95,7 @@ export class FileProcessor {
 
       // Step 4.5: Advanced Analysis (sentiment, speakers, emotions)
       // Use validated text if available and setting is enabled
-      const textForAdvancedAnalysis = (analyzeValidatedSetting?.value === 'true' && validationResult.validatedText)
+      const textForAdvancedAnalysis = (analyzeValidated === 'true' && validationResult.validatedText)
         ? validationResult.validatedText
         : transcriptResult.text || '';
       const advancedAnalysisResult = await this.performAdvancedAnalysis(textForAdvancedAnalysis, callbacks.onProgress, signal);
@@ -292,18 +289,10 @@ export class FileProcessor {
   }> {
     try {
       // Read the chosen local Whisper model from settings (defaults to tiny.en)
-      const modelSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['localTranscriptionModel']
-      );
-      const modelName = modelSetting?.value || 'Xenova/whisper-tiny.en';
+      const modelName = (await window.electronAPI.db.settings.get('localTranscriptionModel')) || 'Xenova/whisper-tiny.en';
 
       // Speaker detection is on by default; users can opt out in Settings
-      const diariseSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['enableSpeakerDiarisation']
-      );
-      const enableDiarisation = diariseSetting?.value !== 'false';
+      const enableDiarisation = (await window.electronAPI.db.settings.get('enableSpeakerDiarisation')) !== 'false';
 
       onProgress?.('transcribing', 25);
 
@@ -344,18 +333,9 @@ export class FileProcessor {
       }
 
       // Get AI service settings
-      const aiUrlSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiAnalysisUrl']
-      );
-
-      const aiModelSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiModel']
-      );
-
-      const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
-      const aiModel = aiModelSetting?.value || 'llama2';
+      const ai = await window.electronAPI.db.settings.getMany(['aiAnalysisUrl', 'aiModel']);
+      const aiUrl = ai.aiAnalysisUrl || 'http://localhost:11434';
+      const aiModel = ai.aiModel || 'llama2';
 
       onProgress?.('analyzing', 25);
 
@@ -443,19 +423,11 @@ export class FileProcessor {
 
   // Helper functions for AI service settings
   async getAiUrl(): Promise<string> {
-    const aiUrlSetting = await window.electronAPI.database.get(
-      'SELECT value FROM settings WHERE key = ?',
-      ['aiAnalysisUrl']
-    );
-    return aiUrlSetting?.value || 'http://localhost:11434';
+    return (await window.electronAPI.db.settings.get('aiAnalysisUrl')) || 'http://localhost:11434';
   }
 
   async getAiModel(): Promise<string> {
-    const aiModelSetting = await window.electronAPI.database.get(
-      'SELECT value FROM settings WHERE key = ?',
-      ['aiModel']
-    );
-    return aiModelSetting?.value || 'llama2';
+    return (await window.electronAPI.db.settings.get('aiModel')) || 'llama2';
   }
 
   async callAI(
@@ -609,30 +581,28 @@ export class FileProcessor {
     let duplicateRemovalChanges: any[] = [];
 
     try {
-      // Get validation settings
-      const validationEnabledSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['enableTranscriptValidation']
-      );
-      
-      if (validationEnabledSetting?.value !== 'true') {
+      // Get validation settings in one batch
+      const valSettings = await window.electronAPI.db.settings.getMany([
+        'enableTranscriptValidation',
+        'validationOptions',
+        'enableDuplicateRemoval',
+      ]);
+
+      if (valSettings.enableTranscriptValidation !== 'true') {
         return { validatedText: transcriptText, changes: [] };
       }
-      
-      const validationOptionsSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['validationOptions']
-      );
-      
-      const options = validationOptionsSetting?.value ? JSON.parse(validationOptionsSetting.value) : {};
-      
+
+      let options: any = {};
+      if (valSettings.validationOptions) {
+        try {
+          options = JSON.parse(valSettings.validationOptions);
+        } catch (err) {
+          console.warn('validationOptions: malformed JSON, using defaults', err);
+        }
+      }
+
       // First, remove duplicate sentences if enabled (separate setting)
-      const duplicateRemovalSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['enableDuplicateRemoval']
-      );
-      
-      if (duplicateRemovalSetting?.value !== 'false') {
+      if (valSettings.enableDuplicateRemoval !== 'false') {
         const duplicateResult = await this.removeDuplicateSentences(transcriptText, signal);
         processedText = duplicateResult.cleanedText;
         
@@ -647,19 +617,10 @@ export class FileProcessor {
       }
       
       // Get AI service settings
-      const aiUrlSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiAnalysisUrl']
-      );
-      
-      const aiModelSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiModel']
-      );
-      
-      const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
-      const aiModel = aiModelSetting?.value || 'llama2';
-      
+      const aiSettings = await window.electronAPI.db.settings.getMany(['aiAnalysisUrl', 'aiModel']);
+      const aiUrl = aiSettings.aiAnalysisUrl || 'http://localhost:11434';
+      const aiModel = aiSettings.aiModel || 'llama2';
+
       // Create validation options string
       const validationOptions = [
         options.spelling !== false ? '- Spelling errors' : '',
@@ -1011,19 +972,10 @@ Please format your response as JSON:
       }
 
       // Get AI service settings
-      const aiUrlSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiAnalysisUrl']
-      );
-      
-      const aiModelSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?',
-        ['aiModel']
-      );
-      
-      const aiUrl = aiUrlSetting?.value || 'http://localhost:11434';
-      const aiModel = aiModelSetting?.value || 'llama2';
-      
+      const ai = await window.electronAPI.db.settings.getMany(['aiAnalysisUrl', 'aiModel']);
+      const aiUrl = ai.aiAnalysisUrl || 'http://localhost:11434';
+      const aiModel = ai.aiModel || 'llama2';
+
       onProgress?.('analyzing', 80);
       
       // Create research analysis prompt using configurable prompt

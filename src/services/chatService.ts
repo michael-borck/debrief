@@ -87,26 +87,18 @@ export class ChatService {
    */
   async loadConfigFromDatabase(): Promise<void> {
     try {
-      const settings = await window.electronAPI.database.all(
-        'SELECT key, value FROM settings WHERE key IN (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-        [
-          'chatContextChunks',
-          'chatMemoryLimit', 
-          'chatChunkingMethod',
-          'chatMaxChunkSize',
-          'chatChunkOverlap',
-          'conversationMode',
-          'directLlmContextLimit',
-          'vectorOnlyChunkCount',
-          'dynamicContextManagement',
-          'memoryReserveFactor'
-        ]
-      );
-
-      const settingsMap = settings.reduce((acc: any, { key, value }: any) => {
-        acc[key] = value;
-        return acc;
-      }, {});
+      const settingsMap = await window.electronAPI.db.settings.getMany([
+        'chatContextChunks',
+        'chatMemoryLimit',
+        'chatChunkingMethod',
+        'chatMaxChunkSize',
+        'chatChunkOverlap',
+        'conversationMode',
+        'directLlmContextLimit',
+        'vectorOnlyChunkCount',
+        'dynamicContextManagement',
+        'memoryReserveFactor',
+      ]);
 
       // Update config with database values
       this.config = {
@@ -148,11 +140,7 @@ export class ChatService {
 
     try {
       // Get current AI model from settings
-      const aiModelSetting = await window.electronAPI.database.get(
-        'SELECT value FROM settings WHERE key = ?', 
-        ['aiModel']
-      );
-      const modelName = aiModelSetting?.value || 'llama2';
+      const modelName = (await window.electronAPI.db.settings.get('aiModel')) || 'llama2';
 
       // Get model metadata with dynamic detection
       this.currentModelMetadata = await modelMetadataService.getModelMetadata(modelName);

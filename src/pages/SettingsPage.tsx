@@ -111,14 +111,7 @@ export const SettingsPage: React.FC = () => {
 
   const loadSettings = async () => {
     try {
-      const settings = await window.electronAPI.database.all(
-        'SELECT key, value FROM settings'
-      );
-      
-      const settingsMap = settings.reduce((acc: any, { key, value }: any) => {
-        acc[key] = value;
-        return acc;
-      }, {});
+      const settingsMap = await window.electronAPI.db.settings.getAll();
 
       setLocalTranscriptionModel(settingsMap.localTranscriptionModel || 'Xenova/whisper-tiny.en');
       setAiProvider(settingsMap.aiProvider || 'ollama');
@@ -135,10 +128,7 @@ export const SettingsPage: React.FC = () => {
         if (decryptResult?.wasPlain && plainKey) {
           const encResult = await window.electronAPI.crypto.encrypt(plainKey);
           if (encResult?.success && encResult.encrypted) {
-            await window.electronAPI.database.run(
-              'INSERT OR REPLACE INTO settings (key, value, updated_at) VALUES (?, ?, ?)',
-              ['aiApiKey', encResult.encrypted, new Date().toISOString()]
-            );
+            await window.electronAPI.db.settings.set('aiApiKey', encResult.encrypted);
           }
         }
       } else {
@@ -190,10 +180,7 @@ export const SettingsPage: React.FC = () => {
 
   const saveSetting = async (key: string, value: string) => {
     try {
-      await window.electronAPI.database.run(
-        'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-        [key, value]
-      );
+      await window.electronAPI.db.settings.set(key, value);
     } catch (error) {
       console.error('Error saving setting:', error);
     }
