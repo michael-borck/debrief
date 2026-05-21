@@ -46,11 +46,25 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
     return Array.from(speakers).sort();
   }, [transcripts]);
 
-  const highlightText = (text: string, query: string): string => {
-    if (!query.trim()) return text;
-    
-    const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-    return text.replace(regex, '<mark class="bg-yellow-200 px-1 rounded">$1</mark>');
+  // Returns React children rather than an HTML string, so the surrounding
+  // JSX escapes the text automatically. The previous version interpolated
+  // raw transcript content into HTML and fed it to dangerouslySetInnerHTML
+  // — a transcript titled `<img src=x onerror=...>` would execute on every
+  // search.
+  //
+  // String.split with a capturing-group regex puts matched chunks at odd
+  // indices and unmatched chunks at even indices, so we don't need to
+  // re-test each part against a stateful regex.
+  const highlightText = (text: string, query: string): React.ReactNode => {
+    if (!query.trim() || !text) return text;
+
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+    return parts.map((part, i) =>
+      i % 2 === 1
+        ? <mark key={i} className="bg-yellow-200 px-1 rounded">{part}</mark>
+        : <React.Fragment key={i}>{part}</React.Fragment>
+    );
   };
 
   const getContextWindow = (text: string, matchIndex: number, matchLength: number, windowSize: number = 100): string => {
@@ -417,12 +431,9 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
             {/* Transcript Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex-1">
-                <h3 
-                  className="font-semibold text-surface-900"
-                  dangerouslySetInnerHTML={{ 
-                    __html: highlightText(result.transcript.title, searchQuery) 
-                  }}
-                />
+                <h3 className="font-semibold text-surface-900">
+                  {highlightText(result.transcript.title, searchQuery)}
+                </h3>
                 <div className="text-sm text-surface-500">
                   {formatDate(result.transcript.created_at)} • 
                   {result.totalMatches} match{result.totalMatches !== 1 ? 'es' : ''} • 
@@ -445,12 +456,9 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
                   <div className="text-xs text-surface-500 mb-1">
                     {getFieldDisplayName(match.field)}
                   </div>
-                  <div 
-                    className="text-sm text-surface-700"
-                    dangerouslySetInnerHTML={{ 
-                      __html: highlightText(match.context, searchQuery) 
-                    }}
-                  />
+                  <div className="text-sm text-surface-700">
+                    {highlightText(match.context, searchQuery)}
+                  </div>
                 </div>
               ))}
               

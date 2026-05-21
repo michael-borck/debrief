@@ -75,7 +75,12 @@ let db;
 // check skips migration even on a clean install. We detect "real" data by
 // looking for our app's DB file — if it's not there, the new dir is just
 // Electron's scaffolding and is safe to clobber.
-const APP_DATA_MARKER = 'audio-scribe.db';
+// The DB filename also doubles as the "this is a real userData dir" marker
+// during legacy-dir migration. Used by hasRealAppData, initDatabase, and
+// change-database-location — single source of truth so a future rename
+// can't desync one site from another.
+const DB_FILENAME = 'audio-scribe.db';
+const APP_DATA_MARKER = DB_FILENAME;
 
 function hasRealAppData(dir) {
   try {
@@ -194,7 +199,7 @@ async function initDatabase() {
     if (fs.existsSync(settingsPath)) {
       const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
       if (settings.databaseLocation) {
-        dbPath = path.join(settings.databaseLocation, 'audio-scribe.db');
+        dbPath = path.join(settings.databaseLocation, DB_FILENAME);
       }
     }
   } catch (error) {
@@ -204,7 +209,7 @@ async function initDatabase() {
   // Default location if not set
   if (!dbPath) {
     const userDataPath = app.getPath('userData');
-    dbPath = path.join(userDataPath, 'audio-scribe.db');
+    dbPath = path.join(userDataPath, DB_FILENAME);
   }
   
   // Ensure directory exists
@@ -215,7 +220,13 @@ async function initDatabase() {
   
   console.log('Database location:', dbPath);
   db = new Database(dbPath);
-  
+
+  // Schema declares ON DELETE CASCADE on project_transcripts,
+  // project_chat_*, project_analysis, transcript_segments, transcript_topics.
+  // SQLite defaults to foreign_keys=OFF per connection, so without this
+  // every cascade is a no-op and deletes leave orphan rows.
+  db.pragma('foreign_keys = ON');
+
   // Load and execute schema
   const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
@@ -961,7 +972,7 @@ ipcMain.handle('get-database-info', async () => {
 ipcMain.handle('change-database-location', async (event, newPath) => {
   try {
     const oldDbPath = global.dbPath;
-    const newDbPath = path.join(newPath, 'locallisten.db');
+    const newDbPath = path.join(newPath, DB_FILENAME);
     
     // Ensure new directory exists
     if (!fs.existsSync(newPath)) {
@@ -1484,23 +1495,13 @@ ${text}`;
   }
 });
 
-ipcMain.handle('fs-read-file', async (event, filePath) => {
-  try {
-    const data = fs.readFileSync(filePath);
-    return data;
-  } catch (error) {
-    throw new Error(`Failed to read file: ${error.message}`);
-  }
-});
-
-ipcMain.handle('fs-write-file', async (event, { filePath, data }) => {
-  try {
-    fs.writeFileSync(filePath, data);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
+// fs-read-file and fs-write-file used to exist here. They accepted any
+// path from the renderer and ran readFileSync/writeFileSync on it, so a
+// renderer (or any XSS payload) could read ~/.ssh/id_rsa or overwrite
+// ~/.zshrc. They had zero call sites in src/ at the time the audit
+// found them — pure attack surface — so they have been removed. If a
+// new feature needs file IO from the renderer, add a SCOPED IPC that
+// validates the path against an explicit allow-list root.
 
 ipcMain.handle('fs-get-file-stats', async (event, filePath) => {
   try {
@@ -1515,8 +1516,14 @@ ipcMain.handle('fs-join-path', async (event, ...pathSegments) => {
   return path.join(...pathSegments);
 });
 
+// Only legitimate caller is fileProcessor.ts cleaning up the temp WAV
+// that extract-audio just wrote into os.tmpdir(). assertPathUnderTmp lives
+// in public/electron/safe-paths.js so it can be unit-tested directly.
+const { assertPathUnderTmp } = require('./electron/safe-paths');
+
 ipcMain.handle('fs-delete-file', async (event, filePath) => {
   try {
+    assertPathUnderTmp(filePath);
     fs.unlinkSync(filePath);
     return { success: true };
   } catch (error) {

@@ -19,6 +19,23 @@ try {
   lancedb = null;
 }
 
+// Safe parse for the `speakers` JSON-string column. A single malformed
+// chunk row used to throw out of the surrounding .map() and tank the
+// whole RAG retrieval / stats call. Now bad rows fall back to [] and log.
+function parseSpeakers(raw, chunkId) {
+  if (raw === null || raw === undefined || raw === '') return [];
+  if (typeof raw !== 'string') return Array.isArray(raw) ? raw : [];
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    console.warn(
+      `vector-store: malformed speakers JSON on chunk ${chunkId ?? '?'}, using []`,
+      err.message
+    );
+    return [];
+  }
+}
+
 class MainVectorStore {
   constructor() {
     this.db = null;
@@ -183,7 +200,7 @@ class MainVectorStore {
           speaker: result.speaker,
           chunkIndex: result.chunkIndex,
           wordCount: result.wordCount,
-          speakers: JSON.parse(result.speakers || '[]'),
+          speakers: parseSpeakers(result.speakers, result.id),
           method: result.method,
           createdAt: result.createdAt
         },
@@ -236,7 +253,7 @@ class MainVectorStore {
         speaker: result.speaker,
         chunkIndex: result.chunkIndex,
         wordCount: result.wordCount,
-        speakers: JSON.parse(result.speakers || '[]'),
+        speakers: parseSpeakers(result.speakers, result.id),
         method: result.method,
         createdAt: result.createdAt
       }));
@@ -274,7 +291,7 @@ class MainVectorStore {
 
       const allChunks = await this.table.query().toArray();
       const transcriptIds = [...new Set(allChunks.map(c => c.transcriptId))];
-      const speakers = [...new Set(allChunks.flatMap(c => JSON.parse(c.speakers || '[]')))];
+      const speakers = [...new Set(allChunks.flatMap(c => parseSpeakers(c.speakers, c.id)))];
 
       const avgChunkSize = allChunks.length > 0
         ? allChunks.reduce((sum, c) => sum + (c.endTime - c.startTime), 0) / allChunks.length
