@@ -1137,6 +1137,18 @@ ipcMain.handle('chat-with-ollama', async (event, { prompt, message, context }) =
     const apiKey = decryptIfNeeded(keyRow?.value || '');
     const model = modelRow?.value || '';
 
+    // A key was saved but decrypted to empty -> decryption failed (most often
+    // the OS keychain rotated/changed). Silently sending an empty key would
+    // surface as a confusing auth error, so tell the user to re-enter it —
+    // but only for providers that actually require a key (not local Ollama).
+    if (info.requiresKey && keyRow?.value && !apiKey) {
+      return {
+        success: false,
+        response: '',
+        error: 'Your saved API key could not be decrypted (the OS keychain may have changed since you saved it). Please re-enter it in Settings.',
+      };
+    }
+
     console.log('AI chat request:', {
       provider,
       url,
@@ -1347,11 +1359,14 @@ function decryptIfNeeded(value) {
   if (typeof value !== 'string' || value.length === 0) return '';
   if (!value.startsWith(ENC_PREFIX)) return value; // legacy plain-text
   try {
-    if (!safeStorage.isEncryptionAvailable()) return '';
+    if (!safeStorage.isEncryptionAvailable()) {
+      console.warn('decryptIfNeeded: OS encryption unavailable; stored secret cannot be read');
+      return '';
+    }
     const buffer = Buffer.from(value.slice(ENC_PREFIX.length), 'base64');
     return safeStorage.decryptString(buffer);
   } catch (err) {
-    console.error('Failed to decrypt sensitive setting:', err.message);
+    console.error('Failed to decrypt sensitive setting (keychain may have changed):', err.message);
     return '';
   }
 }
@@ -1957,14 +1972,16 @@ ipcMain.handle('get-media-info', async (event, { filePath }) => {
     ).catch(e => ({ stdout: '', stderr: e.stderr || e.message }));
     const output = stdout + stderr;
     
-    // Parse duration
-    const durationMatch = output.match(/Duration: (\d{2}):(\d{2}):(\d{2})/);
+    // Parse duration, including the fractional (centiseconds) part ffmpeg
+    // prints — e.g. "Duration: 00:01:23.45" -> 83.45s, not 83.
+    const durationMatch = output.match(/Duration: (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?/);
     let duration = 0;
     if (durationMatch) {
-      const hours = parseInt(durationMatch[1]);
-      const minutes = parseInt(durationMatch[2]);
-      const seconds = parseInt(durationMatch[3]);
-      duration = hours * 3600 + minutes * 60 + seconds;
+      const hours = parseInt(durationMatch[1], 10);
+      const minutes = parseInt(durationMatch[2], 10);
+      const seconds = parseInt(durationMatch[3], 10);
+      const frac = durationMatch[4] ? parseFloat(`0.${durationMatch[4]}`) : 0;
+      duration = hours * 3600 + minutes * 60 + seconds + frac;
     }
     
     return {
