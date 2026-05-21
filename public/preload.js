@@ -116,6 +116,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
       deleteByTranscript: (transcriptId) =>
         ipcRenderer.invoke('transcript-segments:delete-by-transcript', transcriptId),
     },
+    topics: {
+      listByTranscript: (transcriptId) =>
+        ipcRenderer.invoke('topics:list-by-transcript', transcriptId),
+      replaceForTranscript: (transcriptId, rows) =>
+        ipcRenderer.invoke('topics:replace-for-transcript', { transcriptId, rows }),
+      deleteByTranscript: (transcriptId) =>
+        ipcRenderer.invoke('topics:delete-by-transcript', transcriptId),
+    },
   },
 
   // Dialog operations

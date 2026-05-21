@@ -283,10 +283,7 @@ export class TopicsService {
 
   // Load topics for a transcript. Returns empty array if none cached.
   async load(transcriptId: string): Promise<Topic[]> {
-    const rows = await window.electronAPI.database.all(
-      'SELECT * FROM transcript_topics WHERE transcript_id = ? ORDER BY topic_index',
-      [transcriptId]
-    );
+    const rows = await window.electronAPI.db.topics.listByTranscript(transcriptId);
     if (!rows || rows.length === 0) return [];
 
     // Hydrate chunks for each topic.
@@ -317,35 +314,20 @@ export class TopicsService {
   // the first topic row (lazy — we only need them if we ever do online
   // re-assignment, which we don't yet).
   async save(transcriptId: string, topics: Topic[], centroids: number[][]): Promise<void> {
-    await window.electronAPI.database.run(
-      'DELETE FROM transcript_topics WHERE transcript_id = ?',
-      [transcriptId]
-    );
-    for (let i = 0; i < topics.length; i++) {
-      const t = topics[i];
-      await window.electronAPI.database.run(
-        `INSERT INTO transcript_topics
-         (id, transcript_id, topic_index, label, summary, chunk_ids, centroid, model_used)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          t.id,
-          transcriptId,
-          i,
-          t.label,
-          t.summary,
-          JSON.stringify(t.chunkIds),
-          JSON.stringify(centroids[t.topicIndex] || []),
-          t.modelUsed || null,
-        ]
-      );
-    }
+    const rows = topics.map((t, i) => ({
+      id: t.id,
+      topic_index: i,
+      label: t.label,
+      summary: t.summary,
+      chunk_ids: t.chunkIds,
+      centroid: centroids[t.topicIndex] || [],
+      model_used: t.modelUsed || null,
+    }));
+    await window.electronAPI.db.topics.replaceForTranscript(transcriptId, rows);
   }
 
   async clear(transcriptId: string): Promise<void> {
-    await window.electronAPI.database.run(
-      'DELETE FROM transcript_topics WHERE transcript_id = ?',
-      [transcriptId]
-    );
+    await window.electronAPI.db.topics.deleteByTranscript(transcriptId);
   }
 }
 

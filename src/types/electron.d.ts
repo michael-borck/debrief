@@ -256,6 +256,30 @@ export interface ElectronAPI {
       /** Deletes every segment for a transcript (all versions). */
       deleteByTranscript: (transcriptId: string) => Promise<{ changes: number }>;
     };
+
+    /**
+     * Cached Topics-tab clusters (transcript_topics). Reads return raw rows
+     * (chunk_ids/centroid still JSON strings); the renderer hydrates.
+     */
+    topics: {
+      /** Cached topics for a transcript, ordered by topic_index. */
+      listByTranscript: (transcriptId: string) => Promise<any[]>;
+      /** Atomically replaces a transcript's topic set with `rows`. */
+      replaceForTranscript: (
+        transcriptId: string,
+        rows: Array<{
+          id: string;
+          topic_index?: number;
+          label?: string;
+          summary?: string | null;
+          chunk_ids?: unknown;
+          centroid?: unknown;
+          model_used?: string | null;
+        }>
+      ) => Promise<{ count: number }>;
+      /** Deletes all cached topics for a transcript. */
+      deleteByTranscript: (transcriptId: string) => Promise<{ changes: number }>;
+    };
   };
 
   dialog: {
