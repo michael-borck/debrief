@@ -1495,23 +1495,13 @@ ${text}`;
   }
 });
 
-ipcMain.handle('fs-read-file', async (event, filePath) => {
-  try {
-    const data = fs.readFileSync(filePath);
-    return data;
-  } catch (error) {
-    throw new Error(`Failed to read file: ${error.message}`);
-  }
-});
-
-ipcMain.handle('fs-write-file', async (event, { filePath, data }) => {
-  try {
-    fs.writeFileSync(filePath, data);
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
+// fs-read-file and fs-write-file used to exist here. They accepted any
+// path from the renderer and ran readFileSync/writeFileSync on it, so a
+// renderer (or any XSS payload) could read ~/.ssh/id_rsa or overwrite
+// ~/.zshrc. They had zero call sites in src/ at the time the audit
+// found them — pure attack surface — so they have been removed. If a
+// new feature needs file IO from the renderer, add a SCOPED IPC that
+// validates the path against an explicit allow-list root.
 
 ipcMain.handle('fs-get-file-stats', async (event, filePath) => {
   try {
@@ -1526,8 +1516,14 @@ ipcMain.handle('fs-join-path', async (event, ...pathSegments) => {
   return path.join(...pathSegments);
 });
 
+// Only legitimate caller is fileProcessor.ts cleaning up the temp WAV
+// that extract-audio just wrote into os.tmpdir(). assertPathUnderTmp lives
+// in public/electron/safe-paths.js so it can be unit-tested directly.
+const { assertPathUnderTmp } = require('./electron/safe-paths');
+
 ipcMain.handle('fs-delete-file', async (event, filePath) => {
   try {
+    assertPathUnderTmp(filePath);
     fs.unlinkSync(filePath);
     return { success: true };
   } catch (error) {

@@ -57,12 +57,13 @@ export interface ElectronAPI {
     saveFile: (options: { defaultPath?: string; filters?: any[] }) => Promise<string | null>;
   };
 
+  // readFile / writeFile are intentionally not exposed — see preload.js.
+  // Any new file IO must go through a scoped IPC that validates its path.
   fs: {
-    readFile: (filePath: string) => Promise<Buffer>;
-    writeFile: (filePath: string, data: any) => Promise<{ success: boolean; error?: string }>;
     getAppPath: (type: string) => Promise<string>;
     getFileStats: (filePath: string) => Promise<{ size: number; mtime?: Date; error?: string }>;
     joinPath: (...pathSegments: string[]) => Promise<string>;
+    // Only deletes paths under os.tmpdir(); rejects anything else.
     deleteFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
     // Replaces the non-standard File.path removed in Electron 32+.
     getPathForFile: (file: File) => string;

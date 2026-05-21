@@ -21,10 +21,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     saveFile: (options) => ipcRenderer.invoke('dialog-save-file', options)
   },
 
-  // File system operations
+  // File system operations.
+  // Note: readFile / writeFile are intentionally NOT exposed. Any new file
+  // IO needed by the renderer should go through a scoped IPC that
+  // validates paths against an explicit allow-list root (see fs-delete-file
+  // for the pattern). The old generic handlers were a full FS escape.
   fs: {
-    readFile: (filePath) => ipcRenderer.invoke('fs-read-file', filePath),
-    writeFile: (filePath, data) => ipcRenderer.invoke('fs-write-file', { filePath, data }),
     getAppPath: (type) => ipcRenderer.invoke('get-app-path', type),
     getFileStats: (filePath) => ipcRenderer.invoke('fs-get-file-stats', filePath),
     joinPath: (...pathSegments) => ipcRenderer.invoke('fs-join-path', ...pathSegments),
