@@ -67,11 +67,7 @@ export const TranscriptCard: React.FC<TranscriptCardProps> = ({
 
   const handleArchive = async () => {
     try {
-      const now = new Date().toISOString();
-      await window.electronAPI.database.run(
-        'UPDATE transcripts SET is_archived = 1, archived_at = ? WHERE id = ?',
-        [now, transcript.id]
-      );
+      await window.electronAPI.db.transcripts.archive(transcript.id);
       window.location.reload();
     } catch (error) {
       console.error('Error archiving transcript:', error);
@@ -118,11 +114,7 @@ export const TranscriptCard: React.FC<TranscriptCardProps> = ({
 
   const moveTranscriptToTrash = async (transcriptId: string) => {
     try {
-      const now = new Date().toISOString();
-      await window.electronAPI.database.run(
-        'UPDATE transcripts SET is_deleted = 1, deleted_at = ? WHERE id = ?',
-        [now, transcriptId]
-      );
+      await window.electronAPI.db.transcripts.softDelete(transcriptId);
       window.location.reload();
     } catch (error) {
       console.error('Error moving transcript to trash:', error);

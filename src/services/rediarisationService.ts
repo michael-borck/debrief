@@ -160,10 +160,11 @@ export class RediarisationService {
 
       // Persist on the transcript row so the rest of the UI stays in
       // sync (speaker count badge, charts, etc.).
-      await window.electronAPI.database.run(
-        `UPDATE transcripts SET speakers = ?, speaker_count = ?, updated_at = ? WHERE id = ?`,
-        [JSON.stringify(speakers), speakers.length, new Date().toISOString(), transcriptId]
-      );
+      await window.electronAPI.db.transcripts.update(transcriptId, {
+        speakers,
+        speaker_count: speakers.length,
+        updated_at: new Date().toISOString(),
+      });
 
       return {
         success: true,

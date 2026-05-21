@@ -105,23 +105,17 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         icon: '📁'
       };
       
-      await window.electronAPI.database.run(
-        `INSERT INTO projects (id, name, description, created_at, updated_at, themes, key_insights, tags, color, icon)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          project.id,
-          project.name,
-          project.description || null,
-          project.created_at,
-          project.updated_at,
-          JSON.stringify(project.themes),
-          JSON.stringify(project.key_insights),
-          JSON.stringify(project.tags),
-          project.color,
-          project.icon
-        ]
-      );
-      
+      await window.electronAPI.db.projects.create({
+        id: project.id,
+        name: project.name,
+        description: project.description || null,
+        themes: project.themes,
+        key_insights: project.key_insights,
+        tags: project.tags,
+        color: project.color,
+        icon: project.icon,
+      });
+
       await loadProjects();
       return project;
     } catch (err) {
@@ -133,51 +127,20 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Update a project
   const updateProject = async (id: string, updates: Partial<Project>) => {
     try {
-      const updateFields = [];
-      const updateValues = [];
-      
-      if (updates.name !== undefined) {
-        updateFields.push('name = ?');
-        updateValues.push(updates.name);
+      // Cherry-pick the editable columns so the context's hydrated extras
+      // (transcript_count, date_range, ...) never reach the RPC allow-list.
+      // The RPC serializes the JSON columns (themes/key_insights/tags) itself.
+      const fields: Record<string, unknown> = {};
+      const editable = ['name', 'description', 'themes', 'key_insights', 'summary', 'tags', 'color', 'icon'] as const;
+      for (const key of editable) {
+        if (updates[key] !== undefined) fields[key] = updates[key];
       }
-      if (updates.description !== undefined) {
-        updateFields.push('description = ?');
-        updateValues.push(updates.description);
-      }
-      if (updates.themes !== undefined) {
-        updateFields.push('themes = ?');
-        updateValues.push(JSON.stringify(updates.themes));
-      }
-      if (updates.key_insights !== undefined) {
-        updateFields.push('key_insights = ?');
-        updateValues.push(JSON.stringify(updates.key_insights));
-      }
-      if (updates.summary !== undefined) {
-        updateFields.push('summary = ?');
-        updateValues.push(updates.summary);
-      }
-      if (updates.tags !== undefined) {
-        updateFields.push('tags = ?');
-        updateValues.push(JSON.stringify(updates.tags));
-      }
-      if (updates.color !== undefined) {
-        updateFields.push('color = ?');
-        updateValues.push(updates.color);
-      }
-      if (updates.icon !== undefined) {
-        updateFields.push('icon = ?');
-        updateValues.push(updates.icon);
-      }
-      
-      if (updateFields.length > 0) {
-        updateValues.push(id);
-        await window.electronAPI.database.run(
-          `UPDATE projects SET ${updateFields.join(', ')} WHERE id = ?`,
-          updateValues
-        );
-        
+
+      if (Object.keys(fields).length > 0) {
+        await window.electronAPI.db.projects.update(id, fields);
+
         await loadProjects();
-        
+
         // Update current project if it's the one being updated
         if (currentProject?.id === id) {
           await loadProject(id);
@@ -192,7 +155,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Delete a project
   const deleteProject = async (id: string) => {
     try {
-      await window.electronAPI.database.run('DELETE FROM projects WHERE id = ?', [id]);
+      await window.electronAPI.db.projects.remove(id);
       await loadProjects();
       
       if (currentProject?.id === id) {
@@ -207,11 +170,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Archive a project
   const archiveProject = async (id: string) => {
     try {
-      const now = new Date().toISOString();
-      await window.electronAPI.database.run(
-        'UPDATE projects SET is_archived = 1, archived_at = ? WHERE id = ?',
-        [now, id]
-      );
+      await window.electronAPI.db.projects.archive(id);
       await loadProjects();
       
       if (currentProject?.id === id) {
@@ -330,23 +289,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       const analysisResult = await projectAnalysisService.analyzeProject(projectId);
       
       // Update project with analysis results
-      await window.electronAPI.database.run(
-        `UPDATE projects SET 
-         themes = ?, 
-         key_insights = ?, 
-         summary = ?, 
-         last_analysis_at = ?, 
-         updated_at = ?
-         WHERE id = ?`,
-        [
-          JSON.stringify(analysisResult.aggregatedThemes?.map(t => t.theme) || []),
-          JSON.stringify(analysisResult.consensusInsights || []),
-          analysisResult.combinedSummary,
-          new Date().toISOString(),
-          new Date().toISOString(),
-          projectId
-        ]
-      );
+      await window.electronAPI.db.projects.update(projectId, {
+        themes: analysisResult.aggregatedThemes?.map(t => t.theme) || [],
+        key_insights: analysisResult.consensusInsights || [],
+        summary: analysisResult.combinedSummary,
+        last_analysis_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
       
       // Store detailed analysis results
       const analysisId = generateId();

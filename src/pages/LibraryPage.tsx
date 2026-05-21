@@ -119,14 +119,10 @@ export const LibraryPage: React.FC = () => {
     const ids = Array.from(selectedIds);
     if (!window.confirm(`Archive ${ids.length} transcript${ids.length !== 1 ? 's' : ''}?`)) return;
 
-    const now = new Date().toISOString();
     let archived = 0;
     for (const id of ids) {
       try {
-        await window.electronAPI.database.run(
-          'UPDATE transcripts SET is_archived = 1, archived_at = ? WHERE id = ?',
-          [now, id]
-        );
+        await window.electronAPI.db.transcripts.archive(id);
         archived++;
       } catch (err) {
         console.error('Bulk archive failed for', id, err);
@@ -150,14 +146,10 @@ export const LibraryPage: React.FC = () => {
     )
       return;
 
-    const now = new Date().toISOString();
     let trashed = 0;
     for (const id of ids) {
       try {
-        await window.electronAPI.database.run(
-          'UPDATE transcripts SET is_deleted = 1, deleted_at = ? WHERE id = ?',
-          [now, id]
-        );
+        await window.electronAPI.db.transcripts.softDelete(id);
         trashed++;
       } catch (err) {
         console.error('Bulk delete failed for', id, err);

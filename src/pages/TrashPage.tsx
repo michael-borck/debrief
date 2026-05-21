@@ -22,12 +22,8 @@ export const TrashPage: React.FC = () => {
   const loadTrashItems = async () => {
     try {
       setLoading(true);
-      const deletedTranscripts = await window.electronAPI.database.all(
-        'SELECT * FROM transcripts WHERE is_deleted = 1 ORDER BY deleted_at DESC'
-      );
-      const deletedProjects = await window.electronAPI.database.all(
-        'SELECT * FROM projects WHERE is_deleted = 1 ORDER BY deleted_at DESC'
-      );
+      const deletedTranscripts = await window.electronAPI.db.transcripts.listTrashed();
+      const deletedProjects = await window.electronAPI.db.projects.listTrashed();
       const now = new Date();
       const items: TrashItem[] = [];
       deletedTranscripts.forEach((transcript: any) => {
@@ -63,13 +59,17 @@ export const TrashPage: React.FC = () => {
 
   const restoreItem = async (item: TrashItem) => {
     try {
-      const table = item.type === 'transcript' ? 'transcripts' : 'projects';
-      await window.electronAPI.database.run(`UPDATE ${table} SET is_deleted = 0, deleted_at = NULL WHERE id = ?`, [item.id]);
-      if (item.type === 'project') {
+      if (item.type === 'transcript') {
+        await window.electronAPI.db.transcripts.restore(item.id);
+      } else {
+        await window.electronAPI.db.projects.restore(item.id);
+        // Cascade-restore the project's still-trashed transcripts. The
+        // junction read stays on the generic IPC until the
+        // project_transcripts domain lands (Phase 3).
         const related = await window.electronAPI.database.all(
           `SELECT DISTINCT t.id FROM transcripts t JOIN project_transcripts pt ON t.id = pt.transcript_id WHERE pt.project_id = ? AND t.is_deleted = 1`, [item.id]);
         for (const t of related) {
-          await window.electronAPI.database.run('UPDATE transcripts SET is_deleted = 0, deleted_at = NULL WHERE id = ?', [t.id]);
+          await window.electronAPI.db.transcripts.restore(t.id);
         }
         if (related.length > 0) alert(`Restored project and ${related.length} related transcript${related.length !== 1 ? 's' : ''}`);
       }
@@ -92,8 +92,11 @@ export const TrashPage: React.FC = () => {
     if (!window.confirm(`Permanently delete all ${trashItems.length} items?\n\nThis cannot be undone.`)) return;
     try {
       for (const item of trashItems) {
-        const table = item.type === 'transcript' ? 'transcripts' : 'projects';
-        await window.electronAPI.database.run(`DELETE FROM ${table} WHERE id = ?`, [item.id]);
+        if (item.type === 'transcript') {
+          await window.electronAPI.db.transcripts.remove(item.id);
+        } else {
+          await window.electronAPI.db.projects.remove(item.id);
+        }
       }
       await loadTrashItems();
     } catch (error) { console.error('Error emptying trash:', error); alert('Failed to empty trash.'); }

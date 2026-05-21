@@ -56,7 +56,7 @@ export const ChatHistoryPage: React.FC = () => {
 
   const handleContinueChat = async (conversation: ChatConversation) => {
     if (conversation.entity_type === 'transcript' && conversation.transcript_id) {
-      const transcript = await window.electronAPI.database.get('SELECT * FROM transcripts WHERE id = ?', [conversation.transcript_id]);
+      const transcript = await window.electronAPI.db.transcripts.get(conversation.transcript_id);
       if (transcript) {
         transcript.action_items = transcript.action_items ? JSON.parse(transcript.action_items) : [];
         transcript.key_topics = transcript.key_topics ? JSON.parse(transcript.key_topics) : [];

@@ -90,11 +90,7 @@ export const UploadPage: React.FC = () => {
 
   const checkForDuplicates = async (fileName: string): Promise<boolean> => {
     try {
-      const existing = await window.electronAPI.database.all(
-        `SELECT id, title, created_at FROM transcripts
-         WHERE filename = ? OR title = ?`,
-        [fileName, fileName]
-      );
+      const existing = await window.electronAPI.db.transcripts.findDuplicates(fileName, fileName);
 
       if (existing.length > 0) {
         const existingFile = existing[0];
@@ -132,10 +128,7 @@ export const UploadPage: React.FC = () => {
         if (signal.aborted) {
           updateProcessingItem(processingItemId, { status: 'cancelled' });
           try {
-            await window.electronAPI.database.run(
-              'DELETE FROM transcripts WHERE id = ?',
-              [transcriptId]
-            );
+            await window.electronAPI.db.transcripts.remove(transcriptId);
           } catch (e) {
             console.warn('Failed to delete cancelled transcript record:', e);
           }
@@ -259,11 +252,15 @@ export const UploadPage: React.FC = () => {
 
         console.log(`Creating transcript record for: ${fileName}`);
 
-        await window.electronAPI.database.run(
-          `INSERT INTO transcripts (id, title, filename, file_path, file_size, created_at, updated_at, status, starred)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [transcriptId, fileName, fileName, filePath, fileStats.size, timestamp, timestamp, 'processing', 0]
-        );
+        await window.electronAPI.db.transcripts.create({
+          id: transcriptId,
+          title: fileName,
+          filename: fileName,
+          file_path: filePath,
+          file_size: fileStats.size,
+          status: 'processing',
+          starred: 0,
+        });
 
         const processingItemId = generateId();
         const controller = new AbortController();

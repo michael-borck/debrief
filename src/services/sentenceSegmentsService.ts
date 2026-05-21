@@ -245,11 +245,7 @@ export class SentenceSegmentsService {
 
     try {
       // Get all transcripts that don't have segments yet
-      const transcripts = await window.electronAPI.database.all(
-        `SELECT id, full_text FROM transcripts 
-         WHERE status = 'completed' AND full_text IS NOT NULL 
-         AND id NOT IN (SELECT DISTINCT transcript_id FROM transcript_segments WHERE version = 'original')`
-      );
+      const transcripts = await window.electronAPI.db.transcripts.listNeedingSegmentMigration();
 
       console.log(`Found ${transcripts.length} transcripts to migrate`);
 
