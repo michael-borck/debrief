@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:* https:; script-src 'self' 'unsafe-inline' <%= htmlWebpackPlugin.options.cspEval %>; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:* https: ws://localhost:*; media-src 'self' safe-file: blob:;">
+  <!-- script-src no longer needs 'unsafe-inline': the global shim moved into
+       the bundle (src/globalShim.ts). cspEval is 'unsafe-eval' only in dev
+       (eval-source-map), empty in production. style-src keeps 'unsafe-inline'
+       because style-loader injects <style> at runtime and React uses inline
+       style attributes; tightening that needs CSS extraction. connect-src
+       keeps https: because the renderer fetches user-configured AI endpoints
+       (remote Ollama / custom providers) directly. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' http://localhost:* https:; script-src 'self' <%= htmlWebpackPlugin.options.cspEval %>; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://localhost:* https: ws://localhost:*; media-src 'self' safe-file: blob:;">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:opsz,wght@14..32,300..700&display=swap" rel="stylesheet">
   <title>Debrief - AI-Powered Conversation Analysis & Insight Discovery</title>
-  <script>
-    // Fix for Electron renderer
-    if (typeof global === 'undefined') {
-      window.global = window;
-    }
-  </script>
 </head>
 <body>
   <div id="root"></div>
