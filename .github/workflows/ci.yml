@@ -18,7 +18,10 @@ jobs:
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
+          # Node 22: the db-rpc tests use the built-in node:sqlite module, which
+          # only exists in Node 22.5+. Node 20 throws "No such built-in module:
+          # node:sqlite" and fails the whole suite.
+          node-version: 22
           cache: npm
 
       # --ignore-scripts skips the postinstall native rebuild
