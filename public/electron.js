@@ -941,9 +941,6 @@ const maintenance = require('./electron/db-rpc/maintenance');
 const completion = require('./electron/completion');
 const { autoUpdater } = require('electron-updater');
 let dbRpcRegistered = false;
-// Set when the Completion module is registered; used by handlers in main that
-// need an AI completion (e.g. validate-transcript) without going over IPC.
-let completionApi = null;
 
 // Wire GitHub-releases auto-update. electron-updater reads the feed from the
 // app-update.yml that electron-builder generates from electron-builder.json's
@@ -968,7 +965,7 @@ function ensureDbRpcRegistered() {
   // The Completion module shares the same db getter, the key decryptor, and
   // the usage recorder. It resolves provider/url/key/model per call, so it's
   // safe to register here (db need not exist yet).
-  completionApi = completion.register(ipcMain, {
+  completion.register(ipcMain, {
     getDb: () => db,
     decrypt: decryptIfNeeded,
     recordUsage,
@@ -1369,107 +1366,6 @@ ipcMain.handle('crypto-encrypt-string', async (event, { plain }) => {
 // NOTE: there is intentionally no crypto-decrypt-string IPC. The renderer can
 // encrypt+store a secret but never reads it back in cleartext — main decrypts
 // stored secrets itself (decryptIfNeeded / resolveApiKey) for outbound calls.
-
-ipcMain.handle('validate-transcript', async (event, { text }) => {
-  try {
-    // Get validation settings from database
-    const validationEnabledSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('enableTranscriptValidation');
-    
-    if (validationEnabledSetting?.value !== 'true') {
-      return {
-        validatedText: text,
-        changes: [],
-        success: true
-      };
-    }
-
-    const validationOptionsSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('validationOptions');
-    const options = validationOptionsSetting?.value ? JSON.parse(validationOptionsSetting.value) : {};
-
-    // Create validation options string
-    const validationOptions = [
-      options.spelling && 'spelling',
-      options.grammar && 'grammar', 
-      options.punctuation && 'punctuation',
-      options.capitalization && 'capitalization'
-    ].filter(Boolean).join(', ');
-
-    if (validationOptions.length === 0) {
-      return {
-        validatedText: text,
-        changes: [],
-        success: true
-      };
-    }
-
-    const prompt = `Please validate and correct the following transcript text. Focus on ${validationOptions}.
-
-Return your response as a JSON object with the following structure:
-{
-  "validatedText": "the corrected text",
-  "changes": [
-    {
-      "type": "spelling|grammar|punctuation|capitalization",
-      "original": "original text",
-      "corrected": "corrected text",
-      "position": number
-    }
-  ]
-}
-
-Transcript to validate:
-${text}`;
-
-    console.log('Validating transcript with options:', validationOptions);
-
-    // Route through the Completion seam: provider/url/key/model resolution and
-    // JSON mode all live in one place, so manual re-validation honours the
-    // configured provider (it previously hit Ollama's /api/generate directly).
-    const res = await completionApi.complete({
-      prompt,
-      expects: 'json',
-      options: {
-        temperature: 0.3,
-        maxTokens: Math.max(Math.floor(text.length * 1.5), 2048),
-        timeout: 300000, // 5 minutes for long transcripts
-      },
-    });
-
-    if (!res.ok) {
-      console.error('Validation API error:', res.error);
-      return {
-        success: false,
-        error: `Validation failed: ${res.error}`,
-        validatedText: text,
-        changes: [],
-      };
-    }
-
-    if (res.data) {
-      return {
-        validatedText: res.data.validatedText || text,
-        changes: res.data.changes || [],
-        success: true,
-      };
-    }
-
-    // Model returned non-JSON text — use it as-is (matches prior behaviour).
-    console.warn('Validation response is not JSON format, using as-is');
-    return {
-      validatedText: res.text || text,
-      changes: [],
-      success: true,
-    };
-  } catch (error) {
-    console.error('Failed to validate transcript:', error);
-    return { 
-      success: false, 
-      error: error.message,
-      validatedText: text,
-      changes: []
-    };
-  }
-});
 
 // fs-read-file and fs-write-file used to exist here. They accepted any
 // path from the renderer and ran readFileSync/writeFileSync on it, so a

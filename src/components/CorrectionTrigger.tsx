@@ -3,16 +3,7 @@ import { logger } from '../utils/logger';
 import { CheckCircle, Edit3, AlertTriangle, Settings, RefreshCw } from 'lucide-react';
 import { Transcript } from '../types';
 import { sentenceSegmentsService } from '../services/sentenceSegmentsService';
-
-// Extend the services interface to include validateTranscript
-interface ExtendedServices {
-  validateTranscript: (text: string) => Promise<{ 
-    success: boolean; 
-    validatedText: string; 
-    changes: any[]; 
-    error?: string;
-  }>;
-}
+import { transcriptValidationService } from '../services/transcriptValidationService';
 
 interface CorrectionTriggerProps {
   transcript: Transcript;
@@ -101,15 +92,9 @@ export const CorrectionTrigger: React.FC<CorrectionTriggerProps> = ({
     onCorrectionStart();
 
     try {
-      // Use the validation service API
-      const services = window.electronAPI.services as typeof window.electronAPI.services & ExtendedServices;
-      const validationResult = await services.validateTranscript(
+      const validationResult = await transcriptValidationService.validate(
         transcript.full_text || ''
       );
-
-      if (!validationResult.success) {
-        throw new Error(validationResult.error || 'Validation failed');
-      }
 
       // Update the transcript in the database
       await window.electronAPI.db.transcripts.update(transcript.id, {

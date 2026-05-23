@@ -159,7 +159,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     testConnection: (url) => ipcRenderer.invoke('test-service-connection', { url }),
     getOllamaModels: (url) => ipcRenderer.invoke('get-ollama-models', { url }),
     getModelInfo: (options) => ipcRenderer.invoke('get-model-info', options),
-    validateTranscript: (text) => ipcRenderer.invoke('validate-transcript', { text }),
     // Multi-provider AI support
     aiListModels: (provider, url, apiKey) => ipcRenderer.invoke('ai-list-models', { provider, url, apiKey }),
     aiTestConnection: (provider, url, apiKey) => ipcRenderer.invoke('ai-test-connection', { provider, url, apiKey }),

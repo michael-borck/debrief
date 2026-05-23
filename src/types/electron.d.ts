@@ -343,12 +343,6 @@ export interface ElectronAPI {
       info?: any;
       error?: string;
     }>;
-    validateTranscript: (text: string) => Promise<{
-      success: boolean;
-      validatedText: string;
-      changes: any[];
-      error?: string;
-    }>;
     aiListModels: (provider: string, url?: string, apiKey?: string) => Promise<{
       success: boolean;
       models: string[];
