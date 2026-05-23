@@ -156,7 +156,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Service operations
   services: {
-    testConnection: (url) => ipcRenderer.invoke('test-service-connection', { url }),
     getOllamaModels: (url) => ipcRenderer.invoke('get-ollama-models', { url }),
     getModelInfo: (options) => ipcRenderer.invoke('get-model-info', options),
     // Multi-provider AI support

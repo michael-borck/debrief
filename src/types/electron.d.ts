@@ -328,11 +328,6 @@ export interface ElectronAPI {
   };
 
   services: {
-    testConnection: (url: string) => Promise<{
-      success: boolean;
-      status?: number;
-      error?: string;
-    }>;
     getOllamaModels: (url: string) => Promise<{
       success: boolean;
       models?: any[];

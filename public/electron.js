@@ -1062,25 +1062,6 @@ ipcMain.on('show-item-in-folder', (event, fullPath) => {
   shell.showItemInFolder(fullPath);
 });
 
-ipcMain.handle('test-service-connection', async (event, { url }) => {
-  // Used by the AI analysis service (Ollama) only. Speech-to-text is now
-  // entirely local — no connection to test there.
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      signal: AbortSignal.timeout(5000),
-    });
-
-    if (response.ok) {
-      return { success: true, status: response.status };
-    }
-    return { success: false, status: response.status, error: `HTTP ${response.status}` };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
 ipcMain.handle('get-ollama-models', async (event, { url }) => {
   try {
     const response = await fetch(`${url}/api/tags`, {

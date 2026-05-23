@@ -77,6 +77,16 @@ function stripSlash(url) {
   return (url || '').replace(/\/+$/, '');
 }
 
+// Ollama's OpenAI-compatible API lives under /v1. Users often paste the bare
+// host (http://localhost:11434), which then 404s on /v1/* paths with a cryptic
+// "404 page not found". Append /v1 for Ollama when it's missing; other
+// providers carry their own correct base, so leave them untouched.
+function normaliseBaseUrl(provider, url) {
+  const stripped = stripSlash(url);
+  if (provider !== 'ollama') return stripped;
+  return /\/v1$/.test(stripped) ? stripped : `${stripped}/v1`;
+}
+
 // A request always carries a timeout; callers (the Completion module) may
 // also pass an AbortSignal for true mid-flight cancellation. Combine them so
 // whichever fires first aborts the fetch.
@@ -101,7 +111,7 @@ async function safeErrorText(response) {
 async function listModels(provider, url, apiKey) {
   try {
     const info = getProviderInfo(provider);
-    const effectiveUrl = url || info.defaultUrl;
+    const effectiveUrl = normaliseBaseUrl(provider, url || info.defaultUrl);
     if (!effectiveUrl) {
       return { success: false, models: [], error: 'No URL configured for this provider' };
     }
@@ -177,7 +187,7 @@ async function anthropicListModels(url, apiKey) {
 async function chat(provider, url, apiKey, model, prompt, options = {}) {
   try {
     const info = getProviderInfo(provider);
-    const effectiveUrl = url || info.defaultUrl;
+    const effectiveUrl = normaliseBaseUrl(provider, url || info.defaultUrl);
     if (!effectiveUrl) {
       return { success: false, response: '', error: 'No URL configured for this provider' };
     }
@@ -295,6 +305,7 @@ async function testConnection(provider, url, apiKey) {
 module.exports = {
   PROVIDERS,
   getProviderInfo,
+  normaliseBaseUrl,
   listModels,
   chat,
   testConnection,

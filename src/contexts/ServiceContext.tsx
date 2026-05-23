@@ -68,10 +68,18 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({ children }) =>
         // electronAPI.sidecar unavailable (very early / test env)
       }
 
-      const aiUrl = await window.electronAPI.db.settings.get('aiAnalysisUrl');
+      // Use the provider-aware test (it lists models via the OpenAI-compatible
+      // /v1/models endpoint) rather than a bare GET on the base URL. Ollama's
+      // /v1 root 404s on a plain GET, which would show a false "error" even
+      // when it's reachable — the same test the Settings page uses.
+      const aiCfg = await window.electronAPI.db.settings.getMany([
+        'aiProvider',
+        'aiAnalysisUrl',
+      ]);
 
-      const aiResult = await window.electronAPI.services.testConnection(
-        aiUrl || 'http://localhost:11434'
+      const aiResult = await window.electronAPI.services.aiTestConnection(
+        aiCfg.aiProvider || 'ollama',
+        aiCfg.aiAnalysisUrl || undefined
       );
 
       setServiceStatus({
