@@ -1130,64 +1130,6 @@ ipcMain.handle('get-model-info', async (event, { url, modelName }) => {
 });
 
 /**
- * AI chat IPC handler. The name is kept as 'chat-with-ollama' for
- * back-compat with existing renderer code, but internally it dispatches
- * through the ai-providers module so any configured provider
- * (Ollama, OpenAI, Anthropic, Groq, Gemini, OpenRouter, Custom) works.
- */
-ipcMain.handle('chat-with-ollama', async (event, { prompt, message, context }) => {
-  try {
-    const providerRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('aiProvider');
-    const urlRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('aiAnalysisUrl');
-    const keyRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('aiApiKey');
-    const modelRow = db.prepare('SELECT value FROM settings WHERE key = ?').get('aiModel');
-
-    const provider = providerRow?.value || 'ollama';
-    const info = aiProviders.getProviderInfo(provider);
-    const url = urlRow?.value || info.defaultUrl;
-    // API key may be safeStorage-encrypted; decrypt before use
-    const apiKey = decryptIfNeeded(keyRow?.value || '');
-    const model = modelRow?.value || '';
-
-    // A key was saved but decrypted to empty -> decryption failed (most often
-    // the OS keychain rotated/changed). Silently sending an empty key would
-    // surface as a confusing auth error, so tell the user to re-enter it —
-    // but only for providers that actually require a key (not local Ollama).
-    if (info.requiresKey && keyRow?.value && !apiKey) {
-      return {
-        success: false,
-        response: '',
-        error: 'Your saved API key could not be decrypted (the OS keychain may have changed since you saved it). Please re-enter it in Settings.',
-      };
-    }
-
-    console.log('AI chat request:', {
-      provider,
-      url,
-      model,
-      promptLength: prompt?.length ?? 0,
-      hasKey: !!apiKey,
-    });
-
-    const result = await aiProviders.chat(provider, url, apiKey, model, prompt);
-    if (result.success && result.usage) {
-      recordUsage(provider, model, result.usage);
-    }
-    return {
-      success: result.success,
-      response: result.response || '',
-      error: result.error,
-      usage: result.usage,
-      model,
-      provider,
-    };
-  } catch (error) {
-    console.error('AI chat failed:', error);
-    return { success: false, response: '', error: error.message };
-  }
-});
-
-/**
  * List available models for the given provider/URL/key. Used by the
  * Settings page to populate the model dropdown.
  */

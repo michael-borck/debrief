@@ -1,10 +1,12 @@
 // Cancellation helpers for long-running pipelines (transcription, analysis).
 //
 // Electron IPC does not propagate AbortSignal to the main process, so we
-// can't truly cancel an in-flight whisper run or chatWithOllama call from
-// the renderer. Instead, we race the IPC promise against the abort signal:
-// the renderer stops awaiting immediately on cancel, and the now-orphaned
-// IPC call completes harmlessly in main and its result is discarded.
+// can't truly cancel an in-flight whisper run from the renderer. (AI
+// completions are the exception: ai.complete takes a requestId and ai.cancel
+// aborts them in main.) For everything else we race the IPC promise against
+// the abort signal: the renderer stops awaiting immediately on cancel, and
+// the now-orphaned IPC call completes harmlessly in main and its result is
+// discarded.
 
 export class CancelledError extends Error {
   constructor(message = 'Cancelled by user') {

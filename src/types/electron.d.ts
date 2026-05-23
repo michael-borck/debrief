@@ -343,10 +343,6 @@ export interface ElectronAPI {
       info?: any;
       error?: string;
     }>;
-    chatWithOllama: (data: { prompt: string; message: string; context: string }) => Promise<
-      | { success: true; response: string; error?: undefined }
-      | { success: false; response?: undefined; error?: string }
-    >;
     validateTranscript: (text: string) => Promise<{
       success: boolean;
       validatedText: string;
