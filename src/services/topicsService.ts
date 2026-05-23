@@ -179,24 +179,28 @@ async function labelTopic(
     .map(c => `[${formatTime(c.startTime)}] ${c.text.trim()}`)
     .join('\n\n---\n\n');
 
+  // The excerpts must live in the prompt itself. (They used to be passed as
+  // the chat-with-ollama `context` arg, which that IPC silently dropped — so
+  // the labeller never actually saw the cluster text.)
   const prompt =
     'You are labelling a topic cluster from a conversation transcript. ' +
     'Look at the excerpts below and respond with TWO lines:\n' +
     'Line 1: a 3-5 word label (no quotes, no punctuation at the end).\n' +
     'Line 2: a single sentence (max 20 words) describing what this topic covers.\n' +
-    'Do not mention "topic", "cluster", "excerpt", or yourself.';
+    'Do not mention "topic", "cluster", "excerpt", or yourself.\n\n' +
+    'Excerpts:\n' +
+    excerpts;
 
   try {
-    const response = await window.electronAPI.services.chatWithOllama({
+    const response = await window.electronAPI.ai.complete({
       prompt,
-      message: 'Label this cluster.',
-      context: excerpts,
+      expects: 'text',
     });
-    if (response.success && response.response) {
-      const lines = response.response.split('\n').map((l: string) => l.trim()).filter(Boolean);
+    if (response.ok && response.text) {
+      const lines = response.text.split('\n').map((l: string) => l.trim()).filter(Boolean);
       const label = (lines[0] || 'Untitled topic').replace(/^["']|["']$/g, '').slice(0, 80);
       const summary = (lines.slice(1).join(' ') || '').slice(0, 280);
-      return { label, summary, modelUsed: (response as any).model || 'unknown' };
+      return { label, summary, modelUsed: response.model || 'unknown' };
     }
   } catch (e) {
     console.error('Topic labelling failed:', e);

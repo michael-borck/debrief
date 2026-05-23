@@ -729,14 +729,13 @@ export class ProjectChatService {
         message: userMessage
       });
 
-      const response = await window.electronAPI.services.chatWithOllama({
+      const response = await window.electronAPI.ai.complete({
         prompt: systemPrompt,
-        message: userMessage,
-        context: context
+        expects: 'text'
       });
 
-      if (response.success) {
-        return response.response;
+      if (response.ok) {
+        return response.text ?? '';
       } else {
         throw new Error(response.error || 'Failed to generate response');
       }

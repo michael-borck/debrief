@@ -941,6 +941,9 @@ const maintenance = require('./electron/db-rpc/maintenance');
 const completion = require('./electron/completion');
 const { autoUpdater } = require('electron-updater');
 let dbRpcRegistered = false;
+// Set when the Completion module is registered; used by handlers in main that
+// need an AI completion (e.g. validate-transcript) without going over IPC.
+let completionApi = null;
 
 // Wire GitHub-releases auto-update. electron-updater reads the feed from the
 // app-update.yml that electron-builder generates from electron-builder.json's
@@ -965,7 +968,7 @@ function ensureDbRpcRegistered() {
   // The Completion module shares the same db getter, the key decryptor, and
   // the usage recorder. It resolves provider/url/key/model per call, so it's
   // safe to register here (db need not exist yet).
-  completion.register(ipcMain, {
+  completionApi = completion.register(ipcMain, {
     getDb: () => db,
     decrypt: decryptIfNeeded,
     recordUsage,
@@ -1439,12 +1442,7 @@ ipcMain.handle('validate-transcript', async (event, { text }) => {
     }
 
     const validationOptionsSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('validationOptions');
-    const aiUrlSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('aiAnalysisUrl');
-    const aiModelSetting = db.prepare('SELECT value FROM settings WHERE key = ?').get('aiModel');
-    
     const options = validationOptionsSetting?.value ? JSON.parse(validationOptionsSetting.value) : {};
-    const aiUrl = aiUrlSetting ? aiUrlSetting.value : 'http://localhost:11434';
-    const model = aiModelSetting ? aiModelSetting.value : 'llama2';
 
     // Create validation options string
     const validationOptions = [
@@ -1482,65 +1480,44 @@ ${text}`;
 
     console.log('Validating transcript with options:', validationOptions);
 
-    const response = await fetch(`${aiUrl}/api/generate`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
+    // Route through the Completion seam: provider/url/key/model resolution and
+    // JSON mode all live in one place, so manual re-validation honours the
+    // configured provider (it previously hit Ollama's /api/generate directly).
+    const res = await completionApi.complete({
+      prompt,
+      expects: 'json',
+      options: {
+        temperature: 0.3,
+        maxTokens: Math.max(Math.floor(text.length * 1.5), 2048),
+        timeout: 300000, // 5 minutes for long transcripts
       },
-      body: JSON.stringify({
-        model: model,
-        prompt: prompt,
-        stream: false,
-        options: {
-          temperature: 0.3,
-          num_predict: Math.max(text.length * 1.5, 2048),
-          top_p: 0.9,
-          top_k: 40
-        }
-      }),
-      signal: AbortSignal.timeout(300000) // 5 minute timeout for validation
     });
 
-    if (response.ok) {
-      const data = await response.json();
-      
-      try {
-        // Check if the response looks like JSON
-        const responseText = data.response || '';
-        if (responseText.trim().startsWith('{') && responseText.trim().endsWith('}')) {
-          const validationData = JSON.parse(responseText);
-          return {
-            validatedText: validationData.validatedText || text,
-            changes: validationData.changes || [],
-            success: true
-          };
-        } else {
-          // Response is plain text, not JSON
-          console.warn('Validation response is not JSON format, using as-is');
-          return {
-            validatedText: responseText || text,
-            changes: [],
-            success: true
-          };
-        }
-      } catch (parseError) {
-        console.warn('Failed to parse validation response as JSON:', parseError.message);
-        return {
-          validatedText: data.response || text,
-          changes: [],
-          success: true
-        };
-      }
-    } else {
-      const errorText = await response.text();
-      console.error('Validation API error:', response.status, errorText);
-      return { 
-        success: false, 
-        error: `Validation failed: HTTP ${response.status}: ${errorText}`,
+    if (!res.ok) {
+      console.error('Validation API error:', res.error);
+      return {
+        success: false,
+        error: `Validation failed: ${res.error}`,
         validatedText: text,
-        changes: []
+        changes: [],
       };
     }
+
+    if (res.data) {
+      return {
+        validatedText: res.data.validatedText || text,
+        changes: res.data.changes || [],
+        success: true,
+      };
+    }
+
+    // Model returned non-JSON text — use it as-is (matches prior behaviour).
+    console.warn('Validation response is not JSON format, using as-is');
+    return {
+      validatedText: res.text || text,
+      changes: [],
+      success: true,
+    };
   } catch (error) {
     console.error('Failed to validate transcript:', error);
     return { 

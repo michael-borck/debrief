@@ -317,30 +317,23 @@ Segment 0: Speaker Name
 Segment 1: Speaker Name
 etc.`;
 
-      // Get AI settings
-      const ai = await window.electronAPI.db.settings.getMany(['aiAnalysisUrl', 'aiModel']);
-      const aiUrl = ai.aiAnalysisUrl || 'http://localhost:11434';
-      const aiModel = ai.aiModel || 'llama3.2';
-
       logger.log('AI Prompt:', aiPrompt);
-      logger.log('AI URL:', aiUrl, 'Model:', aiModel);
 
-      // Call AI service through Electron API
-      const result = await window.electronAPI.services.chatWithOllama({
+      // Call the unified Completion seam (provider/key/model resolved in main).
+      const result = await window.electronAPI.ai.complete({
         prompt: aiPrompt,
-        message: '',
-        context: ''
+        expects: 'text'
       });
 
       logger.log('AI Result:', result);
 
-      if (!result.success) {
+      if (!result.ok) {
         throw new Error(`AI service error: ${result.error}`);
       }
 
-      if (result.response) {
+      if (result.text) {
         // Parse AI response
-        const lines = result.response.split('\n');
+        const lines = result.text.split('\n');
         const updatedSegments = [...segments];
         
         lines.forEach((line: string) => {

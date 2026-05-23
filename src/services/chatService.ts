@@ -546,14 +546,13 @@ export class ChatService {
         conversation: conversationText
       });
       
-      const response = await window.electronAPI.services.chatWithOllama({
+      const response = await window.electronAPI.ai.complete({
         prompt: compactionPrompt,
-        message: '',
-        context: ''
+        expects: 'text'
       });
-      
-      if (response.success) {
-        return response.response.trim();
+
+      if (response.ok) {
+        return (response.text ?? '').trim();
       } else {
         console.error('Failed to compact conversation:', response.error);
         // Fallback: create a simple summary
@@ -624,15 +623,14 @@ export class ChatService {
         message: userMessage
       });
 
-      // Call Ollama API through electron API
-      const response = await window.electronAPI.services.chatWithOllama({
+      // Generate the reply through the unified Completion seam.
+      const response = await window.electronAPI.ai.complete({
         prompt: systemPrompt,
-        message: userMessage,
-        context: context
+        expects: 'text'
       });
 
-      if (response.success) {
-        return response.response;
+      if (response.ok) {
+        return response.text ?? '';
       } else {
         throw new Error(response.error || 'Failed to generate response');
       }
@@ -836,18 +834,18 @@ export class ChatService {
         message: userMessage
       });
 
-      // Call LLM with optimized context
-      const response = await window.electronAPI.services.chatWithOllama({
+      // Generate the reply through the unified Completion seam.
+      const response = await window.electronAPI.ai.complete({
         prompt: systemPrompt,
-        message: userMessage,
-        context: context
+        expects: 'text'
       });
 
-      if (response.success) {
+      if (response.ok) {
+        const text = response.text ?? '';
         if (transcriptWasTruncated) {
-          return `⚠️ This transcript was longer than the model's context window, so only part of it was sent. The answer below may be incomplete — switch to **Ask AI** mode for better handling of long transcripts.\n\n---\n\n${response.response}`;
+          return `⚠️ This transcript was longer than the model's context window, so only part of it was sent. The answer below may be incomplete — switch to **Ask AI** mode for better handling of long transcripts.\n\n---\n\n${text}`;
         }
-        return response.response;
+        return text;
       } else {
         throw new Error(response.error || 'Failed to generate response');
       }

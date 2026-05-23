@@ -120,13 +120,12 @@ export async function suggestSpeakerImprovements(
   const prompt = buildPrompt(speakersWithSamples);
 
   try {
-    const result = await window.electronAPI.services.chatWithOllama({
+    const result = await window.electronAPI.ai.complete({
       prompt,
-      message: '',
-      context: '',
+      expects: 'text',
     });
 
-    if (!result?.success) {
+    if (!result?.ok) {
       return {
         success: false,
         error: result?.error || 'AI service returned no result',
@@ -135,7 +134,7 @@ export async function suggestSpeakerImprovements(
       };
     }
 
-    const parsed = extractJson(result.response);
+    const parsed = extractJson(result.text ?? '');
     if (!parsed) {
       return {
         success: false,
