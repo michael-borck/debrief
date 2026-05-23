@@ -938,6 +938,7 @@ function createMenu() {
 // pointing at a closed connection.
 const dbRpc = require('./electron/db-rpc');
 const maintenance = require('./electron/db-rpc/maintenance');
+const completion = require('./electron/completion');
 const { autoUpdater } = require('electron-updater');
 let dbRpcRegistered = false;
 
@@ -961,6 +962,14 @@ function setupAutoUpdater() {
 function ensureDbRpcRegistered() {
   if (dbRpcRegistered) return;
   dbRpc.registerAll(ipcMain, () => db);
+  // The Completion module shares the same db getter, the key decryptor, and
+  // the usage recorder. It resolves provider/url/key/model per call, so it's
+  // safe to register here (db need not exist yet).
+  completion.register(ipcMain, {
+    getDb: () => db,
+    decrypt: decryptIfNeeded,
+    recordUsage,
+  });
   dbRpcRegistered = true;
 }
 

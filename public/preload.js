@@ -169,6 +169,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
     aiResetUsageStats: (scope) => ipcRenderer.invoke('ai-reset-usage-stats', { scope })
   },
 
+  // Unified AI completion. Provider/key/model resolution and JSON mode all
+  // live in the main-process Completion module behind this one call; callers
+  // pass a prompt and what they expect back ('text' | 'json'). Pass a
+  // requestId to enable mid-flight cancel via ai.cancel(requestId).
+  ai: {
+    complete: (spec) => ipcRenderer.invoke('ai:complete', spec),
+    cancel: (requestId) => ipcRenderer.invoke('ai:cancel', requestId)
+  },
+
   // Sensitive value encryption (uses Electron safeStorage / OS keychain).
   // Encrypt-only: the renderer can store a secret but never reads it back in
   // cleartext — main decrypts stored secrets itself for outbound calls.

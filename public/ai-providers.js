@@ -77,6 +77,14 @@ function stripSlash(url) {
   return (url || '').replace(/\/+$/, '');
 }
 
+// A request always carries a timeout; callers (the Completion module) may
+// also pass an AbortSignal for true mid-flight cancellation. Combine them so
+// whichever fires first aborts the fetch.
+function buildSignal(options) {
+  const timeout = AbortSignal.timeout(options.timeout ?? 120000);
+  return options.signal ? AbortSignal.any([options.signal, timeout]) : timeout;
+}
+
 async function safeErrorText(response) {
   try {
     const text = await response.text();
@@ -195,16 +203,22 @@ async function openaiChat(url, apiKey, model, prompt, options) {
   const headers = { 'Content-Type': 'application/json' };
   if (apiKey && apiKey.trim()) headers['Authorization'] = `Bearer ${apiKey.trim()}`;
 
+  const body = {
+    model,
+    messages: [{ role: 'user', content: prompt }],
+    temperature: options.temperature ?? 0.7,
+    max_tokens: options.maxTokens ?? 2048,
+  };
+  // Structured-output mode: ask OpenAI-compatible servers (incl. Ollama's
+  // /v1 endpoint) to return a JSON object. The prompt must also mention JSON,
+  // which the Completion module guarantees before calling.
+  if (options.jsonMode) body.response_format = { type: 'json_object' };
+
   const response = await fetch(`${stripSlash(url)}/chat/completions`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({
-      model,
-      messages: [{ role: 'user', content: prompt }],
-      temperature: options.temperature ?? 0.7,
-      max_tokens: options.maxTokens ?? 2048,
-    }),
-    signal: AbortSignal.timeout(options.timeout ?? 120000),
+    body: JSON.stringify(body),
+    signal: buildSignal(options),
   });
   if (!response.ok) {
     return { success: false, response: '', error: `HTTP ${response.status}: ${await safeErrorText(response)}` };
@@ -229,6 +243,8 @@ async function anthropicChat(url, apiKey, model, prompt, options) {
     'x-api-key': apiKey.trim(),
     'anthropic-version': '2023-06-01',
   };
+  // Anthropic has no native JSON-object mode; the Completion module coaxes
+  // JSON via the prompt when expects:'json', so nothing extra is set here.
   const response = await fetch(`${stripSlash(url)}/messages`, {
     method: 'POST',
     headers,
@@ -238,7 +254,7 @@ async function anthropicChat(url, apiKey, model, prompt, options) {
       temperature: options.temperature ?? 0.7,
       messages: [{ role: 'user', content: prompt }],
     }),
-    signal: AbortSignal.timeout(options.timeout ?? 120000),
+    signal: buildSignal(options),
   });
   if (!response.ok) {
     return { success: false, response: '', error: `HTTP ${response.status}: ${await safeErrorText(response)}` };

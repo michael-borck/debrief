@@ -368,6 +368,28 @@ export interface ElectronAPI {
     aiResetUsageStats: (scope?: 'session' | 'lifetime' | 'both') => Promise<{ success: boolean }>;
   };
 
+  // Unified AI completion (main-process Completion module). Provider/key/model
+  // resolution and JSON mode all live behind complete(); callers know nothing
+  // about providers. Pass a requestId to enable mid-flight cancel.
+  ai: {
+    complete: (spec: {
+      prompt: string;
+      expects?: 'text' | 'json';
+      options?: { temperature?: number; maxTokens?: number; timeout?: number };
+      requestId?: string;
+    }) => Promise<{
+      ok: boolean;
+      text?: string;
+      raw?: string;
+      data?: any | null;
+      usage?: { promptTokens: number; completionTokens: number; totalTokens: number };
+      error?: string;
+      provider?: string;
+      model?: string;
+    }>;
+    cancel: (requestId: string) => Promise<{ ok: boolean }>;
+  };
+
   // Encrypt-only: no decrypt is exposed. Stored secrets are decrypted in main
   // (resolveApiKey / decryptIfNeeded) and never returned to the renderer.
   crypto: {

@@ -310,11 +310,6 @@ export class FileProcessor {
         return { summary: '', keyTopics: [], actionItems: [] };
       }
 
-      // Get AI service settings
-      const ai = await window.electronAPI.db.settings.getMany(['aiAnalysisUrl', 'aiModel']);
-      const aiUrl = ai.aiAnalysisUrl || 'http://localhost:11434';
-      const aiModel = ai.aiModel || 'llama2';
-
       onProgress?.('analyzing', 25);
 
       // Get configurable analysis prompt
@@ -325,39 +320,18 @@ export class FileProcessor {
       onProgress?.('analyzing', 50);
       checkCancelled(signal);
 
-      // Make request to AI service (Ollama). signal lets us cancel mid-flight.
-      const response = await fetch(`${aiUrl}/api/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: aiModel,
-          prompt: analysisPrompt,
-          stream: false,
-          format: 'json'
-        }),
-        signal,
-      });
+      // Run via the Completion module (provider/key/model resolved in main).
+      const res = await this.aiComplete(analysisPrompt, 'json', signal);
 
       onProgress?.('analyzing', 75);
-      
-      if (!response.ok) {
-        throw new Error(`AI service error: ${response.status} ${response.statusText}`);
+
+      if (!res.ok) {
+        throw new Error(res.error || 'AI service error');
       }
-      
-      const result = await response.json();
-      
-      // Parse the AI response
-      let analysisData;
-      try {
-        analysisData = JSON.parse(result.response);
-      } catch (parseError) {
-        console.warn('Failed to parse AI response as JSON, using fallback parsing');
-        // Fallback: extract data manually if JSON parsing fails
-        analysisData = this.parseAnalysisText(result.response);
-      }
-      
+
+      // data is the tolerant JSON parse; fall back to schema-specific parsing.
+      const analysisData = res.data ?? this.parseAnalysisText(res.raw);
+
       console.log('Analysis completed:', analysisData);
       
       return {
@@ -399,57 +373,41 @@ export class FileProcessor {
     return items.map(item => item.trim().replace(/\n/g, ' '));
   }
 
-  // Helper functions for AI service settings
-  async getAiUrl(): Promise<string> {
-    return (await window.electronAPI.db.settings.get('aiAnalysisUrl')) || 'http://localhost:11434';
-  }
 
-  async getAiModel(): Promise<string> {
-    return (await window.electronAPI.db.settings.get('aiModel')) || 'llama2';
-  }
-
-  async callAI(
-    aiUrl: string,
-    aiModel: string,
+  /**
+   * Single entry point for AI calls from the import pipeline. Routes to the
+   * main-process Completion module — provider, URL, key, model and JSON mode
+   * are all resolved there, so the pipeline honours whatever provider the
+   * user configured (not just local Ollama).
+   *
+   * Cancellation is threaded both ways: abortable() rejects the renderer side
+   * the moment the signal fires, and ai.cancel(requestId) aborts the in-flight
+   * request in main so it stops truly, not just gets orphaned.
+   */
+  private async aiComplete(
     prompt: string,
-    expectJson: boolean = true,
+    expects: 'text' | 'json',
     signal?: AbortSignal
-  ): Promise<any> {
+  ): Promise<{ ok: boolean; text: string; raw: string; data: any | null; error?: string }> {
+    const requestId = `fp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const onAbort = () => {
+      void window.electronAPI.ai.cancel(requestId);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
     try {
-      const response = await fetch(`${aiUrl}/api/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: aiModel,
-          prompt: prompt,
-          stream: false,
-          format: expectJson ? 'json' : undefined
-        }),
-        signal,
-      });
-
-      if (!response.ok) {
-        throw new Error(`AI service error: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-
-      if (expectJson) {
-        try {
-          return { parsed: JSON.parse(result.response), raw: result.response };
-        } catch (parseError) {
-          console.warn('Failed to parse AI response as JSON:', result.response);
-          return { parsed: null, raw: result.response };
-        }
-      } else {
-        return result.response;
-      }
-    } catch (error) {
-      if (isCancelled(error)) throw error;
-      console.error('AI call error:', error);
-      return expectJson ? { parsed: null, raw: '' } : '';
+      const res = await abortable(
+        window.electronAPI.ai.complete({ prompt, expects, requestId }),
+        signal
+      );
+      return {
+        ok: !!res.ok,
+        text: res.text || '',
+        raw: res.raw || '',
+        data: res.data ?? null,
+        error: res.error,
+      };
+    } finally {
+      signal?.removeEventListener('abort', onAbort);
     }
   }
 
@@ -458,15 +416,12 @@ export class FileProcessor {
     sentimentScore: number;
   }> {
     try {
-      const aiUrl = await this.getAiUrl();
-      const aiModel = await this.getAiModel();
-
       const prompt = await promptService.getProcessedPrompt('analysis', 'sentiment_analysis', {
         transcript: transcriptText
       });
 
-      const aiResponse = await this.callAI(aiUrl, aiModel, prompt, true, signal);
-      const result = aiResponse.parsed || {};
+      const res = await this.aiComplete(prompt, 'json', signal);
+      const result = res.data || {};
       return {
         sentiment: result.sentiment || 'neutral',
         sentimentScore: typeof result.sentimentScore === 'number' ? result.sentimentScore : 0
@@ -480,15 +435,12 @@ export class FileProcessor {
 
   async performEmotionAnalysis(transcriptText: string, signal?: AbortSignal): Promise<Record<string, number>> {
     try {
-      const aiUrl = await this.getAiUrl();
-      const aiModel = await this.getAiModel();
-
       const prompt = await promptService.getProcessedPrompt('analysis', 'emotion_analysis', {
         transcript: transcriptText
       });
 
-      const aiResponse = await this.callAI(aiUrl, aiModel, prompt, true, signal);
-      return aiResponse.parsed || {};
+      const res = await this.aiComplete(prompt, 'json', signal);
+      return res.data || {};
     } catch (error) {
       if (isCancelled(error)) throw error;
       console.error('Emotion analysis error:', error);
@@ -594,11 +546,6 @@ export class FileProcessor {
         }
       }
       
-      // Get AI service settings
-      const aiSettings = await window.electronAPI.db.settings.getMany(['aiAnalysisUrl', 'aiModel']);
-      const aiUrl = aiSettings.aiAnalysisUrl || 'http://localhost:11434';
-      const aiModel = aiSettings.aiModel || 'llama2';
-
       // Create validation options string
       const validationOptions = [
         options.spelling !== false ? '- Spelling errors' : '',
@@ -618,44 +565,27 @@ export class FileProcessor {
       // For very long transcripts, use chunked validation
       if (processedText.length > 4000) {
         console.log('Using chunked validation for long transcript');
-        const chunkResult = await this.performChunkedValidation(processedText, options, aiUrl, aiModel, signal);
+        const chunkResult = await this.performChunkedValidation(processedText, options, signal);
         return {
           validatedText: chunkResult.validatedText,
           changes: [...duplicateRemovalChanges, ...chunkResult.changes]
         };
       }
 
-      // Make request to AI service
-      const response = await fetch(`${aiUrl}/api/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: aiModel,
-          prompt: validationPrompt,
-          stream: false,
-          format: 'json'
-        }),
-        signal,
-      });
-      
-      if (!response.ok) {
-        throw new Error(`AI service error: ${response.status} ${response.statusText}`);
+      // Run via the Completion module (provider/key/model resolved in main).
+      const res = await this.aiComplete(validationPrompt, 'json', signal);
+      console.log(`Validation output length: ${res.raw?.length || 0} characters`);
+
+      if (!res.ok) {
+        throw new Error(res.error || 'AI service error');
       }
-      
-      const result = await response.json();
-      console.log(`Validation output length: ${result.response?.length || 0} characters`);
-      
-      // Parse the AI response
-      let validationData;
-      try {
-        validationData = JSON.parse(result.response);
-      } catch (parseError) {
+
+      const validationData = res.data;
+      if (!validationData) {
         console.warn('Failed to parse validation response as JSON');
-        return { 
+        return {
           validatedText: processedText, // Use duplicate-cleaned text as fallback
-          changes: duplicateRemovalChanges 
+          changes: duplicateRemovalChanges
         };
       }
       
@@ -695,8 +625,6 @@ export class FileProcessor {
   async performChunkedValidation(
     text: string,
     options: any,
-    aiUrl: string,
-    aiModel: string,
     signal?: AbortSignal
   ): Promise<{
     validatedText: string;
@@ -769,23 +697,10 @@ Please format your response as JSON:
   ]
 }`;
 
-        const response = await fetch(`${aiUrl}/api/generate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            model: aiModel,
-            prompt: validationPrompt,
-            stream: false,
-            format: 'json'
-          }),
-          signal,
-        });
+        const res = await this.aiComplete(validationPrompt, 'json', signal);
 
-        if (response.ok) {
-          const result = await response.json();
-          const chunkData = JSON.parse(result.response);
+        if (res.ok && res.data) {
+          const chunkData = res.data;
           validatedChunks.push(chunkData.validatedText || chunk);
 
           if (Array.isArray(chunkData.changes)) {
@@ -949,52 +864,27 @@ Please format your response as JSON:
         return { notableQuotes: [], researchThemes: [], qaPairs: [], conceptFrequency: {} };
       }
 
-      // Get AI service settings
-      const ai = await window.electronAPI.db.settings.getMany(['aiAnalysisUrl', 'aiModel']);
-      const aiUrl = ai.aiAnalysisUrl || 'http://localhost:11434';
-      const aiModel = ai.aiModel || 'llama2';
-
       onProgress?.('analyzing', 80);
-      
+
       // Create research analysis prompt using configurable prompt
       const researchPrompt = await promptService.getProcessedPrompt('analysis', 'research_analysis', {
         transcript: transcriptText
       });
 
       onProgress?.('analyzing', 90);
-      
-      // Make request to AI service
-      const response = await fetch(`${aiUrl}/api/generate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: aiModel,
-          prompt: researchPrompt,
-          stream: false,
-          format: 'json'
-        }),
-        signal,
-      });
+
+      // Run via the Completion module (provider/key/model resolved in main).
+      const res = await this.aiComplete(researchPrompt, 'json', signal);
 
       onProgress?.('analyzing', 95);
-      
-      if (!response.ok) {
-        throw new Error(`AI service error: ${response.status} ${response.statusText}`);
+
+      if (!res.ok) {
+        throw new Error(res.error || 'AI service error');
       }
-      
-      const result = await response.json();
-      
-      // Parse the AI response
-      let analysisData;
-      try {
-        analysisData = JSON.parse(result.response);
-      } catch (parseError) {
-        console.warn('Failed to parse research analysis response as JSON, using fallback');
-        analysisData = this.parseResearchAnalysisText(result.response, transcriptText);
-      }
-      
+
+      // data is the tolerant JSON parse; fall back to schema-specific parsing.
+      const analysisData = res.data ?? this.parseResearchAnalysisText(res.raw, transcriptText);
+
       console.log('Research analysis completed:', analysisData);
       
       return {
