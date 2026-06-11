@@ -101,10 +101,10 @@ export const AddExistingModal: React.FC<AddExistingModalProps> = ({
       }
 
       // Duration filter
-      if (filters.duration.min && transcript.duration < parseInt(filters.duration.min)) {
+      if (filters.duration.min && transcript.duration < parseInt(filters.duration.min, 10)) {
         return false;
       }
-      if (filters.duration.max && transcript.duration > parseInt(filters.duration.max)) {
+      if (filters.duration.max && transcript.duration > parseInt(filters.duration.max, 10)) {
         return false;
       }
 

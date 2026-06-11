@@ -311,15 +311,16 @@ export const TranscriptDetailPage: React.FC = () => {
       console.log(`Testing pattern ${idx + 1}:`, pattern.toString());
       // Reset regex lastIndex to avoid conflicts
       pattern.lastIndex = 0;
-      let match;
+      let match: RegExpExecArray | null = pattern.exec(text);
       let matchCount = 0;
-      while ((match = pattern.exec(text)) !== null) {
+      while (match !== null) {
         matchCount++;
         const segment = match[1]?.trim();
-        console.log(`Pattern ${idx + 1} match ${matchCount}:`, segment?.substring(0, 50) + '...');
+        console.log(`Pattern ${idx + 1} match ${matchCount}:`, `${segment?.substring(0, 50)}...`);
         if (segment && segment.length > 10) { // Minimum segment length
           segments.push(segment);
         }
+        match = pattern.exec(text);
       }
       console.log(`Pattern ${idx + 1} found ${matchCount} matches`);
     });
@@ -335,7 +336,7 @@ export const TranscriptDetailPage: React.FC = () => {
     
     console.log(`Total unique segments found for ${speakerName}:`, uniqueSegments.length);
     uniqueSegments.forEach((seg, idx) => {
-      console.log(`Segment ${idx + 1}:`, seg.substring(0, 50) + '...');
+      console.log(`Segment ${idx + 1}:`, `${seg.substring(0, 50)}...`);
     });
     
     return uniqueSegments;

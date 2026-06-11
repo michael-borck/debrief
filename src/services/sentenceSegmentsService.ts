@@ -160,7 +160,6 @@ export class SentenceSegmentsService {
         return transcript.validated_text || transcript.full_text || '';
       case 'speaker_tagged':
         return transcript.processed_text || transcript.validated_text || transcript.full_text || '';
-      case 'original':
       default:
         return transcript.full_text || '';
     }
@@ -220,7 +219,7 @@ export class SentenceSegmentsService {
    * Simple sentence splitting
    */
   private splitIntoSentences(text: string): string[] {
-    if (!text || !text.trim()) return [];
+    if (!text?.trim()) return [];
 
     return text
       .split(/[.!?]+/)
@@ -277,7 +276,7 @@ export class SentenceSegmentsService {
    */
   async createBasicSegments(transcriptId: string, text: string): Promise<boolean> {
     try {
-      if (!text || !text.trim()) {
+      if (!text?.trim()) {
         console.warn('No text provided for basic segment creation');
         return false;
       }

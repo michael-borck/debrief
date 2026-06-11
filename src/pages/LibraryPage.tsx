@@ -61,7 +61,6 @@ export const LibraryPage: React.FC = () => {
           return a.title.localeCompare(b.title);
         case 'duration':
           return b.duration - a.duration;
-        case 'date':
         default:
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       }

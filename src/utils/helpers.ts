@@ -28,7 +28,7 @@ export const formatFileSize = (bytes: number): string => {
   const sizes = ['Bytes', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  return `${parseFloat((bytes / k ** i).toFixed(1))} ${sizes[i]}`;
 };
 
 export const formatDate = (dateString: string): string => {
@@ -90,13 +90,13 @@ export const groupTranscriptsByDate = (transcripts: any[]) => {
     const date = new Date(transcript.created_at);
     
     if (date >= todayStart) {
-      groups['Today'].push(transcript);
+      groups.Today.push(transcript);
     } else if (date >= weekStart) {
       groups['This Week'].push(transcript);
     } else if (date >= monthStart) {
       groups['This Month'].push(transcript);
     } else {
-      groups['Older'].push(transcript);
+      groups.Older.push(transcript);
     }
   });
 

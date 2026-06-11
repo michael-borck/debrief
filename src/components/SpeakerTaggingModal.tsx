@@ -339,7 +339,7 @@ etc.`;
         lines.forEach((line: string) => {
           const match = line.match(/Segment (\d+):\s*(.+)/);
           if (match) {
-            const segmentId = parseInt(match[1]);
+            const segmentId = parseInt(match[1], 10);
             const speakerName = match[2].trim();
             const speaker = speakers.find(s => s.name === speakerName);
             

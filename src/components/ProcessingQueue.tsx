@@ -99,7 +99,9 @@ export const ProcessingQueue: React.FC<ProcessingQueueProps> = ({ items }) => {
                 .filter(i =>
                   i.status === 'completed' || i.status === 'error' || i.status === 'cancelled'
                 )
-                .forEach(i => removeFromProcessingQueue(i.id));
+                .forEach(i => {
+                  removeFromProcessingQueue(i.id);
+                });
             }}
             className="text-xs text-surface-500 hover:text-surface-700 transition-colors"
             title="Remove all completed, errored, and cancelled items"

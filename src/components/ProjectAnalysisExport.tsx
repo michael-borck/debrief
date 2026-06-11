@@ -311,7 +311,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
         <strong>Format:</strong> ${exportFormat.toUpperCase()}<br>
         <strong>Sections:</strong> ${Object.entries(exportSections).filter(([_, included]) => included).map(([section]) => section).join(', ')}
     </div>
-    ${markdownContent.replace(/\n/g, '<br>').replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^\- (.+)$/gm, '<li>$1</li>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}
+    ${markdownContent.replace(/\n/g, '<br>').replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^- (.+)$/gm, '<li>$1</li>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}
 </body>
 </html>`;
   };

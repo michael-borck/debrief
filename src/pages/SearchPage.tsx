@@ -60,7 +60,7 @@ export const SearchPage: React.FC = () => {
       const projectResults = projects.filter(p => {
         if (searchQuery) {
           return p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                 (p.description && p.description.toLowerCase().includes(searchQuery.toLowerCase()));
+                 (p.description?.toLowerCase().includes(searchQuery.toLowerCase()));
         }
         return true;
       });
@@ -95,8 +95,8 @@ export const SearchPage: React.FC = () => {
       }
       if (result.type === 'transcript') {
         const transcript = result.data as Transcript;
-        if (filters.duration.min && transcript.duration < parseInt(filters.duration.min)) return false;
-        if (filters.duration.max && transcript.duration > parseInt(filters.duration.max)) return false;
+        if (filters.duration.min && transcript.duration < parseInt(filters.duration.min, 10)) return false;
+        if (filters.duration.max && transcript.duration > parseInt(filters.duration.max, 10)) return false;
         if (filters.sentiment && transcript.sentiment_overall !== filters.sentiment) return false;
         if (filters.hasKeywords.length > 0) {
           const hasKeyword = filters.hasKeywords.some(keyword =>

@@ -4,11 +4,11 @@
 // installed via pip. Subsequent launches spawn server.py from that venv.
 
 const { app } = require('electron');
-const { spawn } = require('child_process');
-const crypto = require('crypto');
-const path = require('path');
-const fs = require('fs');
-const net = require('net');
+const { spawn } = require('node:child_process');
+const crypto = require('node:crypto');
+const path = require('node:path');
+const fs = require('node:fs');
+const net = require('node:net');
 
 const READY_TIMEOUT_MS = 30000;
 const HEALTHZ_POLL_INTERVAL_MS = 250;
@@ -132,10 +132,11 @@ class SidecarManager {
 
       this.setupProc.stdout.on('data', (d) => {
         buffer += d.toString();
-        let nl;
-        while ((nl = buffer.indexOf('\n')) !== -1) {
+        let nl = buffer.indexOf('\n');
+        while (nl !== -1) {
           handleLine(buffer.slice(0, nl));
           buffer = buffer.slice(nl + 1);
+          nl = buffer.indexOf('\n');
         }
       });
       this.setupProc.stderr.on('data', (d) => console.error(`[sidecar setup err] ${d.toString().trim()}`));

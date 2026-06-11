@@ -1,10 +1,10 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell, protocol, net, safeStorage } = require('electron');
-const { pathToFileURL } = require('url');
-const path = require('path');
-const fs = require('fs');
+const { pathToFileURL } = require('node:url');
+const path = require('node:path');
+const fs = require('node:fs');
 const Database = require('better-sqlite3');
-const { execFile, spawn } = require('child_process');
-const { promisify } = require('util');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
 // execFile (not exec) runs the binary directly without a shell, so file paths
 // containing spaces or shell metacharacters can't inject commands. maxBuffer is
 // raised because the duration-probe calls read ffmpeg's full stderr log.
@@ -104,7 +104,7 @@ function rmRecursive(target) {
 
 function migrateLegacyUserDataDir() {
   const newDir = app.getPath('userData');
-  const home = require('os').homedir();
+  const home = require('node:os').homedir();
   const legacyNames = ['deep' + '-talk', 'deep' + '-debrief'];
   const platformBase = process.platform === 'darwin'
     ? path.join(home, 'Library', 'Application Support')
@@ -149,7 +149,7 @@ function migrateLegacyUserDataDir() {
   }
 }
 
-const os = require('os');
+const os = require('node:os');
 
 // Transcode any input audio to a canonical 16 kHz mono WAV in the OS temp
 // dir. pyannote's torchcodec backend chokes on MP3 frame-boundary precision
@@ -212,7 +212,7 @@ async function initDatabase() {
         dbPath = path.join(settings.databaseLocation, DB_FILENAME);
       }
     }
-  } catch (error) {
+  } catch {
     console.log('No custom database location found, using default');
   }
   
@@ -784,7 +784,7 @@ function createWindow() {
       url.startsWith('http://localhost:') ||
       url.startsWith('file://') ||
       url === currentUrl ||
-      url.startsWith(currentUrl.split('#')[0] + '#'); // hash navigation in HashRouter
+      url.startsWith(`${currentUrl.split('#')[0]}#`); // hash navigation in HashRouter
     if (!isInternal && (url.startsWith('http://') || url.startsWith('https://'))) {
       event.preventDefault();
       shell.openExternal(url);
@@ -1294,8 +1294,8 @@ const ENC_PREFIX = 'enc:v1:';
 function resolveApiKey(passed) {
   if (typeof passed === 'string' && passed.length > 0) return passed;
   try {
-    const row = db && db.prepare('SELECT value FROM settings WHERE key = ?').get('aiApiKey');
-    return decryptIfNeeded(row && row.value ? row.value : '');
+    const row = db?.prepare('SELECT value FROM settings WHERE key = ?').get('aiApiKey');
+    return decryptIfNeeded(row?.value ? row.value : '');
   } catch (err) {
     console.error('resolveApiKey failed:', err.message);
     return '';
@@ -1648,7 +1648,7 @@ function createSentenceSegmentsFromChunks(transcriptId, chunkTimings, version = 
       startTime: chunk.startTime, 
       endTime: chunk.endTime,
       textLength: chunk.text?.length,
-      textPreview: chunk.text?.substring(0, 50) + '...'
+      textPreview: `${chunk.text?.substring(0, 50)}...`
     });
     const sentences = splitIntoSentences(chunk.text);
     const chunkDuration = chunk.duration || 0;
@@ -1684,7 +1684,7 @@ function createSentenceSegmentsFromChunks(transcriptId, chunkTimings, version = 
 }
 
 function splitIntoSentences(text) {
-  if (!text || !text.trim()) return [];
+  if (!text?.trim()) return [];
 
   // Simple sentence splitting
   const sentences = text
@@ -1735,8 +1735,8 @@ function getFFmpegPath() {
   // falls back to the original MP3 and pyannote then hits its frame
   // alignment bug ("441000 samples").
   const p = require('ffmpeg-static');
-  if (app.isPackaged && p.includes('app.asar' + path.sep)) {
-    return p.replace('app.asar' + path.sep, 'app.asar.unpacked' + path.sep);
+  if (app.isPackaged && p.includes(`app.asar${path.sep}`)) {
+    return p.replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
   }
   return p;
 }
@@ -1834,9 +1834,7 @@ function simpleTextEmbedding(text) {
 }
 
 // Global instances
-let embeddingPipeline = null;
 let vectorStore = null;
-let isEmbeddingInitialized = false;
 
 // Embedding service — delegates to the bundled Python sidecar's /embed
 // endpoint (sentence-transformers/all-MiniLM-L6-v2, 384-dim). The legacy
@@ -1847,7 +1845,6 @@ let isEmbeddingInitialized = false;
 ipcMain.handle('embedding-initialize', async () => {
   // Initialisation is now implicit (sidecar lazy-loads on first /embed call).
   // Keep the IPC for renderer compat — return success.
-  isEmbeddingInitialized = true;
   return { success: true };
 });
 
@@ -2027,7 +2024,7 @@ ipcMain.handle('segments-create', async (event, { transcriptId, segments }) => {
 ipcMain.handle('segments-get-by-transcript', async (event, { transcriptId, version }) => {
   try {
     let query = 'SELECT * FROM transcript_segments WHERE transcript_id = ?';
-    let params = [transcriptId];
+    const params = [transcriptId];
     
     if (version) {
       query += ' AND version = ?';
@@ -2064,7 +2061,7 @@ ipcMain.handle('segments-update', async (event, { segmentId, updates }) => {
 ipcMain.handle('segments-delete-by-transcript', async (event, { transcriptId, version }) => {
   try {
     let query = 'DELETE FROM transcript_segments WHERE transcript_id = ?';
-    let params = [transcriptId];
+    const params = [transcriptId];
     
     if (version) {
       query += ' AND version = ?';

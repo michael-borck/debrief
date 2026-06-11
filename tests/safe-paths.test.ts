@@ -5,7 +5,7 @@
 // the fix, it routes through assertPathUnderTmp which canonicalises both
 // paths and checks the prefix via path.relative.
 
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, symlinkSync, realpathSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';

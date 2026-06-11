@@ -2,8 +2,8 @@
 // Initialised by electron.js with a reference to the SidecarManager so we
 // always know the live port and can fail fast when the sidecar isn't ready.
 
-const fs = require('fs');
-const path = require('path');
+const fs = require('node:fs');
+const path = require('node:path');
 const { Agent } = require('undici');
 
 // Long-running localhost dispatcher. Node's undici has a default 5-minute

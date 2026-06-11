@@ -7,8 +7,8 @@
 // degrades to a no-op (initialize/store/search all succeed silently
 // with empty results) so the rest of the app keeps working.
 
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const fs = require('node:fs');
 // electron is only needed to resolve the default userData path. Guard the
 // require so the module can load (and be unit-tested) outside Electron, where
 // require('electron') throws — callers that pass an explicit dbPath never need
@@ -121,7 +121,7 @@ class MainVectorStore {
       try {
         this.table = await this.db.openTable('chunks');
         console.log('Opened existing chunks table');
-      } catch (error) {
+      } catch {
         // Create table from the schema-defining seed row. The seed row stays
         // in the table (LanceDB 0.20's string `.where()` can't delete it — see
         // the note at the top), but it carries transcriptId 'sample' so the

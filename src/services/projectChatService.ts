@@ -121,7 +121,7 @@ export class ProjectChatService {
       this.config = {
         ...this.config,
         crossTranscriptAnalysis: settingsMap.projectCrossTranscriptAnalysis !== 'false',
-        maxTranscriptsInContext: parseInt(settingsMap.projectMaxTranscriptsInContext) || 5,
+        maxTranscriptsInContext: parseInt(settingsMap.projectMaxTranscriptsInContext, 10) || 5,
         transcriptSelectionStrategy: settingsMap.projectTranscriptSelectionStrategy as 'recent' | 'relevant' | 'all' || 'relevant',
         projectAnalysisMode: settingsMap.projectAnalysisMode as 'collated' | 'cross_transcript' | 'hybrid' || 'hybrid'
       };
@@ -192,7 +192,7 @@ export class ProjectChatService {
       let searchResults: SearchResult[] = [];
 
       switch (this.config.projectAnalysisMode) {
-        case 'collated':
+        case 'collated': {
           const collatedResult = await this.handleCollatedAnalysis(
             transcriptSelection.transcripts,
             userMessage,
@@ -201,6 +201,7 @@ export class ProjectChatService {
           response = collatedResult.response;
           searchResults = collatedResult.searchResults;
           break;
+        }
 
         case 'cross_transcript':
           response = await this.handleCrossTranscriptAnalysis(
@@ -210,7 +211,7 @@ export class ProjectChatService {
           );
           break;
 
-        case 'hybrid':
+        case 'hybrid': {
           const hybridResult = await this.handleHybridAnalysis(
             transcriptSelection.transcripts,
             userMessage,
@@ -219,6 +220,7 @@ export class ProjectChatService {
           response = hybridResult.response;
           searchResults = hybridResult.searchResults;
           break;
+        }
 
         default:
           throw new Error(`Unknown project analysis mode: ${this.config.projectAnalysisMode}`);
@@ -322,7 +324,7 @@ export class ProjectChatService {
           reasoning: `Selected all available transcripts (limited to ${maxTranscripts})`
         };
 
-      case 'relevant':
+      case 'relevant': {
         // Use vector similarity to find most relevant transcripts
         const relevantTranscripts = await this.findRelevantTranscriptsByContent(
           allTranscripts,
@@ -334,6 +336,7 @@ export class ProjectChatService {
           strategy: 'relevant',
           reasoning: `Selected ${relevantTranscripts.length} most relevant transcripts based on content similarity`
         };
+      }
 
       default:
         return {

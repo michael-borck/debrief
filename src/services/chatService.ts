@@ -103,14 +103,14 @@ export class ChatService {
       // Update config with database values
       this.config = {
         ...this.config,
-        contextChunks: parseInt(settingsMap.chatContextChunks) || 4,
-        conversationMemoryLimit: parseInt(settingsMap.chatMemoryLimit) || 20,
+        contextChunks: parseInt(settingsMap.chatContextChunks, 10) || 4,
+        conversationMemoryLimit: parseInt(settingsMap.chatMemoryLimit, 10) || 20,
         chunkingMethod: settingsMap.chatChunkingMethod as 'speaker' | 'time' | 'hybrid' || 'speaker',
-        maxChunkSize: parseInt(settingsMap.chatMaxChunkSize) || 60,
-        chunkOverlap: parseInt(settingsMap.chatChunkOverlap) || 10,
+        maxChunkSize: parseInt(settingsMap.chatMaxChunkSize, 10) || 60,
+        chunkOverlap: parseInt(settingsMap.chatChunkOverlap, 10) || 10,
         conversationMode: settingsMap.conversationMode as ConversationMode || 'rag',
-        directLlmContextLimit: parseInt(settingsMap.directLlmContextLimit) || 8000,
-        vectorOnlyChunkCount: parseInt(settingsMap.vectorOnlyChunkCount) || 5,
+        directLlmContextLimit: parseInt(settingsMap.directLlmContextLimit, 10) || 8000,
+        vectorOnlyChunkCount: parseInt(settingsMap.vectorOnlyChunkCount, 10) || 5,
         dynamicContextManagement: settingsMap.dynamicContextManagement !== 'false', // Default true
         memoryReserveFactor: parseFloat(settingsMap.memoryReserveFactor) || 0.2
       };
@@ -382,18 +382,19 @@ export class ChatService {
       // 2. Route to appropriate conversation mode
       let response: string;
       let searchResults: SearchResult[] = [];
-      let mode = this.config.conversationMode;
+      const mode = this.config.conversationMode;
 
       switch (mode) {
         case 'vector-only':
           response = await this.handleVectorOnlyMode(transcriptId, userMessage, memory);
           break;
         
-        case 'rag':
+        case 'rag': {
           const ragResult = await this.handleRAGMode(transcriptId, userMessage, memory);
           response = ragResult.response;
           searchResults = ragResult.searchResults;
           break;
+        }
         
         case 'direct-llm':
           response = await this.handleDirectLLMMode(transcriptId, userMessage, memory);
@@ -502,7 +503,7 @@ export class ChatService {
     
     // If we have existing summary, include it with new messages to compact
     let allMessagesToCompact = messagesToCompact;
-    if (existingMemory && existingMemory.compactedSummary) {
+    if (existingMemory?.compactedSummary) {
       // Create a synthetic message representing the previous summary
       const summaryMessage: ChatMessage = {
         id: 'summary',
@@ -792,7 +793,7 @@ export class ChatService {
               .join('\n\n');
             
             if (recentMessagesText.length <= memoryLimit - 50) {
-              truncatedMemory = 'RECENT CONVERSATION:\n\n' + recentMessagesText + '\n\n';
+              truncatedMemory = `RECENT CONVERSATION:\n\n${recentMessagesText}\n\n`;
             } else {
               // Truncate recent messages
               truncatedMemory = 'RECENT CONVERSATION:\n\n' + 

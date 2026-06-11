@@ -45,7 +45,6 @@ export const ServiceProvider: React.FC<ServiceProviderProps> = ({ children }) =>
       case 'setting_up': return 'setting_up';
       case 'starting': return 'starting';
       case 'failed': return 'error';
-      case 'stopped':
       default: return 'disconnected';
     }
   };

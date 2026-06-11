@@ -241,13 +241,13 @@ export class ModelMetadataService {
     // Extract context length from model info
     let contextLimit = 4096; // Default fallback
     
-    if (info.parameters && info.parameters.num_ctx) {
-      contextLimit = parseInt(info.parameters.num_ctx);
-    } else if (info.template && info.template.includes('context_length')) {
+    if (info.parameters?.num_ctx) {
+      contextLimit = parseInt(info.parameters.num_ctx, 10);
+    } else if (info.template?.includes('context_length')) {
       // Try to extract from template
       const match = info.template.match(/context_length["\s:]*(\d+)/);
       if (match) {
-        contextLimit = parseInt(match[1]);
+        contextLimit = parseInt(match[1], 10);
       }
     }
     

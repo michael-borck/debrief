@@ -34,7 +34,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
         // Remove all timestamps in format [MM:SS] or [HH:MM:SS]
         return text.replace(/\[(\d{1,2}:\d{2}(?::\d{2})?)\]/g, '').replace(/\n\s*\n/g, '\n').trim();
       
-      case 'external-tools':
+      case 'external-tools': {
         // Format for external audio tools: timestamp at start of each segment
         const segments = text.split(/(\[(\d{1,2}:\d{2}(?::\d{2})?)\])/);
         let formatted = '';
@@ -46,12 +46,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           if (timestampWithBrackets && nextText) {
             formatted += `${timestampWithBrackets} ${nextText.trim()}\n`;
           } else if (beforeTimestamp.trim()) {
-            formatted += beforeTimestamp.trim() + '\n';
+            formatted += `${beforeTimestamp.trim()}\n`;
           }
         }
         return formatted.trim();
-      
-      case 'preserve':
+      }
       default:
         return text;
     }

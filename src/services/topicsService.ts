@@ -84,8 +84,8 @@ interface KMeansResult {
 }
 
 export function kmeans(vectors: number[][], k: number): KMeansResult {
-  let centroids = seed(vectors, k);
-  let assignments = new Array(vectors.length).fill(0);
+  const centroids = seed(vectors, k);
+  const assignments = new Array(vectors.length).fill(0);
 
   for (let iter = 0; iter < KMEANS_MAX_ITERS; iter++) {
     let changed = false;
@@ -120,7 +120,9 @@ export function kmeans(vectors: number[][], k: number): KMeansResult {
 function silhouette(vectors: number[][], assignments: number[], k: number): number {
   if (k < 2) return -1;
   const byCluster: number[][] = Array.from({ length: k }, () => []);
-  assignments.forEach((c, i) => byCluster[c].push(i));
+  assignments.forEach((c, i) => {
+    byCluster[c].push(i);
+  });
 
   let total = 0;
   let counted = 0;
@@ -253,7 +255,9 @@ export class TopicsService {
 
     // Group chunks by cluster.
     const clusters: VectorChunk[][] = Array.from({ length: k }, () => []);
-    kResult.assignments.forEach((c, i) => clusters[c].push(chunks[i]));
+    kResult.assignments.forEach((c, i) => {
+      clusters[c].push(chunks[i]);
+    });
 
     onProgress?.('Labelling topics');
     const topics: Topic[] = [];

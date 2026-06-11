@@ -100,9 +100,10 @@ export const EnhancedDeleteModal: React.FC<EnhancedDeleteModalProps> = ({
 
   const getActionDescription = () => {
     switch (selectedAction) {
-      case 'remove-from-selected':
+      case 'remove-from-selected': {
         const selectedCount = projectRelations.filter(rel => rel.selected).length;
         return `Remove from ${selectedCount} selected project${selectedCount !== 1 ? 's' : ''}. The ${itemType} will remain in other projects and your library.`;
+      }
       case 'remove-from-all':
         return `Remove from all projects. The ${itemType} will remain in your library but won't be part of any projects.`;
       case 'move-to-trash':

@@ -621,7 +621,9 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
           // Add themes from transcript
           if (transcript.key_topics) {
             const topics = typeof transcript.key_topics === 'string' ? JSON.parse(transcript.key_topics) : transcript.key_topics;
-            topics.forEach((topic: string) => speakerData.themes.add(topic));
+            topics.forEach((topic: string) => {
+              speakerData.themes.add(topic);
+            });
           }
           
           // Add notable quotes
@@ -723,7 +725,9 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
       // Add themes
       if (transcript.key_topics) {
         const topics = typeof transcript.key_topics === 'string' ? JSON.parse(transcript.key_topics) : transcript.key_topics;
-        topics.forEach((topic: string) => monthData.themes.add(topic));
+        topics.forEach((topic: string) => {
+          monthData.themes.add(topic);
+        });
       }
       
       // Add sentiment

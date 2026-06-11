@@ -129,7 +129,7 @@ export const CorrectionTrigger: React.FC<CorrectionTriggerProps> = ({
       const errorMessage = (error as Error).message;
       // Truncate very long error messages (like HTML responses)
       const truncatedMessage = errorMessage.length > 200 
-        ? errorMessage.substring(0, 200) + '...' 
+        ? `${errorMessage.substring(0, 200)}...` 
         : errorMessage;
       onError(`Failed to correct transcript: ${truncatedMessage}`);
     } finally {

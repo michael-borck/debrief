@@ -8,9 +8,9 @@
 // `/tmpfoo`). The helpers here use fs.realpathSync + path.relative to get
 // it right.
 
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 
 function isPathUnder(targetPath, rootPath) {
   if (typeof targetPath !== 'string' || targetPath.length === 0) return false;

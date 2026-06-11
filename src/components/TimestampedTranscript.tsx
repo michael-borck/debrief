@@ -157,7 +157,7 @@ export const TimestampedTranscript: React.FC<TimestampedTranscriptProps> = ({
       const beforeTimestamp = parts[i] || '';
       const timestamp = parts[i + 2] || '';
       
-      if (timestamp && timestamp.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
+      if (timestamp?.match(/^\d{1,2}:\d{2}(:\d{2})?$/)) {
         // This is a timestamp
         const nextText = parts[i + 3] || '';
         

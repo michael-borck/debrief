@@ -81,7 +81,7 @@ export class ChunkingService {
   private chunkBySpeaker(transcriptId: string, segments: TranscriptSegment[]): TextChunk[] {
     const chunks: TextChunk[] = [];
     let currentChunk: TranscriptSegment[] = [];
-    let currentSpeaker: string | undefined = undefined;
+    let currentSpeaker: string | undefined;
     let chunkIndex = 0;
 
     for (const segment of segments) {

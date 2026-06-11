@@ -89,7 +89,7 @@ export const SettingsPage: React.FC = () => {
     try {
       const stats = await window.electronAPI.services.aiGetUsageStats();
       setUsageStats(stats);
-    } catch (err) {
+    } catch {
       // IPC may not be available in web build — silently ignore
     }
   };
@@ -139,7 +139,7 @@ export const SettingsPage: React.FC = () => {
       }
       setAnalyzeValidatedTranscript(settingsMap.analyzeValidatedTranscript !== 'false');
       setEnableSpeakerDiarisation(settingsMap.enableSpeakerDiarisation !== 'false');
-      if (settingsMap.diaMedianFilterFrames) setDiaMedianFilterFrames(parseInt(settingsMap.diaMedianFilterFrames) || 11);
+      if (settingsMap.diaMedianFilterFrames) setDiaMedianFilterFrames(parseInt(settingsMap.diaMedianFilterFrames, 10) || 11);
       if (settingsMap.diaMinDurationOn) setDiaMinDurationOn(parseFloat(settingsMap.diaMinDurationOn) || 0.50);
       if (settingsMap.diaMinDurationOff) setDiaMinDurationOff(parseFloat(settingsMap.diaMinDurationOff) || 0.20);
       if (settingsMap.diaClusterThreshold) setDiaClusterThreshold(parseFloat(settingsMap.diaClusterThreshold) || 0.50);
@@ -147,14 +147,14 @@ export const SettingsPage: React.FC = () => {
       setEnableDuplicateRemoval(settingsMap.enableDuplicateRemoval !== 'false');
       
       // Load chat settings
-      setChatContextChunks(parseInt(settingsMap.chatContextChunks) || 4);
-      setChatMemoryLimit(parseInt(settingsMap.chatMemoryLimit) || 20);
+      setChatContextChunks(parseInt(settingsMap.chatContextChunks, 10) || 4);
+      setChatMemoryLimit(parseInt(settingsMap.chatMemoryLimit, 10) || 20);
       setChatChunkingMethod(settingsMap.chatChunkingMethod || 'speaker');
-      setChatMaxChunkSize(parseInt(settingsMap.chatMaxChunkSize) || 60);
-      setChatChunkOverlap(parseInt(settingsMap.chatChunkOverlap) || 10);
+      setChatMaxChunkSize(parseInt(settingsMap.chatMaxChunkSize, 10) || 60);
+      setChatChunkOverlap(parseInt(settingsMap.chatChunkOverlap, 10) || 10);
       setConversationMode(settingsMap.conversationMode || 'rag');
-      setDirectLlmContextLimit(parseInt(settingsMap.directLlmContextLimit) || 8000);
-      setVectorOnlyChunkCount(parseInt(settingsMap.vectorOnlyChunkCount) || 5);
+      setDirectLlmContextLimit(parseInt(settingsMap.directLlmContextLimit, 10) || 8000);
+      setVectorOnlyChunkCount(parseInt(settingsMap.vectorOnlyChunkCount, 10) || 5);
     } catch (error) {
       console.error('Error loading settings:', error);
     }
@@ -635,7 +635,7 @@ export const SettingsPage: React.FC = () => {
                 {/* API key — hidden for Ollama local */}
                 {(() => {
                   const info = aiProviderList.find((p) => p.id === aiProvider);
-                  if (info && info.isLocal) return null;
+                  if (info?.isLocal) return null;
                   return (
                     <div>
                       <label className="label">
@@ -947,7 +947,7 @@ export const SettingsPage: React.FC = () => {
                               step="2"
                               value={diaMedianFilterFrames}
                               onChange={(e) => {
-                                const v = parseInt(e.target.value);
+                                const v = parseInt(e.target.value, 10);
                                 setDiaMedianFilterFrames(v);
                                 saveSetting('diaMedianFilterFrames', String(v));
                               }}
@@ -1173,7 +1173,7 @@ export const SettingsPage: React.FC = () => {
                           max="10"
                           value={vectorOnlyChunkCount}
                           onChange={(e) => {
-                            const value = parseInt(e.target.value);
+                            const value = parseInt(e.target.value, 10);
                             setVectorOnlyChunkCount(value);
                             saveChatSetting('vectorOnlyChunkCount', value.toString());
                           }}
@@ -1205,7 +1205,7 @@ export const SettingsPage: React.FC = () => {
                           step="1000"
                           value={directLlmContextLimit}
                           onChange={(e) => {
-                            const value = parseInt(e.target.value);
+                            const value = parseInt(e.target.value, 10);
                             setDirectLlmContextLimit(value);
                             saveChatSetting('directLlmContextLimit', value.toString());
                           }}
@@ -1241,7 +1241,7 @@ export const SettingsPage: React.FC = () => {
                       max="10"
                       value={chatContextChunks}
                       onChange={(e) => {
-                        const value = parseInt(e.target.value);
+                        const value = parseInt(e.target.value, 10);
                         setChatContextChunks(value);
                         saveChatSetting('chatContextChunks', value.toString());
                       }}
@@ -1291,7 +1291,7 @@ export const SettingsPage: React.FC = () => {
                       step="15"
                       value={chatMaxChunkSize}
                       onChange={(e) => {
-                        const value = parseInt(e.target.value);
+                        const value = parseInt(e.target.value, 10);
                         setChatMaxChunkSize(value);
                         saveChatSetting('chatMaxChunkSize', value.toString());
                       }}
@@ -1319,7 +1319,7 @@ export const SettingsPage: React.FC = () => {
                       step="5"
                       value={chatChunkOverlap}
                       onChange={(e) => {
-                        const value = parseInt(e.target.value);
+                        const value = parseInt(e.target.value, 10);
                         setChatChunkOverlap(value);
                         saveChatSetting('chatChunkOverlap', value.toString());
                       }}
@@ -1347,7 +1347,7 @@ export const SettingsPage: React.FC = () => {
                       step="5"
                       value={chatMemoryLimit}
                       onChange={(e) => {
-                        const value = parseInt(e.target.value);
+                        const value = parseInt(e.target.value, 10);
                         setChatMemoryLimit(value);
                         saveChatSetting('chatMemoryLimit', value.toString());
                       }}

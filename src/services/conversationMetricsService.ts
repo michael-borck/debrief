@@ -122,15 +122,16 @@ export function detectFillerWords(text: string): FillerWordResult {
   }
 
   // Multi-word fillers — match against the joined lowercased text with word boundaries
-  const joined = ' ' + tokens.join(' ') + ' ';
+  const joined = ` ${tokens.join(' ')} `;
   for (const phrase of MULTI_WORD_FILLERS) {
     // Simple substring with surrounding spaces to enforce word boundary
-    const needle = ' ' + phrase + ' ';
-    let idx = 0;
+    const needle = ` ${phrase} `;
+    let idx = joined.indexOf(needle);
     let n = 0;
-    while ((idx = joined.indexOf(needle, idx)) !== -1) {
+    while (idx !== -1) {
       n++;
       idx += needle.length - 1; // allow overlap on trailing space
+      idx = joined.indexOf(needle, idx);
     }
     if (n > 0) {
       counts.set(phrase, (counts.get(phrase) || 0) + n);
@@ -159,7 +160,7 @@ export function detectFillerWords(text: string): FillerWordResult {
 export function analyzeTalkTime(segments: SentenceSegment[]): TalkTimeResult | undefined {
   if (!segments || segments.length === 0) return undefined;
 
-  const withSpeakers = segments.filter(s => s.speaker && s.speaker.trim());
+  const withSpeakers = segments.filter(s => s.speaker?.trim());
   if (withSpeakers.length === 0) return undefined;
 
   const bySpeaker = new Map<string, { words: number; count: number; duration: number }>();

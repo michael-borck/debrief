@@ -73,8 +73,8 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
     const end = Math.min(text.length, matchIndex + matchLength + windowSize);
     
     let context = text.substring(start, end);
-    if (start > 0) context = '...' + context;
-    if (end < text.length) context = context + '...';
+    if (start > 0) context = `...${context}`;
+    if (end < text.length) context = `${context}...`;
     
     return context;
   };
@@ -189,7 +189,7 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
       const searchResults: SearchResult[] = [];
       
       // Filter transcripts by date range and sentiment
-      let filteredTranscripts = transcripts.filter(transcript => {
+      const filteredTranscripts = transcripts.filter(transcript => {
         // Date filter
         if (dateRange.start && new Date(transcript.created_at) < new Date(dateRange.start)) {
           return false;
