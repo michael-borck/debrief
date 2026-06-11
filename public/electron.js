@@ -1015,14 +1015,21 @@ ipcMain.handle('get-database-info', async () => {
 
 ipcMain.handle('change-database-location', async (event, newPath) => {
   try {
+    // newPath comes from an OS directory picker (showOpenDialog in Settings),
+    // so it normally exists. Defence in depth for a compromised renderer:
+    // require an existing directory instead of mkdir -p'ing an arbitrary tree,
+    // which could otherwise plant directories in sensitive locations
+    // (e.g. ~/Library/LaunchAgents).
+    if (typeof newPath !== 'string' || newPath.length === 0) {
+      throw new Error('invalid database location');
+    }
+    if (!fs.existsSync(newPath) || !fs.statSync(newPath).isDirectory()) {
+      throw new Error('database location must be an existing directory');
+    }
+
     const oldDbPath = global.dbPath;
     const newDbPath = path.join(newPath, DB_FILENAME);
-    
-    // Ensure new directory exists
-    if (!fs.existsSync(newPath)) {
-      fs.mkdirSync(newPath, { recursive: true });
-    }
-    
+
     // Close current database
     if (db) {
       db.close();
@@ -1051,6 +1058,15 @@ ipcMain.handle('change-database-location', async (event, newPath) => {
 
 ipcMain.handle('backup-database', async (event, backupPath) => {
   try {
+    // backupPath comes from an OS save dialog (showSaveDialog in Settings),
+    // which already confirmed any overwrite with the user. Sanity-check the
+    // shape so a compromised renderer can't direct writes at odd targets.
+    if (typeof backupPath !== 'string' || backupPath.length === 0) {
+      throw new Error('invalid backup path');
+    }
+    if (!fs.existsSync(path.dirname(backupPath))) {
+      throw new Error('backup directory does not exist');
+    }
     fs.copyFileSync(global.dbPath, backupPath);
     return { success: true };
   } catch (error) {
@@ -1058,6 +1074,9 @@ ipcMain.handle('backup-database', async (event, backupPath) => {
   }
 });
 
+// Trust note: fullPath is only ever the database path the app itself reported
+// via get-database-info (SettingsPage); showItemInFolder reveals but never
+// opens or executes the target.
 ipcMain.on('show-item-in-folder', (event, fullPath) => {
   shell.showItemInFolder(fullPath);
 });
@@ -1748,7 +1767,7 @@ ipcMain.handle('extract-audio', async (event, { inputPath, outputPath }) => {
   try {
     // Check if FFmpeg exists
     if (!fs.existsSync(ffmpegPath)) {
-      throw new Error('FFmpeg not found. Please run: npm run download-ffmpeg');
+      throw new Error('FFmpeg not found. The binary is bundled by the ffmpeg-static package — try reinstalling dependencies (npm install).');
     }
     
     await execFileAsync(
