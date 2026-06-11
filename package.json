@@ -22,8 +22,7 @@
     "lint": "biome lint",
     "lint:fix": "biome lint --write",
     "format": "biome format --write",
-    "postinstall": "electron-builder install-app-deps",
-    "download-ffmpeg": "node scripts/download-ffmpeg.js"
+    "postinstall": "electron-builder install-app-deps"
   },
   "keywords": [
     "electron",

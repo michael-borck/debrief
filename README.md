@@ -118,7 +118,7 @@ Debrief/
 ├── src/               # React TypeScript source
 ├── public/            # Electron main process
 ├── database/          # SQLite schema
-└── ffmpeg-binaries/   # Platform-specific FFmpeg
+└── embedded-server/   # Python sidecar (transcription, diarisation, embeddings)
 ```
 
 ## Technologies
