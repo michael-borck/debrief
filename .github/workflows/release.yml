@@ -57,7 +57,13 @@ jobs:
             'speech-analyser[diarization]>=0.2.0' \
             'sentence-transformers>=2.7,<6'
           /tmp/audit-venv/bin/pip install --quiet pip-audit
-          /tmp/audit-venv/bin/pip-audit --strict
+          # CVE-2025-3000 (torch, no fixed release as of Jun 2026): local-only
+          # memory-corruption crash in torch.jit.script with list attributes,
+          # CVSS 5.3. The sidecar never calls torch.jit.script (torch is used
+          # for whisper/pyannote inference only) and exploitation requires
+          # already-running local Python. Waived so the gate doesn't block
+          # every release; drop the ignore once torch ships a fixed version.
+          /tmp/audit-venv/bin/pip-audit --strict --ignore-vuln CVE-2025-3000
 
   build:
     needs: security-audit
