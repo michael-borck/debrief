@@ -99,7 +99,7 @@ interface DetailedAnalysis {
       transcript_id: string;
       transcript_title: string;
       date: string;
-      supporting_data: any;
+      supporting_data: unknown;
     }>;
     insights: string[];
   }>;
@@ -193,7 +193,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
         ].map(({ key, label }) => (
           <button
             key={key}
-            onClick={() => setActiveView(key as any)}
+            onClick={() => setActiveView(key as 'overview' | 'themes' | 'concepts' | 'speakers' | 'timeline' | 'patterns')}
             className={`pb-2 px-3 border-b-2 transition-colors ${
               activeView === key
                 ? 'border-primary-600 text-primary-800 font-medium'
@@ -309,7 +309,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
             
             {detailedAnalysis?.themeEvolution ? (
               <div className="space-y-4">
-                {detailedAnalysis.themeEvolution.slice(0, 10).map((theme: any, index: number) => (
+                {detailedAnalysis.themeEvolution.slice(0, 10).map((theme, index: number) => (
                   <div key={index} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-surface-900">{theme.theme}</h4>
@@ -337,7 +337,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
                     <div className="mb-3">
                       <div className="text-xs text-surface-500 mb-1">Timeline:</div>
                       <div className="flex gap-1">
-                        {theme.occurrences.slice(0, 8).map((occ: any, i: number) => (
+                        {theme.occurrences.slice(0, 8).map((occ, i: number) => (
                           <div
                             key={i}
                             className="h-2 bg-primary-200 rounded flex-1"
@@ -348,12 +348,12 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
                     </div>
 
                     {/* Sample quotes */}
-                    {theme.occurrences.some((occ: any) => occ.quotes.length > 0) && (
+                    {theme.occurrences.some((occ) => occ.quotes.length > 0) && (
                       <div>
                         <div className="text-xs text-surface-500 mb-1">Sample quotes:</div>
                         <div className="text-sm text-surface-700 italic">
                           {theme.occurrences
-                            .flatMap((occ: any) => occ.quotes)
+                            .flatMap((occ) => occ.quotes)
                             .slice(0, 2)
                             .map((quote: string, i: number) => (
                               <div key={i} className="truncate">"{quote.substring(0, 100)}..."</div>
@@ -430,7 +430,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
                 <div>
                   <h4 className="font-medium text-surface-900 mb-3">Speaker Distribution</h4>
                   <div className="grid gap-3 md:grid-cols-2">
-                    {Object.entries(detailedAnalysis.speakerAnalysis.speakerDistribution).map(([speaker, data]: [string, any]) => (
+                    {Object.entries(detailedAnalysis.speakerAnalysis.speakerDistribution).map(([speaker, data]) => (
                       <div key={speaker} className="border rounded-lg p-3">
                         <div className="font-medium text-surface-900 mb-1">{speaker}</div>
                         <div className="text-sm text-surface-600">
@@ -474,7 +474,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
                 <div>
                   <h4 className="font-medium text-surface-900 mb-3">Interaction Patterns</h4>
                   <div className="space-y-2">
-                    {detailedAnalysis.speakerAnalysis.speakerInteractions.slice(0, 5).map((interaction: any, index: number) => (
+                    {detailedAnalysis.speakerAnalysis.speakerInteractions.slice(0, 5).map((interaction, index: number) => (
                       <div key={index} className="border rounded p-3">
                         <div className="flex items-center justify-between">
                           <div className="font-medium text-surface-900">{interaction.transcript_title}</div>
@@ -521,7 +521,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
                 <div>
                   <h4 className="font-medium text-surface-900 mb-3">Activity by Month</h4>
                   <div className="space-y-2">
-                    {detailedAnalysis.timelineAnalysis.transcriptsByPeriod.map((period: any, index: number) => (
+                    {detailedAnalysis.timelineAnalysis.transcriptsByPeriod.map((period, index: number) => (
                       <div key={index} className="flex items-center justify-between border rounded p-3">
                         <div>
                           <div className="font-medium text-surface-900">{period.period}</div>
@@ -544,7 +544,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
                   <div>
                     <h4 className="font-medium text-surface-900 mb-3">Sentiment Trend</h4>
                     <div className="space-y-2">
-                      {detailedAnalysis.timelineAnalysis.sentimentTrend.map((point: any, index: number) => (
+                      {detailedAnalysis.timelineAnalysis.sentimentTrend.map((point, index: number) => (
                         <div key={index} className="flex items-center justify-between border rounded p-2">
                           <div className="text-sm text-surface-700">{formatDate(point.date)}</div>
                           <div className="flex items-center gap-2">
@@ -577,7 +577,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
             
             {detailedAnalysis?.crossTranscriptPatterns ? (
               <div className="space-y-4">
-                {detailedAnalysis.crossTranscriptPatterns.map((pattern: any, index: number) => (
+                {detailedAnalysis.crossTranscriptPatterns.map((pattern, index: number) => (
                   <div key={index} className="border rounded-lg p-4">
                     <div className="flex items-center justify-between mb-2">
                       <h4 className="font-medium text-surface-900">{pattern.description}</h4>
@@ -602,7 +602,7 @@ export const ProjectInsightsDashboard: React.FC<ProjectInsightsDashboardProps> =
                         Evidence from {pattern.evidence.length} transcript(s):
                       </div>
                       <div className="space-y-1">
-                        {pattern.evidence.slice(0, 3).map((evidence: any, i: number) => (
+                        {pattern.evidence.slice(0, 3).map((evidence, i: number) => (
                           <div key={i} className="text-sm text-surface-700">
                             • {evidence.transcript_title} ({formatDate(evidence.date)})
                           </div>

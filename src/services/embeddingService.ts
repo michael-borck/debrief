@@ -10,7 +10,7 @@ export interface EmbeddingConfig {
 export interface EmbeddingResult {
   embedding: number[];
   text: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export class EmbeddingService {
@@ -30,11 +30,11 @@ export class EmbeddingService {
     return window.electronAPI.embedding.initialize();
   }
 
-  async embedText(text: string, metadata?: Record<string, any>): Promise<EmbeddingResult> {
+  async embedText(text: string, metadata?: Record<string, unknown>): Promise<EmbeddingResult> {
     return window.electronAPI.embedding.embedText(text, metadata);
   }
 
-  async embedBatch(texts: string[], metadata?: Record<string, any>[]): Promise<EmbeddingResult[]> {
+  async embedBatch(texts: string[], metadata?: Record<string, unknown>[]): Promise<EmbeddingResult[]> {
     return window.electronAPI.embedding.embedBatch(texts, metadata);
   }
 

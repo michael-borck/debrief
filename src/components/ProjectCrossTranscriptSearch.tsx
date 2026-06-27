@@ -1,3 +1,12 @@
+// One term hit found while searching a transcript field.
+interface SearchMatch {
+  field: string;
+  content: string;
+  context: string;
+  startIndex: number;
+  endIndex: number;
+}
+
 import React, { useState, useCallback, useMemo } from 'react';
 import { logger } from '../utils/logger';
 import { Transcript } from '../types';
@@ -79,7 +88,7 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
     return context;
   };
 
-  const calculateRelevanceScore = (matches: any[], transcript: Transcript): number => {
+  const calculateRelevanceScore = (matches: SearchMatch[], transcript: Transcript): number => {
     let score = 0;
     
     // Base score from number of matches
@@ -126,10 +135,10 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
     return Math.min(100, score);
   };
 
-  const searchInField = (content: any, field: string, query: string): any[] => {
+  const searchInField = (content: unknown, field: string, query: string): SearchMatch[] => {
     if (!content || !query.trim()) return [];
     
-    const matches: any[] = [];
+    const matches: SearchMatch[] = [];
     const searchTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 1);
     
     const searchInText = (text: string, fieldName: string) => {
@@ -218,10 +227,10 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
       });
       
       for (const transcript of filteredTranscripts) {
-        const allMatches: any[] = [];
+        const allMatches: SearchMatch[] = [];
         
         // Define searchable fields based on filter
-        const fieldsToSearch: { [key: string]: any } = {};
+        const fieldsToSearch: { [key: string]: unknown } = {};
         
         if (searchFilter === 'all' || searchFilter === 'text') {
           fieldsToSearch.title = transcript.title;
@@ -330,7 +339,7 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
           </div>
           <select
             value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value as any)}
+            onChange={(e) => setSearchFilter(e.target.value as 'all' | 'text' | 'themes' | 'quotes' | 'insights')}
             className="px-3 py-2 border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400"
           >
             <option value="all">All Fields</option>
@@ -385,7 +394,7 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
               <label className="block text-sm font-medium text-surface-700 mb-1">Sentiment</label>
               <select
                 value={sentimentFilter}
-                onChange={(e) => setSentimentFilter(e.target.value as any)}
+            onChange={(e) => setSentimentFilter(e.target.value as 'all' | 'positive' | 'negative' | 'neutral')}
                 className="w-full px-3 py-2 border border-surface-200 rounded text-sm"
               >
                 <option value="all">All</option>

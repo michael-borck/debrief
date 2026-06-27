@@ -89,8 +89,8 @@ export const TopicsTab: React.FC<TopicsTabProps> = ({ transcript, onSeek }) => {
       });
       setTopics(computed);
       setExpanded(new Set());
-    } catch (e: any) {
-      setError(e?.message || 'Failed to compute topics');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Failed to compute topics');
     } finally {
       setComputing(false);
       setProgress('');

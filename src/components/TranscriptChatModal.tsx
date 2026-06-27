@@ -3,7 +3,7 @@ import { logger } from '../utils/logger';
 import { createPortal } from 'react-dom';
 import { X, Send, MessageCircle, User, Bot, AlertCircle, Plus } from 'lucide-react';
 import { Transcript } from '../types';
-import { chatService, ChatMessage, ProcessingProgress } from '../services/chatService';
+import { chatService, ChatMessage, ProcessingProgress, ConversationMode } from '../services/chatService';
 
 interface TranscriptChatModalProps {
   transcript: Transcript;
@@ -206,7 +206,7 @@ export const TranscriptChatModal: React.FC<TranscriptChatModalProps> = ({
   const handleModeChange = async (newMode: string) => {
     try {
       // Update the chat service configuration
-      await chatService.updateConfig({ conversationMode: newMode as any });
+      await chatService.updateConfig({ conversationMode: newMode as ConversationMode });
       
       // Update local state
       setCurrentMode(newMode);

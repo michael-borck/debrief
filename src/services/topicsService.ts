@@ -299,7 +299,7 @@ export class TopicsService {
     const allChunks = await vectorStoreService.getTranscriptChunks(transcriptId);
     const byId = new Map(allChunks.map(c => [c.id, c]));
 
-    return rows.map((row: any) => {
+    return rows.map((row) => {
       const chunkIds: string[] = JSON.parse(row.chunk_ids || '[]');
       const chunks = chunkIds.map(id => byId.get(id)).filter(Boolean) as VectorChunk[];
       chunks.sort((a, b) => a.startTime - b.startTime);

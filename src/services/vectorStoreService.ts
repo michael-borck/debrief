@@ -46,7 +46,7 @@ export class VectorStoreService {
     return window.electronAPI.vectorStore.initialize(dbPath);
   }
 
-  async storeChunks(chunks: any[], embeddings: any[]): Promise<void> {
+  async storeChunks(chunks: unknown[], embeddings: unknown[]): Promise<void> {
     return window.electronAPI.vectorStore.storeChunks(chunks, embeddings);
   }
 
@@ -65,7 +65,7 @@ export class VectorStoreService {
     return window.electronAPI.vectorStore.getTranscriptChunks(transcriptId);
   }
 
-  async updateChunks(chunks: any[], embeddings: any[]): Promise<void> {
+  async updateChunks(chunks: unknown[], embeddings: unknown[]): Promise<void> {
     return window.electronAPI.vectorStore.updateChunks(chunks, embeddings);
   }
 

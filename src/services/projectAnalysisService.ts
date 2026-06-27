@@ -1,4 +1,5 @@
 import { Transcript } from '../types';
+import { hydrateTranscriptRow } from '../utils/hydration';
 
 export interface ProjectAnalysisConfig {
   enableCrossTranscriptAnalysis: boolean;
@@ -110,9 +111,33 @@ export interface CrossTranscriptPattern {
     transcript_id: string;
     transcript_title: string;
     date: string;
-    supporting_data: any;
+    supporting_data: unknown;
   }[];
   insights: string[];
+}
+
+// Return type of aggregateTranscriptData — the aggregated input the summary
+// generators consume. Extracted so generateCombinedSummary and
+// createFallbackSummary share one typed contract instead of `any`.
+type AggregatedTranscriptData = {
+  allTopics: string[];
+  allActionItems: string[];
+  themeFrequency: Array<{
+    theme: string;
+    frequency: number;
+    sources: Array<{ transcriptId: string; transcriptTitle: string; relevance: number }>;
+  }>;
+};
+
+type NotableQuote = NonNullable<Transcript['notable_quotes']>[number];
+
+// notable_quotes is an Array in the Transcript type, but the DB layer can hand
+// back a JSON string for unhydrated rows. Normalise to a typed array without
+// `any`: unknown in, declared NotableQuote[] out.
+function toNotableQuotes(value: unknown): NotableQuote[] {
+  if (value == null) return [];
+  const raw: unknown = typeof value === 'string' ? JSON.parse(value) : value;
+  return Array.isArray(raw) ? raw : [];
 }
 
 export class ProjectAnalysisService {
@@ -187,10 +212,11 @@ export class ProjectAnalysisService {
    */
   private async getProjectTranscripts(projectId: string): Promise<Transcript[]> {
     try {
-      return await window.electronAPI.db.projectTranscripts.listTranscriptsForProject(projectId, {
+      const rows = await window.electronAPI.db.projectTranscripts.listTranscriptsForProject(projectId, {
         completedOnly: true,
         orderBy: 'created_asc',
       });
+      return rows.map(hydrateTranscriptRow);
     } catch (error) {
       console.error('Failed to get project transcripts:', error);
       return [];
@@ -200,19 +226,7 @@ export class ProjectAnalysisService {
   /**
    * Aggregate data from all transcripts
    */
-  private aggregateTranscriptData(transcripts: Transcript[]): {
-    allTopics: string[];
-    allActionItems: string[];
-    themeFrequency: Array<{
-      theme: string;
-      frequency: number;
-      sources: Array<{
-        transcriptId: string;
-        transcriptTitle: string;
-        relevance: number;
-      }>;
-    }>;
-  } {
+  private aggregateTranscriptData(transcripts: Transcript[]): AggregatedTranscriptData {
     const allTopics: string[] = [];
     const allActionItems: string[] = [];
     const themeMap = new Map<string, Array<{ transcriptId: string; transcriptTitle: string; relevance: number }>>();
@@ -266,7 +280,7 @@ export class ProjectAnalysisService {
    */
   private async generateCombinedSummary(
     transcripts: Transcript[],
-    aggregatedData: any
+    aggregatedData: AggregatedTranscriptData
   ): Promise<string> {
     try {
       const summaries = transcripts
@@ -303,8 +317,8 @@ Create a comprehensive summary (200-300 words) that identifies main themes and o
   /**
    * Create fallback summary when AI generation fails
    */
-  private createFallbackSummary(transcripts: Transcript[], aggregatedData: any): string {
-    const topThemes = aggregatedData.themeFrequency.slice(0, 5).map((t: any) => t.theme);
+  private createFallbackSummary(transcripts: Transcript[], aggregatedData: AggregatedTranscriptData): string {
+    const topThemes = aggregatedData.themeFrequency.slice(0, 5).map((t) => t.theme);
     
     return `This project consists of ${transcripts.length} transcripts spanning from ${new Date(transcripts[0].created_at).toLocaleDateString()} to ${new Date(transcripts[transcripts.length - 1].created_at).toLocaleDateString()}. 
 
@@ -348,7 +362,7 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
   /**
    * Cache analysis result
    */
-  private async cacheAnalysisResult(projectId: string, analysisType: string, result: any): Promise<void> {
+  private async cacheAnalysisResult(projectId: string, analysisType: string, result: CollatedAnalysisResult | ComprehensiveAnalysisResult): Promise<void> {
     try {
       const id = `${projectId}_${analysisType}_${Date.now()}`;
       await window.electronAPI.db.projectAnalysis.insert({
@@ -445,14 +459,11 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
           // Extract quotes related to this theme (simplified approach)
           const quotes: string[] = [];
           if (transcript.notable_quotes) {
-            const notableQuotes = typeof transcript.notable_quotes === 'string' 
-              ? JSON.parse(transcript.notable_quotes) 
-              : transcript.notable_quotes;
-            
+            const notableQuotes = toNotableQuotes(transcript.notable_quotes);
             quotes.push(...notableQuotes
-              .filter((q: any) => q.text.toLowerCase().includes(topic.toLowerCase()))
+              .filter((q) => q.text.toLowerCase().includes(topic.toLowerCase()))
               .slice(0, 2)
-              .map((q: any) => q.text)
+              .map((q) => q.text)
             );
           }
 
@@ -628,11 +639,11 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
           
           // Add notable quotes
           if (transcript.notable_quotes) {
-            const quotes = typeof transcript.notable_quotes === 'string' ? JSON.parse(transcript.notable_quotes) : transcript.notable_quotes;
+            const quotes = toNotableQuotes(transcript.notable_quotes);
             const speakerQuotes = quotes
-              .filter((q: any) => q.speaker === speakerName)
+              .filter((q) => q.speaker === speakerName)
               .slice(0, 2)
-              .map((q: any) => q.text);
+              .map((q) => q.text);
             speakerData.keyQuotes.push(...speakerQuotes);
           }
         });

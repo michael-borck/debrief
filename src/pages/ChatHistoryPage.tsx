@@ -3,6 +3,7 @@ import { MessageCircle, Search, Clock, Trash2, ChevronRight, FileText, FolderOpe
 import { formatDistanceToNow } from '../utils/helpers';
 import { TranscriptChatModal } from '../components/TranscriptChatModal';
 import { Transcript } from '../types';
+import { hydrateTranscriptRow } from '../utils/hydration';
 
 interface ChatConversation {
   id: string;
@@ -49,10 +50,7 @@ export const ChatHistoryPage: React.FC = () => {
     if (conversation.entity_type === 'transcript' && conversation.transcript_id) {
       const transcript = await window.electronAPI.db.transcripts.get(conversation.transcript_id);
       if (transcript) {
-        transcript.action_items = transcript.action_items ? JSON.parse(transcript.action_items) : [];
-        transcript.key_topics = transcript.key_topics ? JSON.parse(transcript.key_topics) : [];
-        transcript.tags = transcript.tags ? JSON.parse(transcript.tags) : [];
-        setSelectedTranscript(transcript);
+        setSelectedTranscript(hydrateTranscriptRow(transcript));
         setSelectedConversationId(conversation.id);
         setShowChatModal(true);
       }

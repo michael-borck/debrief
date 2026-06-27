@@ -9,6 +9,7 @@
 
 import { promptService } from './promptService';
 import { aiComplete } from './aiCompletion';
+import { ValidationResultSchema } from './analysisSchemas';
 import { checkCancelled, isCancelled } from '../utils/cancellation';
 
 export interface ValidationChange {
@@ -150,9 +151,17 @@ export function removeDuplicateSentences(transcriptText: string): {
 // Chunked validation for long transcripts
 // ============================================================
 
+// User-configurable per-validation toggles (from the validationOptions setting).
+interface ValidationOptions {
+  spelling?: boolean;
+  grammar?: boolean;
+  punctuation?: boolean;
+  capitalization?: boolean;
+}
+
 async function performChunkedValidation(
   text: string,
-  options: any,
+  options: ValidationOptions,
   signal?: AbortSignal
 ): Promise<ValidationResult> {
   const chunks: string[] = [];
@@ -224,17 +233,15 @@ Please format your response as JSON:
       const res = await aiComplete(validationPrompt, 'json', signal);
 
       if (res.ok && res.data) {
-        const chunkData = res.data;
+        const chunkData = ValidationResultSchema.parse(res.data);
         validatedChunks.push(chunkData.validatedText || chunk);
 
-        if (Array.isArray(chunkData.changes)) {
-          // Adjust positions for the full text
-          const adjustedChanges = chunkData.changes.map((change: any) => ({
-            ...change,
-            position: change.position + (i > 0 ? validatedChunks.slice(0, i).join('').length : 0),
-          }));
-          allChanges.push(...adjustedChanges);
-        }
+        // Adjust positions for the full text
+        const adjustedChanges = chunkData.changes.map((change) => ({
+          ...change,
+          position: change.position + (i > 0 ? validatedChunks.slice(0, i).join('').length : 0),
+        }));
+        allChanges.push(...adjustedChanges);
       } else {
         console.warn(`Failed to validate chunk ${i + 1}, using original`);
         validatedChunks.push(chunk);
@@ -285,7 +292,7 @@ export const transcriptValidationService = {
         return { validatedText: transcriptText, changes: [] };
       }
 
-      let options: any = {};
+      let options: ValidationOptions = {};
       if (valSettings.validationOptions) {
         try {
           options = JSON.parse(valSettings.validationOptions);
@@ -349,14 +356,7 @@ export const transcriptValidationService = {
         throw new Error(res.error || 'AI service error');
       }
 
-      const validationData = res.data;
-      if (!validationData) {
-        console.warn('Failed to parse validation response as JSON');
-        return {
-          validatedText: processedText, // Use duplicate-cleaned text as fallback
-          changes: duplicateRemovalChanges,
-        };
-      }
+      const validationData = ValidationResultSchema.parse(res.data);
 
       // Check if AI returned full text (within 10% of original length)
       const originalLength = processedText.length;
@@ -378,7 +378,7 @@ export const transcriptValidationService = {
         validatedText: validationData.validatedText || processedText,
         changes: [
           ...duplicateRemovalChanges,
-          ...(Array.isArray(validationData.changes) ? validationData.changes : []),
+          ...validationData.changes,
         ],
       };
     } catch (error) {

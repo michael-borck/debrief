@@ -1,10 +1,59 @@
 import React, { useState } from 'react';
 import { logger } from '../utils/logger';
 import { Project } from '../types';
+import type { TranscriptRow } from '../types/db';
 
 interface ProjectAnalysisExportProps {
   project: Project;
   onClose: () => void;
+}
+
+// Shape of the export payload the generate* functions read. All analysis
+// sub-objects are optional (each is rendered behind an `if` guard); only the
+// project identity + exported_at are accessed unconditionally.
+interface ProjectExportData {
+  exported_at: string;
+  project: {
+    name: string;
+    created_at: string;
+    description?: string;
+    transcript_count?: number;
+    total_duration?: number;
+    date_range?: { start: string; end: string };
+  };
+  analysis: {
+    summary?: string;
+    themes?: string[];
+    key_insights?: string[];
+    themeEvolution?: Array<{
+      theme: string;
+      totalOccurrences: number;
+      trend: string;
+      avgRelevance: number;
+      occurrences: unknown[];
+    }>;
+    conceptFrequency?: Record<string, {
+      totalCount: number;
+      transcriptCount: number;
+      avgFrequency: number;
+      trend: string;
+    }>;
+    speakerAnalysis?: {
+      totalSpeakers: number;
+      speakerDistribution: Record<string, {
+        transcriptCount: number;
+        totalSegments: number;
+        themes: string[];
+      }>;
+    };
+    crossTranscriptPatterns?: Array<{
+      description: string;
+      type: string;
+      strength: number;
+      evidence: unknown[];
+      insights: string[];
+    }>;
+  };
 }
 
 export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({ 
@@ -33,7 +82,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
       const detailedAnalysis = analysisResult?.results ? JSON.parse(analysisResult.results) : null;
       
       // Get project transcripts if requested
-      let transcripts = [];
+      let transcripts: TranscriptRow[] = [];
       if (exportSections.transcripts) {
         transcripts = await window.electronAPI.db.projectTranscripts.listTranscriptsForProject(
           project.id,
@@ -135,7 +184,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     }
   };
 
-  const generateCSVExport = (data: any): string => {
+  const generateCSVExport = (data: ProjectExportData): string => {
     const lines = [];
     
     // Project overview
@@ -159,7 +208,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     if (data.analysis.themeEvolution) {
       lines.push('Theme Evolution');
       lines.push('Theme,Total Occurrences,Trend,Avg Relevance');
-      data.analysis.themeEvolution.forEach((theme: any) => {
+      data.analysis.themeEvolution.forEach((theme) => {
         lines.push(`"${theme.theme}",${theme.totalOccurrences},${theme.trend},${theme.avgRelevance.toFixed(2)}`);
       });
       lines.push('');
@@ -169,7 +218,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     if (data.analysis.conceptFrequency) {
       lines.push('Concept Frequency');
       lines.push('Concept,Total Count,Transcript Count,Avg Frequency,Trend');
-      Object.entries(data.analysis.conceptFrequency).forEach(([concept, conceptData]: [string, any]) => {
+      Object.entries(data.analysis.conceptFrequency).forEach(([concept, conceptData]) => {
         lines.push(`"${concept}",${conceptData.totalCount},${conceptData.transcriptCount},${conceptData.avgFrequency.toFixed(1)},${conceptData.trend}`);
       });
     }
@@ -177,7 +226,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     return lines.join('\n');
   };
 
-  const generateMarkdownExport = (data: any): string => {
+  const generateMarkdownExport = (data: ProjectExportData): string => {
     const lines = [];
     
     lines.push(`# Project Analysis: ${data.project.name}`);
@@ -230,7 +279,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     if (data.analysis.themeEvolution) {
       lines.push('## Theme Evolution');
       lines.push('');
-      data.analysis.themeEvolution.slice(0, 10).forEach((theme: any) => {
+      data.analysis.themeEvolution.slice(0, 10).forEach((theme) => {
         lines.push(`### ${theme.theme}`);
         lines.push(`- **Trend:** ${theme.trend}`);
         lines.push(`- **Total Occurrences:** ${theme.totalOccurrences}`);
@@ -247,7 +296,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
       lines.push(`**Total Speakers:** ${data.analysis.speakerAnalysis.totalSpeakers}`);
       lines.push('');
       
-      Object.entries(data.analysis.speakerAnalysis.speakerDistribution).slice(0, 5).forEach(([speaker, speakerData]: [string, any]) => {
+      Object.entries(data.analysis.speakerAnalysis.speakerDistribution).slice(0, 5).forEach(([speaker, speakerData]) => {
         lines.push(`### ${speaker}`);
         lines.push(`- **Transcript Count:** ${speakerData.transcriptCount}`);
         lines.push(`- **Total Segments:** ${speakerData.totalSegments}`);
@@ -262,7 +311,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     if (data.analysis.crossTranscriptPatterns && data.analysis.crossTranscriptPatterns.length > 0) {
       lines.push('## Cross-Transcript Patterns');
       lines.push('');
-      data.analysis.crossTranscriptPatterns.slice(0, 5).forEach((pattern: any) => {
+      data.analysis.crossTranscriptPatterns.slice(0, 5).forEach((pattern) => {
         lines.push(`### ${pattern.description}`);
         lines.push(`- **Type:** ${pattern.type.replace('_', ' ')}`);
         lines.push(`- **Strength:** ${(pattern.strength * 100).toFixed(0)}%`);
@@ -283,7 +332,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     return lines.join('\n');
   };
 
-  const generateHTMLExport = (data: any): string => {
+  const generateHTMLExport = (data: ProjectExportData): string => {
     const markdownContent = generateMarkdownExport(data);
     
     return `
@@ -334,7 +383,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
           </label>
           <select
             value={exportFormat}
-            onChange={(e) => setExportFormat(e.target.value as any)}
+            onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv' | 'markdown' | 'pdf')}
             className="input"
           >
             <option value="json">JSON (Complete Data)</option>

@@ -12,6 +12,9 @@
  * the suggestions (usually: show them in a UI for accept/reject).
  */
 
+import { z } from 'zod';
+import { tolerantArray } from './schemaUtils';
+
 export interface SpeakerWithSamples {
   id: string;
   name: string;
@@ -40,6 +43,28 @@ export interface SpeakerSuggestionsResult {
   labels: SpeakerLabelSuggestion[];
   merges: SpeakerMergeSuggestion[];
 }
+
+// Shape the model is prompted to return for speaker suggestions. Tolerant: a
+// malformed-but-present response degrades to empty arrays rather than throwing.
+const SpeakerSuggestionsSchema = z
+  .object({
+    labels: tolerantArray(
+      z.object({
+        speakerId: z.string().catch(''),
+        suggestedName: z.string().catch(''),
+        reasoning: z.string().optional().catch(undefined),
+      })
+    ),
+    merges: tolerantArray(
+      z.object({
+        speakerAId: z.string().catch(''),
+        speakerBId: z.string().catch(''),
+        confidence: z.string().catch('medium'),
+        reasoning: z.string().optional().catch(undefined),
+      })
+    ),
+  })
+  .catch({ labels: [], merges: [] });
 
 const SYSTEM_PROMPT = `You analyse transcribed conversations to help researchers label speakers meaningfully. You are concise, factual, and never invent names that aren't clearly supported by the samples.`;
 
@@ -85,7 +110,7 @@ Return empty arrays if there are no suggestions. Do not wrap the JSON in anythin
  * Extract the JSON object from an LLM response that may or may not
  * have leading/trailing text or markdown fences.
  */
-const extractJson = (text: string): any | null => {
+const extractJson = (text: string): unknown => {
   if (!text) return null;
 
   // Strip markdown code fences if present
@@ -134,8 +159,8 @@ export async function suggestSpeakerImprovements(
       };
     }
 
-    const parsed = extractJson(result.text ?? '');
-    if (!parsed) {
+    const raw = extractJson(result.text ?? '');
+    if (!raw) {
       return {
         success: false,
         error: 'Could not parse AI response as JSON. The model may need a different prompt.',
@@ -144,8 +169,11 @@ export async function suggestSpeakerImprovements(
       };
     }
 
+    // Validate the model's JSON into a typed shape, then filter/normalise.
+    const parsed = SpeakerSuggestionsSchema.parse(raw);
+
     // Build label suggestions, filtering out ones that match the current label
-    const rawLabels: any[] = Array.isArray(parsed.labels) ? parsed.labels : [];
+    const rawLabels = parsed.labels;
     const speakerById = new Map(speakers.map((s) => [s.id, s]));
 
     const labels: SpeakerLabelSuggestion[] = rawLabels
@@ -165,7 +193,7 @@ export async function suggestSpeakerImprovements(
       })
       .filter((l): l is SpeakerLabelSuggestion => l !== null);
 
-    const rawMerges: any[] = Array.isArray(parsed.merges) ? parsed.merges : [];
+    const rawMerges = parsed.merges;
     const merges: SpeakerMergeSuggestion[] = rawMerges
       .map((m) => {
         const a = speakerById.get(m.speakerAId);

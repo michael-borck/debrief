@@ -206,7 +206,7 @@ export interface ProjectAnalysis {
   id: string;
   project_id: string;
   analysis_type: 'theme_evolution' | 'speaker_comparison' | 'pattern_analysis' | 'consensus_divergence' | 'timeline_analysis';
-  results: any; // JSON data, structure depends on analysis_type
+  results: unknown; // JSON data, structure depends on analysis_type
   created_at: string;
 }
 

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { Project, Transcript } from '../types';
 import { generateId } from '../utils/helpers';
 import { projectAnalysisService } from '../services/projectAnalysisService';
+import { hydrateTranscriptRow, hydrateProjectRow } from '../utils/hydration';
 
 interface ProjectContextType {
   projects: Project[];
@@ -50,11 +51,8 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       
       const result = await window.electronAPI.db.projectTranscripts.listProjectsWithStats();
 
-      const projectsWithMetadata = result.map((row: any) => ({
-        ...row,
-        themes: row.themes ? JSON.parse(row.themes) : [],
-        key_insights: row.key_insights ? JSON.parse(row.key_insights) : [],
-        tags: row.tags ? JSON.parse(row.tags) : [],
+      const projectsWithMetadata = result.map((row) => ({
+        ...hydrateProjectRow(row),
         date_range: row.earliest_transcript && row.latest_transcript ? {
           start: row.earliest_transcript,
           end: row.latest_transcript
@@ -233,12 +231,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
         { includeDeleted: true, orderBy: 'added_desc' }
       );
 
-      return result.map((row: any) => ({
-        ...row,
-        action_items: row.action_items ? JSON.parse(row.action_items) : [],
-        key_topics: row.key_topics ? JSON.parse(row.key_topics) : [],
-        tags: row.tags ? JSON.parse(row.tags) : []
-      }));
+      return result.map(hydrateTranscriptRow);
     } catch (err) {
       console.error('Failed to get project transcripts:', err);
       throw new Error('Failed to get project transcripts');

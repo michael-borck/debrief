@@ -55,7 +55,7 @@ export const EnhancedDeleteModal: React.FC<EnhancedDeleteModalProps> = ({
       
       // Find the corresponding project objects and set selection
       const relatedProjects = projects
-        .filter(project => relations.some((rel: any) => rel.project_id === project.id))
+        .filter(project => relations.some((rel: { project_id: string }) => rel.project_id === project.id))
         .map(project => ({
           id: project.id,
           name: project.name,

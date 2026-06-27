@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Trash, RefreshCw, AlertTriangle, Calendar, FolderOpen, FileText, Clock } from 'lucide-react';
 import { Transcript, Project } from '../types';
 import { formatDate, formatDuration } from '../utils/helpers';
+import { hydrateTranscriptRow, hydrateProjectRow } from '../utils/hydration';
 
 type TrashItem = {
   type: 'transcript' | 'project';
@@ -26,29 +27,24 @@ export const TrashPage: React.FC = () => {
       const deletedProjects = await window.electronAPI.db.projects.listTrashed();
       const now = new Date();
       const items: TrashItem[] = [];
-      deletedTranscripts.forEach((transcript: any) => {
+      deletedTranscripts.forEach((transcript) => {
+        if (!transcript.deleted_at) return;
         const daysElapsed = Math.floor((now.getTime() - new Date(transcript.deleted_at).getTime()) / (1000 * 60 * 60 * 24));
         const daysRemaining = Math.max(0, 30 - daysElapsed);
         if (daysRemaining > 0) {
           items.push({ type: 'transcript', id: transcript.id, title: transcript.title,
             deleted_at: transcript.deleted_at, daysRemaining,
-            data: { ...transcript, action_items: transcript.action_items ? JSON.parse(transcript.action_items) : [],
-              key_topics: transcript.key_topics ? JSON.parse(transcript.key_topics) : [],
-              tags: transcript.tags ? JSON.parse(transcript.tags) : [],
-              speakers: transcript.speakers ? JSON.parse(transcript.speakers) : [],
-              emotions: transcript.emotions ? JSON.parse(transcript.emotions) : {},
-              starred: !!transcript.starred } });
+            data: hydrateTranscriptRow(transcript) });
         }
       });
-      deletedProjects.forEach((project: any) => {
+      deletedProjects.forEach((project) => {
+        if (!project.deleted_at) return;
         const daysElapsed = Math.floor((now.getTime() - new Date(project.deleted_at).getTime()) / (1000 * 60 * 60 * 24));
         const daysRemaining = Math.max(0, 30 - daysElapsed);
         if (daysRemaining > 0) {
           items.push({ type: 'project', id: project.id, title: project.name,
             deleted_at: project.deleted_at, daysRemaining,
-            data: { ...project, themes: project.themes ? JSON.parse(project.themes) : [],
-              key_insights: project.key_insights ? JSON.parse(project.key_insights) : [],
-              tags: project.tags ? JSON.parse(project.tags) : [] } });
+            data: hydrateProjectRow(project) });
         }
       });
       items.sort((a, b) => new Date(b.deleted_at).getTime() - new Date(a.deleted_at).getTime());

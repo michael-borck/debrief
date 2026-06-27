@@ -4,6 +4,7 @@ import { vectorStoreService, SearchResult } from './vectorStoreService';
 import { promptService } from './promptService';
 import { modelMetadataService, ModelMetadata, ModelContextBudget } from './modelMetadataService';
 import { Transcript, TranscriptSegment } from '../types';
+import { hydrateTranscriptRow } from '../utils/hydration';
 
 export type ConversationMode = 'vector-only' | 'rag' | 'direct-llm';
 
@@ -856,7 +857,7 @@ export class ChatService {
     }
   }
 
-  private async getTranscriptMetadata(transcriptId: string): Promise<any> {
+  private async getTranscriptMetadata(transcriptId: string): Promise<{ title?: string } | null> {
     try {
       return await window.electronAPI.db.transcripts.getMetadata(transcriptId);
     } catch (error) {
@@ -889,11 +890,15 @@ export class ChatService {
     
     // Get transcript data
     const transcript = await window.electronAPI.db.transcripts.get(transcriptId);
+    if (!transcript) {
+      console.warn(`Cannot reprocess: transcript ${transcriptId} not found`);
+      return;
+    }
 
     const segments = await window.electronAPI.db.transcriptSegments.listByTranscript(transcriptId);
 
     // Reprocess
-    await this.processTranscriptForChat(transcript, segments, onProgress);
+    await this.processTranscriptForChat(hydrateTranscriptRow(transcript), segments, onProgress);
   }
 
 
@@ -904,7 +909,7 @@ export class ChatService {
     try {
       const messages = await window.electronAPI.db.chat.listMessages(conversationId);
 
-      return messages.map((row: any) => ({
+      return messages.map((row) => ({
         id: row.id.toString(),
         role: row.role,
         content: row.content,
@@ -1051,7 +1056,7 @@ export class ChatService {
 
   async getStats(): Promise<{
     isReady: boolean;
-    vectorStats: any;
+    vectorStats: { totalChunks: number; transcripts: string[]; avgChunkSize: number; speakers: string[] };
     embeddingModel: string;
     config: ChatConfig;
     modelMetadata?: ModelMetadata;

@@ -4,6 +4,13 @@ import { promptService } from './promptService';
 import { sentenceSegmentsService } from './sentenceSegmentsService';
 import { transcriptValidationService } from './transcriptValidationService';
 import { aiComplete } from './aiCompletion';
+import {
+  BasicAnalysisSchema,
+  SentimentResultSchema,
+  EmotionResultSchema,
+  ResearchAnalysisSchema,
+  type ResearchAnalysis,
+} from './analysisSchemas';
 import type { TranscriptionStage } from '../types';
 import { abortable, checkCancelled, isCancelled } from '../utils/cancellation';
 
@@ -332,15 +339,16 @@ export class FileProcessor {
       }
 
       // data is the tolerant JSON parse; fall back to schema-specific parsing.
-      const analysisData = res.data ?? this.parseAnalysisText(res.raw);
+      // Validate model JSON (or the text-fallback parse) into a typed shape.
+      // The schema coerces and defaults, so this never throws and replaces the
+      // old Array.isArray(...) guards.
+      const analysisData = BasicAnalysisSchema.parse(
+        res.data ?? this.parseAnalysisText(res.raw)
+      );
 
       console.log('Analysis completed:', analysisData);
-      
-      return {
-        summary: analysisData.summary || '',
-        keyTopics: Array.isArray(analysisData.keyTopics) ? analysisData.keyTopics : [],
-        actionItems: Array.isArray(analysisData.actionItems) ? analysisData.actionItems : []
-      };
+
+      return analysisData;
       
     } catch (error) {
       if (isCancelled(error)) throw error;
@@ -385,11 +393,7 @@ export class FileProcessor {
       });
 
       const res = await aiComplete(prompt, 'json', signal);
-      const result = res.data || {};
-      return {
-        sentiment: result.sentiment || 'neutral',
-        sentimentScore: typeof result.sentimentScore === 'number' ? result.sentimentScore : 0
-      };
+      return SentimentResultSchema.parse(res.data ?? {});
     } catch (error) {
       if (isCancelled(error)) throw error;
       console.error('Sentiment analysis error:', error);
@@ -404,7 +408,7 @@ export class FileProcessor {
       });
 
       const res = await aiComplete(prompt, 'json', signal);
-      return res.data || {};
+      return EmotionResultSchema.parse(res.data ?? {});
     } catch (error) {
       if (isCancelled(error)) throw error;
       console.error('Emotion analysis error:', error);
@@ -500,17 +504,14 @@ export class FileProcessor {
         throw new Error(res.error || 'AI service error');
       }
 
-      // data is the tolerant JSON parse; fall back to schema-specific parsing.
-      const analysisData = res.data ?? this.parseResearchAnalysisText(res.raw, transcriptText);
+      // Validate model JSON (or the text-fallback parse) into a typed shape.
+      const analysisData = ResearchAnalysisSchema.parse(
+        res.data ?? this.parseResearchAnalysisText(res.raw, transcriptText)
+      );
 
       console.log('Research analysis completed:', analysisData);
-      
-      return {
-        notableQuotes: Array.isArray(analysisData.notableQuotes) ? analysisData.notableQuotes : [],
-        researchThemes: Array.isArray(analysisData.researchThemes) ? analysisData.researchThemes : [],
-        qaPairs: Array.isArray(analysisData.qaPairs) ? analysisData.qaPairs : [],
-        conceptFrequency: analysisData.conceptFrequency || {}
-      };
+
+      return analysisData;
       
     } catch (error) {
       if (isCancelled(error)) throw error;
@@ -520,7 +521,7 @@ export class FileProcessor {
     }
   }
 
-  private parseResearchAnalysisText(text: string, transcript: string): any {
+  private parseResearchAnalysisText(text: string, transcript: string): ResearchAnalysis {
     // Fallback parser for research analysis when JSON parsing fails
     return {
       notableQuotes: this.extractNotableQuotes(text, transcript),

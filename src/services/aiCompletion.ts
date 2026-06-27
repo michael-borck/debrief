@@ -12,7 +12,7 @@ export interface AiCompletionResult {
   ok: boolean;
   text: string;
   raw: string;
-  data: any | null;
+  data: unknown;
   error?: string;
 }
 

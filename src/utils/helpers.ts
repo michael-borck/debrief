@@ -1,3 +1,5 @@
+import type { Transcript } from '../types';
+
 export const generateId = (): string => {
   return Date.now().toString(36) + Math.random().toString(36).substring(2);
 };
@@ -73,8 +75,8 @@ export const formatDistanceToNow = (date: Date): string => {
   }
 };
 
-export const groupTranscriptsByDate = (transcripts: any[]) => {
-  const groups: { [key: string]: any[] } = {
+export const groupTranscriptsByDate = (transcripts: Transcript[]) => {
+  const groups: { [key: string]: Transcript[] } = {
     'Today': [],
     'This Week': [],
     'This Month': [],

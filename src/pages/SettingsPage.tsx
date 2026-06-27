@@ -37,10 +37,10 @@ export const SettingsPage: React.FC = () => {
   const [aiTestStatus, setAiTestStatus] = useState<'idle' | 'testing' | 'ok' | 'error'>('idle');
   const [aiTestMessage, setAiTestMessage] = useState<string>('');
   const [theme, setTheme] = useState('system');
-  const [databaseInfo, setDatabaseInfo] = useState<any>(null);
+  const [databaseInfo, setDatabaseInfo] = useState<{ path: string; size: number; modified: Date } | null>(null);
   const [availableModels, setAvailableModels] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
-  const [vectorStats, setVectorStats] = useState<any>(null);
+  const [vectorStats, setVectorStats] = useState<{ totalChunks: number; transcripts: string[]; avgChunkSize: number; speakers: string[] } | null>(null);
   
   // Transcript processing settings
   const [enableTranscriptValidation, setEnableTranscriptValidation] = useState(true);

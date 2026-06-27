@@ -4,6 +4,14 @@ import { embeddingService } from './embeddingService';
 import { vectorStoreService, SearchResult } from './vectorStoreService';
 import { promptService } from './promptService';
 import { Project, Transcript } from '../types';
+import { hydrateTranscriptRow, hydrateProjectRow } from '../utils/hydration';
+
+// projectChatService reuses chatService's private memory manager. Reach it via
+// a named interface + as unknown as rather than `as any`.
+interface ChatServiceMemoryInternals {
+  manageConversationMemory(conversationId: string, messages: ChatMessage[]): Promise<ConversationMemory>;
+}
+const chatServiceMemory = chatService as unknown as ChatServiceMemoryInternals;
 
 export interface ProjectChatConfig extends ChatConfig {
   crossTranscriptAnalysis: boolean;
@@ -282,7 +290,7 @@ export class ProjectChatService {
           orderBy: 'created_desc',
         });
 
-      return { project, transcripts };
+      return { project: hydrateProjectRow(project), transcripts: transcripts.map(hydrateTranscriptRow) };
     } catch (error) {
       console.error('Failed to get project data:', error);
       return null;
@@ -764,7 +772,7 @@ export class ProjectChatService {
     }));
 
     // Use chatService's memory management
-    return await (chatService as any).manageConversationMemory(conversationId, baseMemory);
+    return await chatServiceMemory.manageConversationMemory(conversationId, baseMemory);
   }
 
   /**
@@ -811,7 +819,7 @@ export class ProjectChatService {
     try {
       const messages = await window.electronAPI.db.projectChat.listMessages(conversationId);
 
-      return messages.map((row: any) => ({
+      return messages.map((row) => ({
         id: row.id.toString(),
         role: row.role,
         content: row.content,

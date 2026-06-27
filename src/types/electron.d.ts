@@ -6,6 +6,7 @@
 // merge unpredictably with this one and create silent type drift.
 
 import type { ChunkTimingInfo } from './index';
+import type { TranscriptRow, ProjectRow, ProjectStatsRow, MessageRow, TopicRow } from './db';
 
 export interface AIUsageTotals {
   promptTokens: number;
@@ -72,23 +73,23 @@ export interface ElectronAPI {
      */
     transcripts: {
       /** Non-trashed transcripts, newest first. */
-      list: () => Promise<any[]>;
+      list: () => Promise<TranscriptRow[]>;
       /** Archived transcripts, newest archived first. */
-      listArchived: () => Promise<any[]>;
+      listArchived: () => Promise<TranscriptRow[]>;
       /** Trashed transcripts, newest deleted first. */
-      listTrashed: () => Promise<any[]>;
+      listTrashed: () => Promise<TranscriptRow[]>;
       /** Full row by id, or null. */
-      get: (id: string) => Promise<any | null>;
+      get: (id: string) => Promise<TranscriptRow | null>;
       /** { title, full_text, processed_text } for direct-LLM chat, or null. */
       getForChat: (id: string) => Promise<any | null>;
       /** { title, duration, speaker_count } for chat sizing, or null. */
       getMetadata: (id: string) => Promise<any | null>;
       /** Rows matching filename or title (upload dedup check). */
-      findDuplicates: (filename: string, title: string) => Promise<any[]>;
+      findDuplicates: (filename: string, title: string) => Promise<TranscriptRow[]>;
       /** Completed transcripts lacking 'original' segments (back-fill). */
-      listNeedingSegmentMigration: () => Promise<any[]>;
+      listNeedingSegmentMigration: () => Promise<TranscriptRow[]>;
       /** Full-text-ish search over title/full_text/summary. */
-      searchByText: (query: string) => Promise<any[]>;
+      searchByText: (query: string) => Promise<TranscriptRow[]>;
       /** Inserts a new transcript row; created_at/updated_at set in main. */
       create: (input: {
         id: string;
@@ -116,11 +117,11 @@ export interface ElectronAPI {
      */
     projects: {
       /** Full row by id (excludes trashed), or null. */
-      get: (id: string) => Promise<any | null>;
+      get: (id: string) => Promise<ProjectRow | null>;
       /** Archived projects, newest archived first. */
-      listArchived: () => Promise<any[]>;
+      listArchived: () => Promise<ProjectRow[]>;
       /** Trashed projects, newest deleted first. */
-      listTrashed: () => Promise<any[]>;
+      listTrashed: () => Promise<ProjectRow[]>;
       /** Inserts a new project; created_at/updated_at set in main. */
       create: (input: {
         id: string;
@@ -148,9 +149,9 @@ export interface ElectronAPI {
      */
     projectTranscripts: {
       /** Live, non-archived projects + rollup stats (transcript_count, etc). */
-      listProjectsWithStats: () => Promise<any[]>;
+      listProjectsWithStats: () => Promise<ProjectStatsRow[]>;
       /** One project + rollup stats (includes archived/trashed), or null. */
-      getProjectWithStats: (id: string) => Promise<any | null>;
+      getProjectWithStats: (id: string) => Promise<ProjectStatsRow | null>;
       /** A project's transcripts (raw rows + added_at). */
       listTranscriptsForProject: (
         projectId: string,
@@ -159,7 +160,7 @@ export interface ElectronAPI {
           completedOnly?: boolean;
           orderBy?: 'added_desc' | 'created_desc' | 'created_asc';
         }
-      ) => Promise<any[]>;
+      ) => Promise<TranscriptRow[]>;
       /** [{ project_id }] for each project a transcript is filed under. */
       listProjectIdsForTranscript: (transcriptId: string) => Promise<{ project_id: string }[]>;
       /** Number of transcripts filed under a project. */
@@ -187,7 +188,7 @@ export interface ElectronAPI {
       /** Deletes a conversation; messages + memory cascade. */
       deleteConversation: (id: string) => Promise<{ changes: number }>;
       /** Messages for a conversation, oldest first (raw rows). */
-      listMessages: (conversationId: string) => Promise<any[]>;
+      listMessages: (conversationId: string) => Promise<MessageRow[]>;
       /** Appends a message; role must be 'user' or 'assistant'. */
       addMessage: (
         conversationId: string,
@@ -226,7 +227,7 @@ export interface ElectronAPI {
         last_activity: string | null;
       }>;
       /** Messages for a conversation, oldest first (raw rows). */
-      listMessages: (conversationId: string) => Promise<any[]>;
+      listMessages: (conversationId: string) => Promise<MessageRow[]>;
       /** Appends a message; role must be 'user' or 'assistant'. */
       addMessage: (
         conversationId: string,
@@ -252,7 +253,7 @@ export interface ElectronAPI {
      */
     topics: {
       /** Cached topics for a transcript, ordered by topic_index. */
-      listByTranscript: (transcriptId: string) => Promise<any[]>;
+      listByTranscript: (transcriptId: string) => Promise<TopicRow[]>;
       /** Atomically replaces a transcript's topic set with `rows`. */
       replaceForTranscript: (
         transcriptId: string,

@@ -1,4 +1,17 @@
-import { SentenceSegment, ChunkTimingInfo } from '../types';
+import { SentenceSegment, ChunkTimingInfo, Transcript } from '../types';
+
+// Payload pushed to segments.create when synthesising segments from text.
+interface SegmentCreateInput {
+  transcriptId: string;
+  sentenceIndex: number;
+  text: string;
+  startTime: number | null | undefined;
+  endTime: number | null | undefined;
+  confidence: number;
+  version: string;
+  sourceChunkIndex: number | null | undefined;
+  wordCount: number;
+}
 
 export class SentenceSegmentsService {
   private static instance: SentenceSegmentsService;
@@ -143,7 +156,7 @@ export class SentenceSegmentsService {
    * Get text for display - either from segments or fallback to full text
    */
   async getDisplayText(
-    transcript: any, 
+    transcript: Transcript,
     version: 'original' | 'corrected' | 'speaker_tagged',
     includeTimestamps: boolean = false
   ): Promise<string> {
@@ -180,7 +193,7 @@ export class SentenceSegmentsService {
 
       // Simple approach: split corrected text and map to original segment timing
       const correctedSentences = this.splitIntoSentences(correctedText);
-      const correctedSegments: any[] = [];
+      const correctedSegments: SegmentCreateInput[] = [];
 
       // Map corrected sentences to original segment timing
       for (let i = 0; i < correctedSentences.length; i++) {
@@ -250,7 +263,7 @@ export class SentenceSegmentsService {
 
       for (const transcript of transcripts) {
         try {
-          if (await this.createBasicSegments(transcript.id, transcript.full_text)) {
+          if (await this.createBasicSegments(transcript.id, transcript.full_text ?? '')) {
             migrated++;
             console.log(`Migrated transcript ${transcript.id}`);
           } else {
@@ -288,7 +301,7 @@ export class SentenceSegmentsService {
         return false;
       }
 
-      const basicSegments: any[] = [];
+      const basicSegments: SegmentCreateInput[] = [];
 
       // Create segments without timing info (existing transcripts)
       for (let i = 0; i < sentences.length; i++) {

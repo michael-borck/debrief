@@ -1,3 +1,22 @@
+import { z } from 'zod';
+
+// Subset of the Ollama /api/show response that parseOllamaModelInfo reads.
+// Tolerant: missing/shapeless input yields {} so the family-detection fallback
+// takes over instead of throwing.
+const OllamaModelInfoSchema = z
+  .object({
+    parameters: z.object({ num_ctx: z.coerce.number().optional() }).optional(),
+    template: z.string().optional(),
+    details: z
+      .object({
+        parameter_size: z.string().optional(),
+        quantization_level: z.string().optional(),
+        family: z.string().optional(),
+      })
+      .optional(),
+  })
+  .catch({});
+
 export interface ModelMetadata {
   modelName: string;
   provider: 'ollama' | 'openai' | 'custom';
@@ -237,20 +256,21 @@ export class ModelMetadataService {
   /**
    * Parse Ollama model info response
    */
-  private parseOllamaModelInfo(modelName: string, info: any): ModelMetadata {
+  private parseOllamaModelInfo(modelName: string, info: unknown): ModelMetadata {
+    const data = OllamaModelInfoSchema.parse(info ?? {});
     // Extract context length from model info
     let contextLimit = 4096; // Default fallback
-    
-    if (info.parameters?.num_ctx) {
-      contextLimit = parseInt(info.parameters.num_ctx, 10);
-    } else if (info.template?.includes('context_length')) {
+
+    if (data.parameters?.num_ctx) {
+      contextLimit = data.parameters.num_ctx;
+    } else if (data.template?.includes('context_length')) {
       // Try to extract from template
-      const match = info.template.match(/context_length["\s:]*(\d+)/);
+      const match = data.template.match(/context_length["\s:]*(\d+)/);
       if (match) {
         contextLimit = parseInt(match[1], 10);
       }
     }
-    
+
     // Fallback to model family detection if no explicit context found
     if (contextLimit === 4096) {
       const familyData = this.detectModelFamily(modelName);
@@ -273,9 +293,9 @@ export class ModelMetadataService {
         multimodal: this.isMultimodalModel(modelName)
       },
       parameters: {
-        parameterSize: info.details?.parameter_size || 'unknown',
-        quantization: info.details?.quantization_level || 'unknown',
-        architecture: info.details?.family || this.detectModelFamily(modelName)?.family || 'unknown'
+        parameterSize: data.details?.parameter_size || 'unknown',
+        quantization: data.details?.quantization_level || 'unknown',
+        architecture: data.details?.family || this.detectModelFamily(modelName)?.family || 'unknown'
       },
       lastUpdated: new Date().toISOString(),
       userOverride: false,

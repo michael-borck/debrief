@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Archive, FolderOpen, Clock, RefreshCw, Undo2, Calendar, FileText } from 'lucide-react';
 import { Transcript, Project } from '../types';
 import { formatDate, formatDuration } from '../utils/helpers';
+import { hydrateTranscriptRow, hydrateProjectRow } from '../utils/hydration';
 
 type ArchiveItem = {
   type: 'transcript' | 'project';
@@ -30,25 +31,20 @@ export const ArchivePage: React.FC = () => {
       const archivedTranscripts = await window.electronAPI.db.transcripts.listArchived();
       const archivedProjects = await window.electronAPI.db.projects.listArchived();
       const items: ArchiveItem[] = [];
-      archivedTranscripts.forEach((transcript: any) => {
+      archivedTranscripts.forEach((transcript) => {
+        if (!transcript.archived_at) return;
         items.push({
           type: 'transcript', id: transcript.id, title: transcript.title,
           archived_at: transcript.archived_at,
-          data: { ...transcript, action_items: transcript.action_items ? JSON.parse(transcript.action_items) : [],
-            key_topics: transcript.key_topics ? JSON.parse(transcript.key_topics) : [],
-            tags: transcript.tags ? JSON.parse(transcript.tags) : [],
-            speakers: transcript.speakers ? JSON.parse(transcript.speakers) : [],
-            emotions: transcript.emotions ? JSON.parse(transcript.emotions) : {},
-            starred: !!transcript.starred }
+          data: hydrateTranscriptRow(transcript)
         });
       });
-      archivedProjects.forEach((project: any) => {
+      archivedProjects.forEach((project) => {
+        if (!project.archived_at) return;
         items.push({
           type: 'project', id: project.id, title: project.name,
           archived_at: project.archived_at,
-          data: { ...project, themes: project.themes ? JSON.parse(project.themes) : [],
-            key_insights: project.key_insights ? JSON.parse(project.key_insights) : [],
-            tags: project.tags ? JSON.parse(project.tags) : [] }
+          data: hydrateProjectRow(project)
         });
       });
       items.sort((a, b) => new Date(b.archived_at).getTime() - new Date(a.archived_at).getTime());
