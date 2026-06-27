@@ -15,6 +15,7 @@ const URLS = require('./electron-urls');
 const { MainVectorStore } = require('./electron/vector-store');
 const { SidecarManager } = require('./electron/sidecar-manager');
 const sidecarClient = require('./electron/sidecar-client');
+const logger = require('./electron/logger');
 
 // Isolate dev's userData dir from packaged so they don't share a single
 // `~/Library/Application Support/debrief/` and poison each other's venv
@@ -278,7 +279,7 @@ function runMigrations() {
     // Add missing columns
     for (const column of requiredColumns) {
       if (!columnNames.includes(column.name)) {
-        console.log(`Adding missing column: ${column.name}`);
+        logger.log(`Adding missing column: ${column.name}`);
         db.exec(column.sql);
       }
     }
@@ -286,7 +287,7 @@ function runMigrations() {
     // Check if transcript_segments table exists and create it if not
     const segmentsTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transcript_segments'").all();
     if (segmentsTable.length === 0) {
-      console.log('Creating transcript_segments table...');
+      logger.log('Creating transcript_segments table...');
       db.exec(`
         CREATE TABLE transcript_segments (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -317,16 +318,16 @@ function runMigrations() {
         CREATE INDEX idx_transcript_segments_time ON transcript_segments(transcript_id, start_time);
       `);
       
-      console.log('transcript_segments table created successfully');
+      logger.log('transcript_segments table created successfully');
     } else {
-      console.log('transcript_segments table already exists');
+      logger.log('transcript_segments table already exists');
     }
 
     // transcript_topics — caches per-transcript topic clusters (Topics tab).
     // Recomputed on user demand; ON DELETE CASCADE so it tracks the parent.
     const topicsTable = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='transcript_topics'").all();
     if (topicsTable.length === 0) {
-      console.log('Creating transcript_topics table...');
+      logger.log('Creating transcript_topics table...');
       db.exec(`
         CREATE TABLE transcript_topics (
           id TEXT PRIMARY KEY,
@@ -345,13 +346,13 @@ function runMigrations() {
         CREATE INDEX idx_transcript_topics_transcript ON transcript_topics(transcript_id);
         CREATE INDEX idx_transcript_topics_order ON transcript_topics(transcript_id, topic_index);
       `);
-      console.log('transcript_topics table created');
+      logger.log('transcript_topics table created');
     }
 
     // Check if ai_prompts table exists and create it if not
     const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='ai_prompts'").all();
     if (tables.length === 0) {
-      console.log('Creating ai_prompts table...');
+      logger.log('Creating ai_prompts table...');
       db.exec(`
         CREATE TABLE ai_prompts (
           id TEXT PRIMARY KEY,
@@ -377,14 +378,14 @@ function runMigrations() {
         CREATE INDEX idx_ai_prompts_category_type ON ai_prompts(category, type);
       `);
       
-      console.log('ai_prompts table created successfully');
+      logger.log('ai_prompts table created successfully');
     } else {
       // Check if system_used column exists, add it if not
       const columns = db.prepare("PRAGMA table_info(ai_prompts)").all();
       const hasSystemUsedColumn = columns.some(col => col.name === 'system_used');
       
       if (!hasSystemUsedColumn) {
-        console.log('Adding system_used column to ai_prompts table...');
+        logger.log('Adding system_used column to ai_prompts table...');
         db.exec('ALTER TABLE ai_prompts ADD COLUMN system_used BOOLEAN DEFAULT 0');
       }
     }
@@ -392,9 +393,9 @@ function runMigrations() {
     // Always try to initialize default prompts (in case they're missing)
     initializeDefaultPrompts();
     
-    console.log('Database migrations completed');
+    logger.log('Database migrations completed');
   } catch (error) {
-    console.error('Error running migrations:', error);
+    logger.error('Error running migrations:', error);
   }
 }
 
