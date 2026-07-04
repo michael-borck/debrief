@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Debrief — Every conversation has more to tell.</title>
+  <meta name="description" content="Debrief is a privacy-first desktop app for transcribing and analysing conversations. Whisper transcription and speaker diarisation run entirely on your machine; AI analysis uses the provider of your choice. Your recordings never leave your device." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <nav class="topnav">
+    <div class="container topnav-inner">
+      <span class="brand">De<span class="brand-accent">brief</span></span>
+      <div class="topnav-links">
+        <a href="https://github.com/michael-borck/debrief">GitHub</a>
+        <a href="https://github.com/michael-borck/debrief/releases">Releases</a>
+        <a href="#download" class="nav-cta">Download</a>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero" id="top">
+    <div class="container hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Privacy-first conversation analysis</p>
+        <h1>Every conversation has <em>more to tell.</em></h1>
+        <p class="sub">Drop in an interview, a meeting, a lecture — Debrief transcribes
+          it on your own machine, works out who said what from the actual audio, and
+          turns the transcript into analysis you can question. Nothing is uploaded
+          unless you choose a cloud AI.</p>
+
+        <div class="download-block" id="download">
+          <a id="download-btn" class="btn btn-primary" href="https://github.com/michael-borck/debrief/releases/latest">Download</a>
+          <div class="platform-toggle" role="group" aria-label="Choose platform">
+            <button data-platform="mac" class="platform-btn">macOS</button>
+            <button data-platform="windows" class="platform-btn">Windows</button>
+            <button data-platform="linux" class="platform-btn">Linux</button>
+          </div>
+          <p class="version"><span id="version">&nbsp;</span> <a id="alt-arch" class="alt-arch" href="#" hidden></a></p>
+          <p class="all-releases"><a href="https://github.com/michael-borck/debrief/releases">All releases &amp; older versions →</a></p>
+        </div>
+
+        <p class="privacy-tag">Local-first. Your recordings, transcripts, and speaker data stay on this device.</p>
+      </div>
+
+      <div class="hero-shots">
+        <!-- Screenshots auto-discovered from screenshots/debrief-1.png, -2.png, -3.png…
+             Drop a new numbered PNG in docs/screenshots/ and it joins the rotation. -->
+        <div class="carousel" id="carousel" aria-label="App screenshots">
+          <noscript><img src="screenshots/debrief-1.png" alt="Debrief welcome screen" /></noscript>
+        </div>
+        <div class="carousel-dots" id="carousel-dots"></div>
+      </div>
+    </div>
+  </header>
+
+  <section class="container steps">
+    <h2>From recording to insight</h2>
+    <div class="grid four">
+      <div class="card">
+        <div class="card-num">Transcribe</div>
+        <h3>Audio in, text out</h3>
+        <p>Drag in audio or video — MP3, WAV, MP4, MOV, and more. Whisper runs
+          locally in a bundled sidecar, with FFmpeg included, so it just works
+          offline.</p>
+      </div>
+      <div class="card">
+        <div class="card-num">Identify</div>
+        <h3>Who said what</h3>
+        <p>Speaker diarisation from the actual audio — pyannote listens to voices,
+          not text, so speakers are separated reliably. Name them once and the
+          transcript follows.</p>
+      </div>
+      <div class="card">
+        <div class="card-num">Analyse</div>
+        <h3>Beyond the words</h3>
+        <p>Summaries, themes, tone, and a conversation-quality score across
+          clarity, depth, balance, and pace — with concrete strengths and things
+          to work on.</p>
+      </div>
+      <div class="card">
+        <div class="card-num">Ask</div>
+        <h3>Chat with your library</h3>
+        <p>Question a single transcript, a project, or your whole library.
+          Retrieval-backed chat finds the moments that matter and answers with
+          the evidence.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="providers-band">
+    <div class="container">
+      <h2>Bring your own AI</h2>
+      <div class="grid three">
+        <div class="card plain">
+          <h3>Fully local, by default</h3>
+          <p>Point Debrief at Ollama and everything — audio, transcript,
+            analysis, chat — stays on your machine. Transcription and speaker
+            identification are local no matter what.</p>
+        </div>
+        <div class="card plain">
+          <h3>Or any major provider</h3>
+          <p>Anthropic Claude, OpenAI, Google Gemini, Groq, OpenRouter, or any
+            OpenAI-compatible endpoint. Your key, your choice, one settings tab
+            each.</p>
+        </div>
+        <div class="card plain">
+          <h3>No tokens, no accounts</h3>
+          <p>Speech and speaker models ship inside the installer. No HuggingFace
+            token, no sign-up, no external server to stand up first.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container privacy">
+    <div class="privacy-grid">
+      <div>
+        <h2>Privacy-first, by design</h2>
+        <p>Research interviews, staff meetings, counselling sessions — the
+          conversations worth analysing are exactly the ones that should
+          <em>not</em> sit on someone else's server.</p>
+      </div>
+      <ul class="privacy-list">
+        <li><strong>No account, no telemetry.</strong> Install it and start transcribing.</li>
+        <li><strong>Audio processed locally.</strong> Transcription and diarisation never touch the network.</li>
+        <li><strong>Everything on disk.</strong> Transcripts, analysis, and chats live in a local database, exportable whenever you like.</li>
+        <li><strong>Open source.</strong> MIT-licensed, auditable, yours.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="container audience">
+    <div class="grid two">
+      <div class="card">
+        <h3>For researchers</h3>
+        <p>Qualitative interviews and focus groups, transcribed and diarised
+          without the audio ever leaving your machine — then organised into
+          projects you can search, tag, and interrogate across participants.</p>
+      </div>
+      <div class="card">
+        <h3>For educators &amp; teams</h3>
+        <p>Debrief lectures, tutorials, and meetings: see how balanced the
+          discussion was, who spoke and for how long, what themes kept coming
+          up — and get the summary before the next session.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <a href="https://github.com/michael-borck/debrief">GitHub</a>
+      <a href="https://github.com/michael-borck/debrief/releases">Releases</a>
+      <span class="copyright">MIT © Michael Borck · part of the Buddy suite</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
