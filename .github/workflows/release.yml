@@ -179,6 +179,7 @@ jobs:
             release/*.exe
             release/latest*.yml
           if-no-files-found: warn
+          retention-days: 5
 
   release:
     needs: build
