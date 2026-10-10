@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-react';
 import { useToast, ToastKind } from '../contexts/ToastContext';
 
 const KIND_STYLES: Record<ToastKind, { icon: React.ComponentType<{ size?: number; className?: string }>; iconClass: string; border: string }> = {
@@ -17,6 +17,11 @@ const KIND_STYLES: Record<ToastKind, { icon: React.ComponentType<{ size?: number
     icon: Info,
     iconClass: 'text-primary-600',
     border: 'border-l-primary-600',
+  },
+  warning: {
+    icon: AlertTriangle,
+    iconClass: 'text-amber-500',
+    border: 'border-l-amber-500',
   },
 };
 

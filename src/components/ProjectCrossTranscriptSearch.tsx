@@ -8,6 +8,7 @@ interface SearchMatch {
 }
 
 import React, { useState, useCallback, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { logger } from '../utils/logger';
 import { Transcript } from '../types';
 
@@ -33,6 +34,7 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
   transcripts,
   className = ""
 }) => {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFilter, setSearchFilter] = useState<'all' | 'text' | 'themes' | 'quotes' | 'insights'>('all');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -452,7 +454,7 @@ export const ProjectCrossTranscriptSearch: React.FC<ProjectCrossTranscriptSearch
                 </div>
               </div>
               <button
-                onClick={() => window.open(`/transcript/${result.transcript.id}`, '_blank')}
+                onClick={() => navigate(`/transcript/${result.transcript.id}`)}
                 className="px-3 py-1 text-sm bg-primary-100 text-primary-700 rounded hover:bg-primary-200 transition-colors"
               >
                 Open

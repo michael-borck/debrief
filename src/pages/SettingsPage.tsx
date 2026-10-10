@@ -5,6 +5,7 @@ import { formatFileSize } from '../utils/helpers';
 import { PromptsSettings } from '../components/PromptsSettings';
 import { Collapsible } from '../components/Collapsible';
 import { chatService } from '../services/chatService';
+import { useToast } from '../contexts/ToastContext';
 
 type SettingsTab = 'transcription' | 'processing' | 'chat' | 'prompts' | 'general';
 
@@ -12,6 +13,7 @@ export const SettingsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('transcription');
   const [searchQuery, setSearchQuery] = useState('');
   const { testConnections } = useContext(ServiceContext);
+  const { showToast } = useToast();
   
   // Settings state
   const [localTranscriptionModel, setLocalTranscriptionModel] = useState('Xenova/whisper-tiny.en');
@@ -190,9 +192,13 @@ export const SettingsPage: React.FC = () => {
   };
 
   // Encrypt a sensitive setting (API key) before persisting it. Uses the
-  // OS keychain via Electron's safeStorage when available; on Linux
-  // machines without a keyring it falls back to plain text and the
-  // crypto.encrypt response sets `fallback: true` (we still save).
+  // OS keychain via Electron's safeStorage when available.
+  //
+  // On a Linux box with no keyring (also common over SSH/headless), safeStorage
+  // reports encryption unavailable and crypto.encrypt hands the plaintext back
+  // with `fallback: true`. Saving is still allowed — refusing would make those
+  // users unable to configure a provider at all — but the user is told plainly
+  // that the key is on disk unencrypted, which the previous code did silently.
   const saveSensitiveSetting = async (key: string, plain: string) => {
     try {
       if (!plain) {
@@ -200,6 +206,14 @@ export const SettingsPage: React.FC = () => {
         return;
       }
       const result = await window.electronAPI.crypto.encrypt(plain);
+      if (result?.fallback) {
+        showToast({
+          kind: 'warning',
+          title: 'API key stored unencrypted',
+          body: 'No OS keyring is available on this machine, so the key was saved as plain text. It is readable by any process running as you.',
+          duration: 12000,
+        });
+      }
       if (result?.success && typeof result.encrypted === 'string') {
         await saveSetting(key, result.encrypted);
       } else {
