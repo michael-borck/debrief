@@ -15,6 +15,7 @@ const URLS = require('./electron-urls');
 const { MainVectorStore } = require('./electron/vector-store');
 const { SidecarManager } = require('./electron/sidecar-manager');
 const sidecarClient = require('./electron/sidecar-client');
+const { makePurgeService } = require('./electron/purge-service');
 const logger = require('./electron/logger');
 
 // Isolate dev's userData dir from packaged so they don't share a single
@@ -242,9 +243,16 @@ async function initDatabase() {
   const schemaPath = path.join(__dirname, '..', 'database', 'schema.sql');
   const schema = fs.readFileSync(schemaPath, 'utf8');
   db.exec(schema);
-  
+
+  // Refuse to run against a database written by a NEWER build before we touch
+  // it — see assertSchemaSupported.
+  assertSchemaSupported();
+
   // Run migrations to ensure all columns exist
   runMigrations();
+
+  // Record the version this build now understands.
+  stampSchemaVersion();
   
   // Store current db path in memory
   global.dbPath = dbPath;
@@ -252,9 +260,80 @@ async function initDatabase() {
   return db;
 }
 
-// Function to check and add missing columns
+// The schema version this build understands. Keep in step with the version
+// stamped by database/schema.sql.
+//
+// database/schema.sql creates schema_migrations and stamps version 1, but
+// nothing ever READ it — the migration list below is shape-detection driven
+// (PRAGMA table_info / sqlite_master probes) rather than version-driven. That
+// means downgrading the app was silent: the old schema.sql's CREATE TABLE IF
+// NOT EXISTS statements are no-ops, every column the new build added is found
+// already present, and the old build carries on against a schema it does not
+// understand. A column the newer version DROPPED would never be noticed.
+const CURRENT_SCHEMA_VERSION = 1;
+
+function readSchemaVersion() {
+  try {
+    const row = db.prepare('SELECT MAX(version) AS v FROM schema_migrations').get();
+    return row && row.v != null ? Number(row.v) : null;
+  } catch {
+    return null; // table absent on a pre-versioning database
+  }
+}
+
+// The dangerous direction is a database from the FUTURE. An older build opening
+// a newer one would apply its own (older) ideas to a schema it no longer
+// matches, and because the migrations are shape-detection it would find
+// everything "already present" and proceed — writing data the newer build must
+// then read back. Refusing to start is cheap; recovering the damage is not.
+function assertSchemaSupported() {
+  const found = readSchemaVersion();
+  if (found != null && found > CURRENT_SCHEMA_VERSION) {
+    const message =
+      `Database schema version ${found} is newer than this build supports ` +
+      `(${CURRENT_SCHEMA_VERSION}). Update Debrief, or restore a backup taken ` +
+      `with a matching version. Refusing to open the database.`;
+    logger.error(message);
+    throw new Error(message);
+  }
+}
+
+function stampSchemaVersion() {
+  try {
+    db.prepare('INSERT OR IGNORE INTO schema_migrations (version) VALUES (?)').run(
+      CURRENT_SCHEMA_VERSION
+    );
+  } catch (error) {
+    // Non-fatal: an unversioned database still works, it just loses the
+    // downgrade guard until the table is available.
+    logger.warn('Could not stamp schema version:', error);
+  }
+}
+
+// Function to check and add missing columns.
+//
+// Runs inside a single transaction. SQLite's DDL is transactional, so a failure
+// part-way through now rolls back cleanly instead of leaving a half-migrated
+// schema behind. The previous version executed 13 ALTER TABLE statements with
+// no transaction and swallowed any error, so a failure still let the app
+// continue to createWindow() — the first symptom being a "no such column" error
+// deep inside an unrelated feature, far from the cause.
 function runMigrations() {
   try {
+    db.transaction(runMigrationsUnsafe)();
+    logger.log('Database migrations completed');
+  } catch (error) {
+    // Fatal by design. Continuing with a partially-migrated schema corrupts
+    // data in ways that are far harder to recover from than refusing to start.
+    logger.error('FATAL: database migration failed — refusing to continue:', error);
+    throw error;
+  }
+}
+
+// The migration body itself. Runs inside runMigrations' transaction; keep all
+// DDL here and do not swallow errors inside.
+function runMigrationsUnsafe() {
+  {
     // Get existing columns for transcripts table
     const columns = db.prepare("PRAGMA table_info(transcripts)").all();
     const columnNames = columns.map(col => col.name);
@@ -392,10 +471,6 @@ function runMigrations() {
     
     // Always try to initialize default prompts (in case they're missing)
     initializeDefaultPrompts();
-    
-    logger.log('Database migrations completed');
-  } catch (error) {
-    logger.error('Error running migrations:', error);
   }
 }
 
@@ -776,20 +851,49 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  // Belt-and-braces: also catch in-page navigation attempts (e.g. <a href>
-  // without target=_blank). Anything that tries to navigate away from the
-  // app shell to an external URL gets handed to the OS browser instead.
+// Belt-and-braces: also catch in-page navigation attempts (e.g. <a href>
+  // without target=_blank). Anything that tries to navigate away from the app
+  // shell to an external URL gets handed to the OS browser instead.
+  //
+  // DENY BY DEFAULT. The previous check treated any `file://` URL as internal,
+  // which is wrong in production: the app itself is loaded from a file:// URL,
+  // so that prefix admitted every file on disk. A renderer that ever navigated
+  // (an injected link, a crafted hash) would load an arbitrary local HTML file
+  // in THIS webContents — and with it, the preload's full electronAPI surface.
+  // Same problem with `http://localhost:` matching any port.
+  //
+  // Instead, allow exactly one target: the app's own document, ignoring the
+  // hash (the app uses HashRouter, so hash-only navigation is normal). Every
+  // other scheme is refused outright — including file:// elsewhere, javascript:
+  // and data:, which must never load in a privileged window.
+  const appDocumentUrl = () => mainWindow.webContents.getURL().split('#')[0];
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const currentUrl = mainWindow.webContents.getURL();
-    const isInternal =
-      url.startsWith('http://localhost:') ||
-      url.startsWith('file://') ||
-      url === currentUrl ||
-      url.startsWith(`${currentUrl.split('#')[0]}#`); // hash navigation in HashRouter
-    if (!isInternal && (url.startsWith('http://') || url.startsWith('https://'))) {
-      event.preventDefault();
+    let internal = false;
+    try {
+      internal = new URL(url).href.split('#')[0] === appDocumentUrl();
+    } catch {
+      internal = false;
+    }
+    if (internal) return; // hash routing within the app — let it through
+
+    event.preventDefault();
+    if (url.startsWith('http://') || url.startsWith('https://')) {
       shell.openExternal(url);
     }
+    // Anything else (file:// outside the bundle, javascript:, data:, unknown
+    // schemes) is simply dropped.
+  });
+
+  // Same rule for server-initiated redirects: the app loads from file:// and
+  // never legitimately redirects, so any redirect is an attempt to escape the
+  // app shell. One handler, one policy.
+  mainWindow.webContents.on('will-redirect', (event, url) => {
+    try {
+      if (new URL(url).href.split('#')[0] === appDocumentUrl()) return;
+    } catch {
+      /* fall through to the deny */
+    }
+    event.preventDefault();
   });
 
   // Handle any loading errors
@@ -974,6 +1078,15 @@ function ensureDbRpcRegistered() {
   dbRpcRegistered = true;
 }
 
+// Paths the user has explicitly granted access to via an OS file dialog in
+// this session. `dialog-open-file` records them here, and fs-get-file-stats
+// will only stat a file that appears in this set.
+//
+// Without it, fs-get-file-stats accepted any renderer-supplied path, turning a
+// single bridged call into a filesystem existence/size/mtime oracle — a
+// compromised renderer could probe anywhere the user can read.
+const userGrantedPaths = new Set();
+
 ipcMain.handle('dialog-open-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile', 'multiSelections'],
@@ -984,6 +1097,13 @@ ipcMain.handle('dialog-open-file', async () => {
   });
 
   if (!result.canceled) {
+    for (const p of result.filePaths) {
+      try {
+        userGrantedPaths.add(fs.realpathSync(p));
+      } catch {
+        userGrantedPaths.add(path.resolve(p));
+      }
+    }
     return result.filePaths;
   }
   return [];
@@ -1001,7 +1121,16 @@ ipcMain.handle('dialog-save-file', async (event, { defaultPath, filters }) => {
   return null;
 });
 
+// app.getPath accepts any documented directory name ('home', 'exe', 'temp',
+// 'downloads', ...), so forwarding a renderer-supplied string turns one bridged
+// call into a free map of the user's home layout. Only the locations the app
+// genuinely uses are reachable.
+const ALLOWED_APP_PATHS = new Set(['temp', 'userData', 'downloads', 'documents']);
+
 ipcMain.handle('get-app-path', async (event, type) => {
+  if (typeof type !== 'string' || !ALLOWED_APP_PATHS.has(type)) {
+    throw new Error(`app path not available: ${JSON.stringify(type)}`);
+  }
   return app.getPath(type);
 });
 
@@ -1057,18 +1186,34 @@ ipcMain.handle('change-database-location', async (event, newPath) => {
   }
 });
 
+// A backup is a copy of the SQLite file, so a database extension is expected.
+const BACKUP_EXTENSIONS = new Set(['.db', '.sqlite', '.sqlite3', '.bak']);
+
 ipcMain.handle('backup-database', async (event, backupPath) => {
   try {
     // backupPath comes from an OS save dialog (showSaveDialog in Settings),
-    // which already confirmed any overwrite with the user. Sanity-check the
-    // shape so a compromised renderer can't direct writes at odd targets.
+    // which already confirmed any overwrite with the user. The IPC still
+    // accepts whatever the renderer sends, so the shape is enforced here.
     if (typeof backupPath !== 'string' || backupPath.length === 0) {
       throw new Error('invalid backup path');
     }
-    if (!fs.existsSync(path.dirname(backupPath))) {
+    if (!path.isAbsolute(backupPath)) {
+      throw new Error('backup path must be absolute');
+    }
+    const resolved = path.resolve(backupPath);
+    if (!BACKUP_EXTENSIONS.has(path.extname(resolved).toLowerCase())) {
+      throw new Error('backup path must end in .db, .sqlite, .sqlite3 or .bak');
+    }
+    if (!fs.existsSync(path.dirname(resolved))) {
       throw new Error('backup directory does not exist');
     }
-    fs.copyFileSync(global.dbPath, backupPath);
+    // Never let a backup overwrite the live database it was taken from — that
+    // is data loss with no dialog in front of it.
+    const liveDb = global.dbPath ? path.resolve(global.dbPath) : null;
+    if (liveDb && resolved === liveDb) {
+      throw new Error('refusing to overwrite the live database');
+    }
+    fs.copyFileSync(liveDb, resolved);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -1378,10 +1523,26 @@ ipcMain.handle('crypto-encrypt-string', async (event, { plain }) => {
 
 ipcMain.handle('fs-get-file-stats', async (event, filePath) => {
   try {
-    const stats = fs.statSync(filePath);
+    if (typeof filePath !== 'string' || filePath.length === 0) {
+      return { size: 0, error: 'invalid path' };
+    }
+    // Only files the user actually picked in a dialog this session. This is a
+    // capability check, not a path-pattern guess.
+    let resolved;
+    try {
+      resolved = fs.realpathSync(filePath);
+    } catch {
+      return { size: 0, error: 'file not found' };
+    }
+    if (!userGrantedPaths.has(resolved)) {
+      return { size: 0, error: 'path not granted by the user' };
+    }
+    const stats = fs.statSync(resolved);
     return { size: stats.size, mtime: stats.mtime };
-  } catch (error) {
-    return { size: 0, error: error.message };
+  } catch {
+    // Never echo the raw fs error: it embeds the resolved path, which would
+    // re-open the oracle the check above just closed.
+    return { size: 0, error: 'unable to read file' };
   }
 });
 
@@ -1392,7 +1553,7 @@ ipcMain.handle('fs-join-path', async (event, ...pathSegments) => {
 // Only legitimate caller is fileProcessor.ts cleaning up the temp WAV
 // that extract-audio just wrote into os.tmpdir(). assertPathUnderTmp lives
 // in public/electron/safe-paths.js so it can be unit-tested directly.
-const { assertPathUnderTmp } = require('./electron/safe-paths');
+const { assertPathUnderTmp, isPathUnder } = require('./electron/safe-paths');
 
 ipcMain.handle('fs-delete-file', async (event, filePath) => {
   try {
@@ -1605,9 +1766,23 @@ app.whenReady().then(async () => {
   ensureDbRpcRegistered();
 
   // Make the "trash auto-deletes after 30 days" promise real: purge expired
-  // trash once per launch. FK cascade cleans up children.
+  // trash once per launch. FK cascade cleans up SQLite children; the purge
+  // service clears the matching vector-store chunks, which FK cascade cannot
+  // reach and which would otherwise keep a "deleted" transcript's full text
+  // searchable forever.
   try {
     const swept = maintenance.makeMaintenance(() => db).sweepExpiredTrash();
+    const expiredIds = swept.transcriptIds || [];
+    if (expiredIds.length > 0) {
+      purgeService
+        .purgeVectorsForMany(expiredIds)
+        .catch((err) =>
+          console.error(
+            `[trash sweep] failed to purge ${expiredIds.length} vector chunk set(s):`,
+            err
+          )
+        );
+    }
     if (swept.transcripts || swept.projects) {
       console.log(
         `[trash sweep] purged ${swept.transcripts} transcript(s) + ${swept.projects} project(s) deleted before ${swept.cutoff}`
@@ -1916,10 +2091,38 @@ ipcMain.handle('embedding-update-config', async (event, config) => {
 // Initialize vector store
 vectorStore = new MainVectorStore();
 
+// Trashed transcripts must never surface in semantic search or project chat.
+// purge-service removes their chunks on delete; this is the second line of
+// defence for chunks that outlived a delete (an older build, a failed purge,
+// or a partially-completed sweep). Resolved per search so it stays correct as
+// transcripts enter and leave the trash.
+vectorStore.setExcludedIdsProvider(() => {
+  const handle = db;
+  if (!handle) return new Set();
+  const rows = handle
+    .prepare('SELECT id FROM transcripts WHERE is_deleted = 1')
+    .all();
+  return new Set(rows.map((row) => row.id));
+});
+
 // Vector store IPC handlers
 ipcMain.handle('vector-store-initialize', async (event, dbPath) => {
   try {
-    await vectorStore.initialize(dbPath);
+    // MainVectorStore does mkdirSync(dbPath, {recursive:true}) and then
+    // lancedb.connect(dbPath), so an unrestricted renderer-supplied path means
+    // planting a database at any writable location. Confine an explicit path to
+    // userData; anything else falls back to the default.
+    let safePath;
+    if (typeof dbPath === 'string' && dbPath.length > 0) {
+      const root = app.getPath('userData');
+      const parent = path.dirname(path.resolve(dbPath));
+      if (isPathUnder(parent, root)) {
+        safePath = dbPath;
+      } else {
+        logger.warn(`[vector-store] ignoring out-of-userData path: ${dbPath}`);
+      }
+    }
+    await vectorStore.initialize(safePath);
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
@@ -1951,6 +2154,43 @@ ipcMain.handle('vector-store-delete-transcript-chunks', async (event, transcript
     return { success: true };
   } catch (error) {
     return { success: false, error: error.message };
+  }
+});
+
+// ---- Coordinated permanent delete ------------------------------------
+// The single entry point for permanent deletion. Owns BOTH the SQLite row and
+// the vector-store embeddings so they can never drift apart again — see
+// public/electron/purge-service.js for why this moved out of the renderer.
+const purgeService = makePurgeService({
+  getDb: () => db,
+  getVectorStore: () => vectorStore,
+});
+
+ipcMain.handle('data:purge', async (event, payload) => {
+  const transcripts = payload?.transcripts ?? [];
+  const projects = payload?.projects ?? [];
+  try {
+    const result = await purgeService.purge({ transcripts, projects });
+    // Surface partial failures loudly: a row that failed to delete is still on
+    // disk, and the user needs to know the "permanent" delete wasn't.
+    if (result.failed > 0) {
+      logger.error(
+        `[purge] ${result.failed} item(s) failed to purge:`,
+        JSON.stringify({ transcripts: result.transcripts.results, projects: result.projects.results })
+      );
+    }
+    // The row was deleted but its embeddings may have survived. They stay
+    // unreachable (search excludes trashed transcripts), but log loudly.
+    if (result.transcripts?.vectorFailures > 0) {
+      logger.error(
+        `[purge] ${result.transcripts.vectorFailures} transcript(s) deleted from SQLite but their vector chunks could not be purged:`,
+        JSON.stringify(result.transcripts.results.filter((r) => r.vectorFailed))
+      );
+    }
+    return { success: result.failed === 0, ...result };
+  } catch (error) {
+    logger.error('[purge] failed:', error);
+    return { success: false, failed: transcripts.length + projects.length, error: error.message };
   }
 });
 
@@ -2010,28 +2250,36 @@ ipcMain.handle('segments-create', async (event, { transcriptId, segments }) => {
   try {
     // Insert sentence segments into database
     const insertStmt = db.prepare(`
-      INSERT INTO transcript_segments 
-      (transcript_id, sentence_index, text, start_time, end_time, speaker, 
+      INSERT INTO transcript_segments
+      (transcript_id, sentence_index, text, start_time, end_time, speaker,
        confidence, version, source_chunk_index, word_count, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    for (const segment of segments) {
-      insertStmt.run(
-        transcriptId,
-        segment.sentenceIndex,
-        segment.text,
-        segment.startTime,
-        segment.endTime,
-        segment.speaker || null,
-        segment.confidence,
-        segment.version,
-        segment.sourceChunkIndex,
-        segment.wordCount,
-        new Date().toISOString(),
-        new Date().toISOString()
-      );
-    }
+    // One transaction for the whole set. Without it, a failure at segment 400
+    // of 1000 left a half-populated transcript marked 'completed', and
+    // migrateAllTranscripts (which replays this over every legacy transcript)
+    // aborted mid-backfill with no resume marker.
+    const now = new Date().toISOString();
+    const insertAll = db.transaction((rows) => {
+      for (const segment of rows) {
+        insertStmt.run(
+          transcriptId,
+          segment.sentenceIndex,
+          segment.text,
+          segment.startTime,
+          segment.endTime,
+          segment.speaker || null,
+          segment.confidence,
+          segment.version,
+          segment.sourceChunkIndex,
+          segment.wordCount,
+          now,
+          now
+        );
+      }
+    });
+    insertAll(segments);
 
     console.log(`Created ${segments.length} sentence segments for transcript ${transcriptId}`);
     return { success: true };
@@ -2061,17 +2309,49 @@ ipcMain.handle('segments-get-by-transcript', async (event, { transcriptId, versi
   }
 });
 
+// Columns a renderer is allowed to write via segments-update. Keys arrive as
+// arbitrary object keys from IPC and are interpolated into the SET clause, so
+// they MUST be allow-listed here — without this, a key such as
+// `text = 'x' WHERE 1=1 --` injects SQL. Deliberately excludes `id`,
+// `transcript_id` and `created_at` (identity/ownership columns are never
+// user-writable) and `updated_at` (always stamped by the handler below).
+// Sourced from database/schema.sql.
+const SEGMENT_UPDATABLE_COLUMNS = new Set([
+  'text', 'start_time', 'end_time', 'speaker', 'confidence',
+  'version', 'source_chunk_index', 'word_count',
+  'sentiment', 'emotions',
+]);
+
 ipcMain.handle('segments-update', async (event, { segmentId, updates }) => {
   try {
-    const fields = Object.keys(updates).map(key => `${key} = ?`).join(', ');
-    const values = Object.values(updates);
+    if (typeof segmentId !== 'number' || !Number.isInteger(segmentId)) {
+      throw new Error(`invalid segment id: ${JSON.stringify(segmentId)}`);
+    }
+    if (!updates || typeof updates !== 'object' || Array.isArray(updates)) {
+      throw new Error('segments-update requires an updates object');
+    }
+    const keys = Object.keys(updates);
+    if (keys.length === 0) return { success: true, changes: 0 };
+
+    const sets = [];
+    const values = [];
+    for (const key of keys) {
+      if (!SEGMENT_UPDATABLE_COLUMNS.has(key)) {
+        throw new Error(`invalid segment column: ${JSON.stringify(key)}`);
+      }
+      sets.push(`${key} = ?`);
+      const value = updates[key];
+      // Coerce booleans so binding works consistently (better-sqlite3
+      // rejects raw booleans under node:sqlite).
+      values.push(typeof value === 'boolean' ? (value ? 1 : 0) : value);
+    }
     values.push(new Date().toISOString()); // updated_at
     values.push(segmentId);
-    
-    const query = `UPDATE transcript_segments SET ${fields}, updated_at = ? WHERE id = ?`;
-    db.prepare(query).run(values);
-    
-    return { success: true };
+
+    const query = `UPDATE transcript_segments SET ${sets.join(', ')}, updated_at = ? WHERE id = ?`;
+    const info = db.prepare(query).run(...values);
+
+    return { success: true, changes: info.changes };
   } catch (error) {
     console.error('Error updating sentence segment:', error);
     return { success: false, error: error.message };
@@ -2124,22 +2404,26 @@ ipcMain.handle('segments-create-from-chunks', async (event, { transcriptId, chun
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
-    for (const segment of segments) {
-      insertStmt.run(
-        segment.transcriptId,
-        segment.sentenceIndex,
-        segment.text,
-        segment.startTime,
-        segment.endTime,
-        segment.speaker || null,
-        segment.confidence,
-        segment.version,
-        segment.sourceChunkIndex,
-        segment.wordCount,
-        new Date().toISOString(),
-        new Date().toISOString()
-      );
-    }
+    const now = new Date().toISOString();
+    const insertAll = db.transaction((rows) => {
+      for (const segment of rows) {
+        insertStmt.run(
+          segment.transcriptId,
+          segment.sentenceIndex,
+          segment.text,
+          segment.startTime,
+          segment.endTime,
+          segment.speaker || null,
+          segment.confidence,
+          segment.version,
+          segment.sourceChunkIndex,
+          segment.wordCount,
+          now,
+          now
+        );
+      }
+    });
+    insertAll(segments);
 
     console.log(`Created ${segments.length} sentence segments from ${chunkTimings.length} chunks for transcript ${transcriptId}`);
     return { success: true, segmentCount: segments.length };

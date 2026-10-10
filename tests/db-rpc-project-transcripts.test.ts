@@ -142,6 +142,19 @@ describe('db-rpc project_transcripts', () => {
       // table still intact
       expect(db.prepare('SELECT COUNT(*) c FROM transcripts').get()).toEqual({ c: 3 });
     });
+
+    it('an inherited Object.prototype key falls back to the default', () => {
+      // The ORDER_BY lookup used to be a plain object literal indexed with `??`,
+      // which catches null/undefined but NOT inherited members: orderBy
+      // 'constructor' resolved to Object's constructor function, and that
+      // function's source was interpolated into the SQL, producing a syntax
+      // error the renderer could trigger. Not injectable, but a DoS.
+      for (const key of ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf']) {
+        const rows = api.listTranscriptsForProject('p1', { orderBy: key as any });
+        expect(rows.map((r: any) => r.id), key).toEqual(['a', 'b']);
+      }
+      expect(db.prepare('SELECT COUNT(*) c FROM transcripts').get()).toEqual({ c: 3 });
+    });
   });
 
   describe('junction reads', () => {

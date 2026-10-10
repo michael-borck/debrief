@@ -1,4 +1,4 @@
-import { SentenceSegment, ChunkTimingInfo, Transcript } from '../types';
+import { SentenceSegment, SegmentUpdate, ChunkTimingInfo, Transcript } from '../types';
 
 // Payload pushed to segments.create when synthesising segments from text.
 interface SegmentCreateInput {
@@ -82,9 +82,17 @@ export class SentenceSegmentsService {
   }
 
   /**
-   * Update a specific segment
+   * Update a specific segment.
+   *
+   * `updates` is narrowed to the columns the main process will accept: the
+   * allow-list in public/electron.js (SEGMENT_UPDATABLE_COLUMNS). Identity and
+   * ownership columns are excluded, so TypeScript now rejects the same keys the
+   * handler rejects at runtime.
    */
-  async updateSegment(segmentId: string, updates: Partial<SentenceSegment>): Promise<boolean> {
+  async updateSegment(
+    segmentId: number,
+    updates: SegmentUpdate,
+  ): Promise<boolean> {
     try {
       const result = await window.electronAPI.segments.update({
         segmentId,

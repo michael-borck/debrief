@@ -5,7 +5,7 @@
 // Do NOT add a competing electronAPI declaration in any other file — it will
 // merge unpredictably with this one and create silent type drift.
 
-import type { ChunkTimingInfo } from './index';
+import type { ChunkTimingInfo, SegmentUpdate } from './index';
 import type { TranscriptRow, ProjectRow, ProjectStatsRow, MessageRow, TopicRow } from './db';
 
 export interface AIUsageTotals {
@@ -405,6 +405,38 @@ export interface ElectronAPI {
     reset: () => Promise<{ success: boolean; error?: string }>;
   };
 
+  /**
+   * Permanent delete. The main process owns both the SQLite row and the
+   * vector-store embeddings so the two cannot drift apart.
+   */
+  data: {
+    purge: (payload: { transcripts?: string[]; projects?: string[] }) => Promise<{
+      success: boolean;
+      failed: number;
+      error?: string;
+      transcripts?: {
+        purged: number;
+        failed: number;
+        vectorFailures: number;
+        results: {
+          id: string;
+          ok: boolean;
+          changes?: number;
+          vectorsPurged?: boolean;
+          vectorNote?: string;
+          vectorFailed?: boolean;
+          vectorError?: string;
+          error?: string;
+        }[];
+      };
+      projects?: {
+        purged: number;
+        failed: number;
+        results: { id: string; ok: boolean; changes?: number; error?: string }[];
+      };
+    }>;
+  };
+
   embedding: {
     initialize: () => Promise<void>;
     embedText: (text: string, metadata?: any) => Promise<{
@@ -420,9 +452,11 @@ export interface ElectronAPI {
     updateConfig: (config: any) => Promise<void>;
   };
 
-  onNavigate: (callback: (page: string) => void) => void;
-  onMenuAction: (callback: (action: string) => void) => void;
-  removeAllListeners: (channel: string) => void;
+  // Each returns an unsubscribe function; prefer those over removeAllListeners.
+  onNavigate: (callback: (page: string) => void) => () => void;
+  onMenuAction: (callback: (action: string) => void) => () => void;
+  // Bound to the 'navigate' and 'menu-action' channels; takes no channel name.
+  removeAllListeners: () => void;
 
   sidecar: {
     status: () => Promise<{
@@ -490,8 +524,9 @@ export interface ElectronAPI {
       error?: string;
     }>;
     getByTranscript: (data: { transcriptId: string; version?: string }) => Promise<any[]>;
-    update: (data: { segmentId: string; updates: any }) => Promise<{
+    update: (data: { segmentId: number; updates: SegmentUpdate }) => Promise<{
       success: boolean;
+      changes?: number;
       error?: string;
     }>;
     deleteByTranscript: (data: { transcriptId: string; version?: string }) => Promise<{

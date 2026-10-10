@@ -76,6 +76,25 @@ export interface SentenceSegment {
   updated_at: string;
 }
 
+// The columns segments.update accepts. Mirrors SEGMENT_UPDATABLE_COLUMNS in
+// public/electron.js — id/transcript_id/created_at/updated_at are excluded
+// because the main process refuses them and always stamps updated_at itself.
+export type SegmentUpdate = Partial<
+  Pick<
+    SentenceSegment,
+    | 'text'
+    | 'start_time'
+    | 'end_time'
+    | 'speaker'
+    | 'confidence'
+    | 'version'
+    | 'source_chunk_index'
+    | 'word_count'
+    | 'sentiment'
+    | 'emotions'
+  >
+>;
+
 export interface ChunkTimingInfo {
   chunkIndex: number;
   startTime: number;

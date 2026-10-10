@@ -65,6 +65,43 @@ describe('vector-store LanceDB workaround (H-18)', () => {
     expect(r.map((x: any) => x.chunk.id).sort()).toEqual(['a1', 'b1']);
   });
 
+  it('searchSimilar hides chunks for excluded (trashed) transcripts', async () => {
+    // Defence in depth behind purge-service: even if a purge fails or an older
+    // build left orphan chunks behind, a trashed transcript's text must not be
+    // retrievable through search or project chat.
+    vs.setExcludedIdsProvider(() => new Set(['A']));
+    try {
+      const unscoped = await vs.searchSimilar(emb(1).embedding, { limit: 10, minScore: 0 });
+      expect(unscoped.every((x: any) => x.chunk.transcriptId !== 'A')).toBe(true);
+      expect(unscoped.some((x: any) => x.chunk.transcriptId === 'B')).toBe(true);
+
+      // An explicit transcriptId filter must not re-admit an excluded one.
+      const forced = await vs.searchSimilar(emb(1).embedding, {
+        transcriptId: 'A',
+        limit: 10,
+        minScore: 0,
+      });
+      expect(forced).toHaveLength(0);
+    } finally {
+      vs.setExcludedIdsProvider(null);
+    }
+    // Restored for the remaining tests in this file.
+    expect(await vs.searchSimilar(emb(1).embedding, { transcriptId: 'A', limit: 10, minScore: 0 }))
+      .toHaveLength(2);
+  });
+
+  it('a throwing exclusion provider degrades to the unfiltered behaviour', async () => {
+    vs.setExcludedIdsProvider(() => {
+      throw new Error('db closed');
+    });
+    try {
+      const r = await vs.searchSimilar(emb(1).embedding, { transcriptId: 'A', limit: 10, minScore: 0 });
+      expect(r).toHaveLength(2);
+    } finally {
+      vs.setExcludedIdsProvider(null);
+    }
+  });
+
   it('getTranscriptChunks returns only that transcript', async () => {
     expect(await vs.getTranscriptChunks('A')).toHaveLength(2);
     expect(await vs.getTranscriptChunks('B')).toHaveLength(1);

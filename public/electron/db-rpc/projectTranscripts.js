@@ -15,11 +15,26 @@ function assertId(name, id) {
 // Whitelisted ORDER BY fragments. The renderer picks a key; it never sends
 // raw SQL, so this can't be an injection vector even though the value is
 // interpolated into the query string.
-const ORDER_BY = {
+//
+// Built with a null prototype so an unknown key cannot reach Object.prototype.
+// With a plain object literal, `ORDER_BY['constructor']` returns the
+// constructor function, which then gets interpolated into the query and
+// produces a syntax error — a renderer-triggerable DoS. The `??` default only
+// catches null/undefined, not inherited members.
+const ORDER_BY = Object.assign(Object.create(null), {
   added_desc: 'pt.added_at DESC',
   created_desc: 't.created_at DESC',
   created_asc: 't.created_at ASC',
-};
+});
+
+// Belt-and-braces own-property check, so the guard survives a future refactor
+// that swaps this back to a plain literal.
+function resolveOrderBy(key) {
+  if (typeof key === 'string' && Object.hasOwn(ORDER_BY, key)) {
+    return ORDER_BY[key];
+  }
+  return ORDER_BY.added_desc;
+}
 
 function makeProjectTranscripts(getDb) {
   return {
@@ -79,7 +94,7 @@ function makeProjectTranscripts(getDb) {
       assertId('project id', projectId);
       const includeDeleted = options.includeDeleted === true;
       const completedOnly = options.completedOnly === true;
-      const order = ORDER_BY[options.orderBy] ?? ORDER_BY.added_desc;
+      const order = resolveOrderBy(options.orderBy);
       const where = ['pt.project_id = ?'];
       if (!includeDeleted) where.push('t.is_deleted = 0');
       if (completedOnly) where.push("t.status = 'completed'");

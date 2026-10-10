@@ -70,6 +70,60 @@ describe('db-rpc maintenance sweepExpiredTrash', () => {
     expect(pids).toEqual(['livep']);
   });
 
+  it('reports which transcript ids it purged, so the caller can clear their vector chunks', () => {
+    // The sweep deletes SQLite rows only. LanceDB rows outlive them, so the
+    // caller needs the ids to purge embeddings — otherwise a swept transcript's
+    // full text stays searchable forever.
+    seedTranscript(db, 'expired-a', { is_deleted: 1, deleted_at: iso(NOW - 31 * DAY) });
+    seedTranscript(db, 'expired-b', { is_deleted: 1, deleted_at: iso(NOW - 90 * DAY) });
+    seedTranscript(db, 'recent', { is_deleted: 1, deleted_at: iso(NOW - 5 * DAY) });
+    seedTranscript(db, 'live');
+
+    const result = api.sweepExpiredTrash({ now: NOW, retentionDays: 30 });
+
+    expect(result.transcriptIds.sort()).toEqual(['expired-a', 'expired-b']);
+    // Not-yet-expired and live transcripts must not be listed.
+    expect(result.transcriptIds).not.toContain('recent');
+    expect(result.transcriptIds).not.toContain('live');
+  });
+
+  it('returns an empty transcriptIds list when nothing expired', () => {
+    seedTranscript(db, 'live');
+    const result = api.sweepExpiredTrash({ now: NOW, retentionDays: 30 });
+    expect(result.transcriptIds).toEqual([]);
+  });
+
+  it('compares chronologically regardless of the stored timestamp format', () => {
+    // deleted_at's SQL default is CURRENT_TIMESTAMP, which SQLite fills as
+    // 'YYYY-MM-DD HH:MM:SS' (space separator, no Z) — a DIFFERENT shape from
+    // the ISO-8601 string softDelete writes. A plain `<` string compare orders
+    // those two shapes by the separator byte (' ' = 0x20 < 'T' = 0x54), so a
+    // row written by anything other than softDelete gets mis-bucketed near the
+    // cutoff. datetime() normalises both.
+    const sqliteFormat = (ms: number) => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+
+    // Written 40 days ago in SQLite's format -> must be swept.
+    seedTranscript(db, 'old-sqlite-fmt', {
+      is_deleted: 1,
+      deleted_at: sqliteFormat(NOW - 40 * DAY),
+    });
+    // Written 5 days ago in SQLite's format -> must be kept.
+    seedTranscript(db, 'recent-sqlite-fmt', {
+      is_deleted: 1,
+      deleted_at: sqliteFormat(NOW - 5 * DAY),
+    });
+    // Mixed formats, both expired.
+    seedTranscript(db, 'old-iso-fmt', { is_deleted: 1, deleted_at: iso(NOW - 45 * DAY) });
+
+    const result = api.sweepExpiredTrash({ now: NOW, retentionDays: 30 });
+
+    expect(result.transcripts).toBe(2);
+    expect(result.transcriptIds.sort()).toEqual(['old-iso-fmt', 'old-sqlite-fmt']);
+
+    const survivors = db.prepare('SELECT id FROM transcripts ORDER BY id').all().map((r: any) => r.id);
+    expect(survivors).toEqual(['recent-sqlite-fmt']);
+  });
+
   it('cascades to a purged transcript\'s children', () => {
     seedTranscript(db, 'old', { is_deleted: 1, deleted_at: iso(NOW - 31 * DAY) });
     db.prepare(

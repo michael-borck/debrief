@@ -196,6 +196,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     reset: () => ipcRenderer.invoke('vector-store-reset')
   },
 
+  // Permanent delete, owned by the main process so the SQLite row and the
+  // vector-store embeddings are always removed together.
+  data: {
+    purge: (payload) => ipcRenderer.invoke('data:purge', payload)
+  },
+
   // Embedding operations (delegated to main process)
   embedding: {
     initialize: () => ipcRenderer.invoke('embedding-initialize'),
@@ -204,19 +210,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
     updateConfig: (config) => ipcRenderer.invoke('embedding-update-config', config)
   },
 
-  // Navigation events
+  // Navigation events. Each returns an unsubscribe function: these use
+  // ipcRenderer.on, so without a handle the only cleanup route was the blunt
+  // channel-wide removeAllListeners below — which would silently kill any other
+  // subscriber on the same channel.
   onNavigate: (callback) => {
-    ipcRenderer.on('navigate', (event, page) => callback(page));
+    const listener = (event, page) => callback(page);
+    ipcRenderer.on('navigate', listener);
+    return () => ipcRenderer.removeListener('navigate', listener);
   },
 
   // Menu actions
   onMenuAction: (callback) => {
-    ipcRenderer.on('menu-action', (event, action) => callback(action));
+    const listener = (event, action) => callback(action);
+    ipcRenderer.on('menu-action', listener);
+    return () => ipcRenderer.removeListener('menu-action', listener);
   },
 
-  // Remove all listeners
-  removeAllListeners: (channel) => {
-    ipcRenderer.removeAllListeners(channel);
+  // Remove all listeners.
+  //
+  // The channel is bound to the two events above rather than passed through.
+  // Every other entry in this bridge is a fixed channel or a named closure;
+  // accepting an arbitrary channel name gave renderer code an unbounded
+  // removeListener over ipcRenderer. Call the returned unsubscribe functions
+  // instead where possible.
+  removeAllListeners: () => {
+    ipcRenderer.removeAllListeners('navigate');
+    ipcRenderer.removeAllListeners('menu-action');
   },
 
   // Embedded Python sidecar (lens/speech-analyser)

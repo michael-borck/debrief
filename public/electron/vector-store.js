@@ -91,6 +91,28 @@ class MainVectorStore {
     this.db = null;
     this.table = null;
     this.isInitialized = false;
+    // Returns a Set of transcript ids that must never appear in results
+    // (currently: trashed transcripts). Injected by the main process so this
+    // module stays free of any DB dependency. Defence in depth: purge-service
+    // removes chunks on delete, but if a purge ever fails or an older build left
+    // orphans behind, deleted content must still not be searchable.
+    this._excludedIdsProvider = null;
+  }
+
+  setExcludedIdsProvider(fn) {
+    this._excludedIdsProvider = typeof fn === 'function' ? fn : null;
+  }
+
+  _excludedIds() {
+    if (!this._excludedIdsProvider) return null;
+    try {
+      return this._excludedIdsProvider();
+    } catch (error) {
+      // Never let a filter lookup failure break search — an empty exclusion set
+      // degrades to the pre-existing behaviour.
+      console.error('Failed to resolve excluded transcript ids:', error);
+      return null;
+    }
   }
 
   async initialize(dbPath) {
@@ -195,7 +217,9 @@ class MainVectorStore {
       }
 
       const limit = options.limit || 10;
-      const needsFilter = !!(options.transcriptId || options.speaker);
+      const excluded = this._excludedIds();
+      const hasExclusions = excluded != null && excluded.size > 0;
+      const needsFilter = !!(options.transcriptId || options.speaker || hasExclusions);
       // String `.where()` is broken in LanceDB 0.20, so filter in JS. When a
       // transcript/speaker filter is requested we over-fetch by vector distance
       // (the matching chunks may not be in the global top-N) and trim after.
@@ -205,6 +229,11 @@ class MainVectorStore {
 
       // Exclude the schema seed row, then apply the requested filters in JS.
       results = results.filter((r) => r.transcriptId !== 'sample');
+      if (hasExclusions) {
+        // Trashed transcripts must never surface in search, even if their
+        // chunks outlived the delete.
+        results = results.filter((r) => !excluded.has(r.transcriptId));
+      }
       if (options.transcriptId) {
         results = results.filter((r) => r.transcriptId === options.transcriptId);
       }
