@@ -33,6 +33,9 @@ electron-builder.yml
 # OS
 Thumbs.db
 desktop.ini
+# AppleDouble resource forks (created when editing on exFAT/FAT external volumes).
+# Harmless but they show up as untracked files and break vitest's test glob.
+._*
 
 # FFmpeg binaries (downloaded separately)
 ffmpeg-binaries/
