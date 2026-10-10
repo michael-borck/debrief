@@ -1,8 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { logger } from '../utils/logger';
 import { X, Download, FileText, CheckCircle, Edit3, Users } from 'lucide-react';
-import { Transcript } from '../types';
+import { Transcript, type SentenceSegment } from '../types';
 import { buildDocx, buildPdf } from '../services/exportService';
+import {
+  selectSegments,
+  toSrt,
+  toVtt,
+  toSpeakerText,
+  precisionNote,
+  precisionFor,
+  toTimedLines,
+  type TimePrecision,
+} from '../utils/timestamped-export';
 import { Modal } from './Modal';
 
 interface ExportModalProps {
@@ -12,7 +22,7 @@ interface ExportModalProps {
 }
 
 type ExportVersion = 'original' | 'corrected' | 'speaker-tagged';
-type ExportFormat = 'markdown' | 'txt' | 'json' | 'docx' | 'pdf';
+type ExportFormat = 'markdown' | 'txt' | 'json' | 'docx' | 'pdf' | 'srt' | 'vtt' | 'timestamped-txt';
 type TimestampFormat = 'preserve' | 'remove' | 'external-tools';
 
 export const ExportModal: React.FC<ExportModalProps> = ({
@@ -121,8 +131,32 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     }
   };
 
+  /**
+   * Timestamped exports (srt/vtt/timestamped-txt) are built from the stored
+   * sentence segments — the only source of per-line timings in the database —
+   * optionally filtered to one speaker.
+   */
+  const buildTimestampedExport = (format: 'srt' | 'vtt' | 'timestamped-txt'): string => {
+    const segments = selectSegments(timestampedSegments, speakerFilter || null);
+    const precision: TimePrecision = precisionFor(segments, turnsAvailable);
+    const note = precisionNote(precision);
+
+    if (format === 'srt') return toSrt(toTimedLines(segments, precision));
+    if (format === 'vtt') return toVtt(toTimedLines(segments, precision));
+
+    const header = `Transcript: ${transcript.title}\n` +
+      `${note}\n` +
+      (speakerFilter ? `Speaker: ${speakerFilter}\n` : '') +
+      `\n`;
+    return header + toSpeakerText(toTimedLines(segments, precision));
+  };
+
   const buildExportContent = (): string => {
     const transcriptContent = getTranscriptContent();
+
+    if (selectedFormat === 'srt' || selectedFormat === 'vtt' || selectedFormat === 'timestamped-txt') {
+      return buildTimestampedExport(selectedFormat);
+    }
 
     if (selectedFormat === 'txt') {
       return transcriptContent;
@@ -214,6 +248,45 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return content;
   };
 
+  // Which speakers exist in the stored segments, and whether diarization turns
+  // were kept for this transcript (they are only stored from schema v2 onward).
+  const [segmentSpeakers, setSegmentSpeakers] = useState<string[]>([]);
+  const [timestampedSegments, setTimestampedSegments] = useState<SentenceSegment[]>([]);
+  const [turnsAvailable, setTurnsAvailable] = useState(false);
+  const [speakerFilter, setSpeakerFilter] = useState<string>('');
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [segments, turns] = await Promise.all([
+          window.electronAPI.segments.getByTranscript({ transcriptId: transcript.id }),
+          window.electronAPI.db.diarizationTurns.count(transcript.id),
+        ]);
+        if (cancelled) return;
+        const names = [
+          ...new Set(
+            (segments as Array<{ speaker?: string | null }>)
+              .map((s) => s.speaker?.trim())
+              .filter((s): s is string => !!s)
+          ),
+        ];
+        setTimestampedSegments(segments as SentenceSegment[]);
+        setSegmentSpeakers(names);
+        setTurnsAvailable(turns > 0);
+      } catch (error) {
+        logger.error('Failed to load segments for export:', error);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, transcript.id]);
+
+  const isTimestampedFormat =
+    selectedFormat === 'srt' || selectedFormat === 'vtt' || selectedFormat === 'timestamped-txt';
+
   const downloadBlob = (blob: Blob, extension: string) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -246,10 +319,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 
       // Text formats stay inline
       const content = buildExportContent();
-      const mimeType = selectedFormat === 'json' ? 'application/json' : 'text/plain';
-      const extension = selectedFormat === 'markdown' ? 'md' : selectedFormat;
-      const blob = new Blob([content], { type: mimeType });
-      downloadBlob(blob, extension);
+      const mimeByFormat: Partial<Record<ExportFormat, string>> = {
+        json: 'application/json',
+        srt: 'application/x-subrip',
+        vtt: 'text/vtt',
+      };
+      const extensionByFormat: Partial<Record<ExportFormat, string>> = {
+        markdown: 'md',
+        'timestamped-txt': 'txt',
+      };
+      const blob = new Blob([content], {
+        type: mimeByFormat[selectedFormat] ?? 'text/plain',
+      });
+      downloadBlob(blob, extensionByFormat[selectedFormat] ?? selectedFormat);
       onClose();
     } catch (error) {
       logger.error('Export failed:', error);
@@ -336,10 +418,38 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               <option value="markdown">Markdown (.md)</option>
               <option value="txt">Plain Text (.txt)</option>
               <option value="json">JSON (.json)</option>
+              <option value="srt">Subtitles (.srt)</option>
+              <option value="vtt">Subtitles (.vtt)</option>
+              <option value="timestamped-txt">Timestamped Text (.txt)</option>
             </select>
           </div>
 
-          {/* Timestamp Options */}
+          {/* Speaker filter — only meaningful for timestamped exports, which are
+              built from the stored segments rather than the version text. */}
+          {isTimestampedFormat && (
+            <div>
+              <label className="block text-sm font-medium text-surface-700 mb-2">
+                Speaker
+              </label>
+              <select
+                value={speakerFilter}
+                onChange={(e) => setSpeakerFilter(e.target.value)}
+                className="input"
+              >
+                <option value="">All speakers</option>
+                {segmentSpeakers.map((name) => (
+                  <option key={name} value={name}>
+                    {name} only
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-surface-500 mt-1.5">{precisionNote(precisionFor(timestampedSegments, turnsAvailable))}</p>
+            </div>
+          )}
+
+          {/* Timestamp Options — N/A for subtitle/timestamped exports, which
+              always carry per-line timings from the stored segments. */}
+          {!isTimestampedFormat && (
           <div>
             <label className="block text-sm font-medium text-surface-700 mb-2">
               Timestamp Handling
@@ -359,9 +469,11 @@ export const ExportModal: React.FC<ExportModalProps> = ({
               {timestampFormat === 'external-tools' && 'Format timestamps for use with audio editing software'}
             </p>
           </div>
+          )}
 
-          {/* Options */}
-          {selectedFormat !== 'txt' && (
+          {/* Options — metadata/analysis annotations only apply to the
+              document formats; subtitle exports are cue text by definition. */}
+          {selectedFormat !== 'txt' && !isTimestampedFormat && (
             <div className="space-y-3">
               <label className="block text-sm font-medium text-surface-700">
                 Include Additional Data
