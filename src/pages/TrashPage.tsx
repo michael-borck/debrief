@@ -85,12 +85,16 @@ export const TrashPage: React.FC = () => {
     if (trashItems.length === 0) return;
     if (!window.confirm(`Permanently delete all ${trashItems.length} items?\n\nThis cannot be undone.`)) return;
     try {
-      for (const item of trashItems) {
-        if (item.type === 'transcript') {
-          await window.electronAPI.db.transcripts.remove(item.id);
-        } else {
-          await window.electronAPI.db.projects.remove(item.id);
-        }
+      // One coordinated call: the main process deletes each transcript's SQLite
+      // row AND its vector-store embeddings together. Doing it per-item here
+      // previously skipped vector cleanup entirely, leaving permanently deleted
+      // transcripts' text searchable.
+      const result = await window.electronAPI.data.purge({
+        transcripts: trashItems.filter((i) => i.type === 'transcript').map((i) => i.id),
+        projects: trashItems.filter((i) => i.type === 'project').map((i) => i.id),
+      });
+      if (!result.success) {
+        alert(`Failed to delete ${result.failed} item(s). Some may still be in the trash.`);
       }
       await loadTrashItems();
     } catch (error) { console.error('Error emptying trash:', error); alert('Failed to empty trash.'); }

@@ -87,18 +87,15 @@ export const TranscriptProvider: React.FC<TranscriptProviderProps> = ({ children
 
   const deleteTranscript = async (id: string) => {
     try {
-      // Delete transcript from database
-      await window.electronAPI.db.transcripts.remove(id);
-
-      // Also delete chunks from vector store
-      try {
-        await window.electronAPI.vectorStore.deleteTranscriptChunks(id);
-        console.log(`Deleted vector chunks for transcript: ${id}`);
-      } catch (vectorError) {
-        console.error('Error deleting vector chunks:', vectorError);
-        // Don't fail the deletion if vector cleanup fails
+      // The main process owns both the SQLite row and the vector-store
+      // embeddings, so they are always removed together. Calling the two
+      // IPCs separately here is what let "permanently deleted" transcripts
+      // keep their full text searchable in the vector store.
+      const result = await window.electronAPI.data.purge({ transcripts: [id] });
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to permanently delete transcript');
       }
-      
+
       await loadTranscripts();
     } catch (error) {
       console.error('Error deleting transcript:', error);

@@ -1,59 +1,17 @@
 import React, { useState } from 'react';
 import { logger } from '../utils/logger';
+import {
+  generateCSVExport,
+  generateHTMLExport,
+  generateMarkdownExport,
+} from '../utils/export-generators';
+import type { ProjectExportData } from '../utils/export-generators';
 import { Project } from '../types';
 import type { TranscriptRow } from '../types/db';
 
 interface ProjectAnalysisExportProps {
   project: Project;
   onClose: () => void;
-}
-
-// Shape of the export payload the generate* functions read. All analysis
-// sub-objects are optional (each is rendered behind an `if` guard); only the
-// project identity + exported_at are accessed unconditionally.
-interface ProjectExportData {
-  exported_at: string;
-  project: {
-    name: string;
-    created_at: string;
-    description?: string;
-    transcript_count?: number;
-    total_duration?: number;
-    date_range?: { start: string; end: string };
-  };
-  analysis: {
-    summary?: string;
-    themes?: string[];
-    key_insights?: string[];
-    themeEvolution?: Array<{
-      theme: string;
-      totalOccurrences: number;
-      trend: string;
-      avgRelevance: number;
-      occurrences: unknown[];
-    }>;
-    conceptFrequency?: Record<string, {
-      totalCount: number;
-      transcriptCount: number;
-      avgFrequency: number;
-      trend: string;
-    }>;
-    speakerAnalysis?: {
-      totalSpeakers: number;
-      speakerDistribution: Record<string, {
-        transcriptCount: number;
-        totalSegments: number;
-        themes: string[];
-      }>;
-    };
-    crossTranscriptPatterns?: Array<{
-      description: string;
-      type: string;
-      strength: number;
-      evidence: unknown[];
-      insights: string[];
-    }>;
-  };
 }
 
 export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({ 
@@ -91,7 +49,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
       }
       
       // Build export data
-      const exportData = {
+      const exportData: ProjectExportData = {
         project: {
           id: project.id,
           name: project.name,
@@ -156,7 +114,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
           
         case 'pdf':
           // For PDF, we'll generate HTML and let the browser handle PDF generation
-          content = generateHTMLExport(exportData);
+          content = generateHTMLExport(exportData, { exportFormat, exportSections });
           filename = `${project.name}_analysis.html`;
           mimeType = 'text/html';
           break;
@@ -182,193 +140,6 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
     } finally {
       setIsExporting(false);
     }
-  };
-
-  const generateCSVExport = (data: ProjectExportData): string => {
-    const lines = [];
-    
-    // Project overview
-    lines.push('Project Analysis Export');
-    lines.push(`Project Name,${data.project.name}`);
-    lines.push(`Description,${data.project.description || ''}`);
-    lines.push(`Created Date,${new Date(data.project.created_at).toLocaleDateString()}`);
-    lines.push(`Transcript Count,${data.project.transcript_count || 0}`);
-    lines.push('');
-    
-    // Themes
-    if (data.analysis.themes) {
-      lines.push('Key Themes');
-      data.analysis.themes.forEach((theme: string) => {
-        lines.push(`"${theme}"`);
-      });
-      lines.push('');
-    }
-    
-    // Theme Evolution
-    if (data.analysis.themeEvolution) {
-      lines.push('Theme Evolution');
-      lines.push('Theme,Total Occurrences,Trend,Avg Relevance');
-      data.analysis.themeEvolution.forEach((theme) => {
-        lines.push(`"${theme.theme}",${theme.totalOccurrences},${theme.trend},${theme.avgRelevance.toFixed(2)}`);
-      });
-      lines.push('');
-    }
-    
-    // Concept Frequency
-    if (data.analysis.conceptFrequency) {
-      lines.push('Concept Frequency');
-      lines.push('Concept,Total Count,Transcript Count,Avg Frequency,Trend');
-      Object.entries(data.analysis.conceptFrequency).forEach(([concept, conceptData]) => {
-        lines.push(`"${concept}",${conceptData.totalCount},${conceptData.transcriptCount},${conceptData.avgFrequency.toFixed(1)},${conceptData.trend}`);
-      });
-    }
-    
-    return lines.join('\n');
-  };
-
-  const generateMarkdownExport = (data: ProjectExportData): string => {
-    const lines = [];
-    
-    lines.push(`# Project Analysis: ${data.project.name}`);
-    lines.push('');
-    
-    if (data.project.description) {
-      lines.push(`**Description:** ${data.project.description}`);
-      lines.push('');
-    }
-    
-    lines.push(`**Created:** ${new Date(data.project.created_at).toLocaleDateString()}`);
-    lines.push(`**Transcripts:** ${data.project.transcript_count || 0}`);
-    lines.push(`**Total Duration:** ${formatDuration(data.project.total_duration || 0)}`);
-    
-    if (data.project.date_range) {
-      lines.push(`**Date Range:** ${new Date(data.project.date_range.start).toLocaleDateString()} - ${new Date(data.project.date_range.end).toLocaleDateString()}`);
-    }
-    
-    lines.push('');
-    
-    // Summary
-    if (data.analysis.summary) {
-      lines.push('## Summary');
-      lines.push('');
-      lines.push(data.analysis.summary);
-      lines.push('');
-    }
-    
-    // Key Themes
-    if (data.analysis.themes && data.analysis.themes.length > 0) {
-      lines.push('## Key Themes');
-      lines.push('');
-      data.analysis.themes.forEach((theme: string) => {
-        lines.push(`- ${theme}`);
-      });
-      lines.push('');
-    }
-    
-    // Key Insights
-    if (data.analysis.key_insights && data.analysis.key_insights.length > 0) {
-      lines.push('## Key Insights');
-      lines.push('');
-      data.analysis.key_insights.forEach((insight: string) => {
-        lines.push(`- ${insight}`);
-      });
-      lines.push('');
-    }
-    
-    // Theme Evolution
-    if (data.analysis.themeEvolution) {
-      lines.push('## Theme Evolution');
-      lines.push('');
-      data.analysis.themeEvolution.slice(0, 10).forEach((theme) => {
-        lines.push(`### ${theme.theme}`);
-        lines.push(`- **Trend:** ${theme.trend}`);
-        lines.push(`- **Total Occurrences:** ${theme.totalOccurrences}`);
-        lines.push(`- **Average Relevance:** ${(theme.avgRelevance * 100).toFixed(1)}%`);
-        lines.push(`- **Appears in:** ${theme.occurrences.length} transcript(s)`);
-        lines.push('');
-      });
-    }
-    
-    // Speaker Analysis
-    if (data.analysis.speakerAnalysis) {
-      lines.push('## Speaker Analysis');
-      lines.push('');
-      lines.push(`**Total Speakers:** ${data.analysis.speakerAnalysis.totalSpeakers}`);
-      lines.push('');
-      
-      Object.entries(data.analysis.speakerAnalysis.speakerDistribution).slice(0, 5).forEach(([speaker, speakerData]) => {
-        lines.push(`### ${speaker}`);
-        lines.push(`- **Transcript Count:** ${speakerData.transcriptCount}`);
-        lines.push(`- **Total Segments:** ${speakerData.totalSegments}`);
-        if (speakerData.themes.length > 0) {
-          lines.push(`- **Key Themes:** ${speakerData.themes.slice(0, 3).join(', ')}`);
-        }
-        lines.push('');
-      });
-    }
-    
-    // Cross-Transcript Patterns
-    if (data.analysis.crossTranscriptPatterns && data.analysis.crossTranscriptPatterns.length > 0) {
-      lines.push('## Cross-Transcript Patterns');
-      lines.push('');
-      data.analysis.crossTranscriptPatterns.slice(0, 5).forEach((pattern) => {
-        lines.push(`### ${pattern.description}`);
-        lines.push(`- **Type:** ${pattern.type.replace('_', ' ')}`);
-        lines.push(`- **Strength:** ${(pattern.strength * 100).toFixed(0)}%`);
-        lines.push(`- **Evidence:** ${pattern.evidence.length} transcript(s)`);
-        if (pattern.insights.length > 0) {
-          lines.push('- **Insights:**');
-          pattern.insights.forEach((insight: string) => {
-            lines.push(`  - ${insight}`);
-          });
-        }
-        lines.push('');
-      });
-    }
-    
-    lines.push('---');
-    lines.push(`*Exported on ${new Date(data.exported_at).toLocaleDateString()} from Debrief*`);
-    
-    return lines.join('\n');
-  };
-
-  const generateHTMLExport = (data: ProjectExportData): string => {
-    const markdownContent = generateMarkdownExport(data);
-    
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Project Analysis: ${data.project.name}</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
-        h1 { color: #2563eb; border-bottom: 3px solid #2563eb; padding-bottom: 10px; }
-        h2 { color: #1e40af; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; }
-        h3 { color: #374151; }
-        ul { padding-left: 20px; }
-        li { margin-bottom: 5px; }
-        .metadata { background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0; }
-        .metadata strong { color: #374151; }
-        hr { border: none; border-top: 1px solid #e5e7eb; margin: 30px 0; }
-        @media print { body { margin: 0; padding: 15px; } }
-    </style>
-</head>
-<body>
-    <div class="metadata">
-        <strong>Exported:</strong> ${new Date(data.exported_at).toLocaleString()}<br>
-        <strong>Format:</strong> ${exportFormat.toUpperCase()}<br>
-        <strong>Sections:</strong> ${Object.entries(exportSections).filter(([_, included]) => included).map(([section]) => section).join(', ')}
-    </div>
-    ${markdownContent.replace(/\n/g, '<br>').replace(/^# (.+)$/gm, '<h1>$1</h1>').replace(/^## (.+)$/gm, '<h2>$1</h2>').replace(/^### (.+)$/gm, '<h3>$1</h3>').replace(/^- (.+)$/gm, '<li>$1</li>').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')}
-</body>
-</html>`;
-  };
-
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
   };
 
   return (

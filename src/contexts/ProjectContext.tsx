@@ -139,9 +139,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   // Delete a project
   const deleteProject = async (id: string) => {
     try {
-      await window.electronAPI.db.projects.remove(id);
+      // Routed through the coordinated purge so this path shares one owner for
+      // permanent deletion. A project does not own its transcripts, so this
+      // leaves those (and their embeddings) intact by design.
+      const result = await window.electronAPI.data.purge({ projects: [id] });
+      if (!result.success) throw new Error(result.error || 'Failed to delete project');
       await loadProjects();
-      
+
       if (currentProject?.id === id) {
         setCurrentProject(null);
       }

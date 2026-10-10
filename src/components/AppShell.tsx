@@ -60,27 +60,23 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
     };
 
     // Main process can request a route change via the 'navigate' channel
-    // (used by the Help → User Guide menu entry, for example)
+    // (used by the Help → User Guide menu entry, for example).
+    // Only the two routes the main process actually sends are accepted; the
+    // previous `page.startsWith('/')` catch-all could route anywhere.
     const handleNavigate = (page: string) => {
       if (typeof page !== 'string') return;
       if (page === 'docs') navigate('/docs');
       else if (page === 'settings') navigate('/settings');
-      else if (page.startsWith('/')) navigate(page);
     };
 
-    if (window.electronAPI?.onMenuAction) {
-      window.electronAPI.onMenuAction(handleMenuAction);
-    }
-    if (window.electronAPI?.onNavigate) {
-      window.electronAPI.onNavigate(handleNavigate);
-    }
+    const offMenu = window.electronAPI?.onMenuAction?.(handleMenuAction);
+    const offNavigate = window.electronAPI?.onNavigate?.(handleNavigate);
 
-    // Cleanup
+    // Cleanup: unsubscribe this component's own listeners rather than tearing
+    // down every listener on the channel.
     return () => {
-      if (window.electronAPI?.removeAllListeners) {
-        window.electronAPI.removeAllListeners('menu-action');
-        window.electronAPI.removeAllListeners('navigate');
-      }
+      offMenu?.();
+      offNavigate?.();
     };
   }, []);
 

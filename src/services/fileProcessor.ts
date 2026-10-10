@@ -213,7 +213,7 @@ export class FileProcessor {
           console.warn('Failed to delete cancelled transcript segments:', segErr);
         }
         try {
-          await window.electronAPI.db.transcripts.remove(transcriptId);
+          await window.electronAPI.data.purge({ transcripts: [transcriptId] });
         } catch (dbErr) {
           console.error('Failed to delete cancelled transcript:', dbErr);
         }
@@ -234,7 +234,10 @@ export class FileProcessor {
         console.warn('Failed to delete failed-import segments:', segErr);
       }
       try {
-        await window.electronAPI.db.transcripts.remove(transcriptId);
+        // Purge (not just remove): a cancelled/failed import may already have
+        // written embeddings, and "cancel = it never happened" means those
+        // chunks must go too.
+        await window.electronAPI.data.purge({ transcripts: [transcriptId] });
       } catch (dbErr) {
         console.error('Failed to delete failed-import transcript:', dbErr);
       }

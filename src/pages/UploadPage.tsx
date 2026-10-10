@@ -128,7 +128,7 @@ export const UploadPage: React.FC = () => {
         if (signal.aborted) {
           updateProcessingItem(processingItemId, { status: 'cancelled' });
           try {
-            await window.electronAPI.db.transcripts.remove(transcriptId);
+            await window.electronAPI.data.purge({ transcripts: [transcriptId] });
           } catch (e) {
             console.warn('Failed to delete cancelled transcript record:', e);
           }
