@@ -123,7 +123,7 @@ installs.
 
 ---
 
-## 4. [~] Per-speaker audio clips  ← next
+## 4. [x] Per-speaker audio clips
 
 **Problem.** No audio is ever cut by time range anywhere in the codebase — no
 `-ss`, `-to` or `atrim` exists. All the plumbing (`ffmpeg-static`, `execFile` with
@@ -252,4 +252,5 @@ Small, independent, ship alongside the above.
 | 2026-10-10 | 1 — map-reduce | Shipped. `analysisMapReduce.ts`, `researchMerge.ts`. All four stages wired. 5 tests verified failing against the previous single-prompt implementation. |
 | 2026-10-10 | 2 — label preservation | Shipped. `speakerLabelPreservation.ts`. Names carried across by temporal overlap (ids are reassigned every run). Merges flagged for review; splits heal. 13 tests. |
 | 2026-10-10 | 3 — Q&A attribution | Shipped. `speakerTranscript.ts`. Research analysis receives speaker-labelled text; prompt demands attribution (both copies verified in sync); `interactionPattern` inferred from talk share rather than speaker count. 29 tests. |
+| 2026-10-10 | 4 — audio clips | Shipped. `speaker-audio.js` (turn prep, filter graph, batching), `db-rpc/diarizationTurns.js`, `SpeakerAudioExport.tsx`. Schema v2 adds `diarization_turns` — turns were computed at import and then thrown away. Turns are now persisted at import and on re-diarisation. Auto-load audio. 30 tests. |
 | 2026-10-10 | Reorder | Items 6→5→4. The original plan treated word timestamps as a blocker for audio clips, but clips cut at turn level where pyannote timings are real, so it never was one. Word timestamps moved last as a precision improvement. |

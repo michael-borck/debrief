@@ -270,7 +270,7 @@ async function initDatabase() {
 // NOT EXISTS statements are no-ops, every column the new build added is found
 // already present, and the old build carries on against a schema it does not
 // understand. A column the newer version DROPPED would never be noticed.
-const CURRENT_SCHEMA_VERSION = 1;
+const CURRENT_SCHEMA_VERSION = 2;
 
 function readSchemaVersion() {
   try {
@@ -2113,6 +2113,55 @@ vectorStore.setExcludedIdsProvider(() => {
 });
 
 // Vector store IPC handlers
+// ---- Per-speaker audio extraction ------------------------------------
+// Everything is resolved from our own database or from a dialog shown HERE:
+// the renderer supplies only a transcript id and a speaker name, never a path.
+const { makeSpeakerAudio } = require('./electron/speaker-audio');
+const speakerAudio = makeSpeakerAudio({
+  getDb: () => db,
+  ffmpegPath: getFFmpegPath,
+  runFfmpeg: (args) =>
+    execFileAsync(getFFmpegPath(), ['-hide_banner', '-loglevel', 'error', ...args], {
+      maxBuffer: FFMPEG_MAX_BUFFER,
+    }),
+  getMediaDuration: (p) => getAudioDurationSec(p),
+  showSaveDialog: async (defaultName) => {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      defaultPath: defaultName,
+      filters: [
+        { name: 'Audio (WAV)', extensions: ['wav'] },
+        { name: 'Audio (M4A)', extensions: ['m4a'] },
+      ],
+    });
+    return result.canceled ? null : result.filePath || null;
+  },
+});
+
+// What the UI can offer for this transcript: which speakers have turns, and how
+// much of them. Read-only, so it is safe to call speculatively.
+ipcMain.handle('speaker-audio:speakers', async (_event, transcriptId) => {
+  try {
+    return { success: true, speakers: speakerAudio.speakers(transcriptId) };
+  } catch (error) {
+    return { success: false, error: error.message, speakers: [] };
+  }
+});
+
+ipcMain.handle('speaker-audio:export', async (_event, { transcriptId, speaker }) => {
+  try {
+    const result = await speakerAudio.exportSpeaker({ transcriptId, speaker });
+    if (!result.cancelled) {
+      logger.log(
+        `[speaker-audio] exported ${result.turns} turn(s) of "${speaker}" to ${result.path}`
+      );
+    }
+    return result;
+  } catch (error) {
+    logger.error('[speaker-audio] export failed:', error);
+    return { cancelled: false, error: error.message };
+  }
+});
+
 ipcMain.handle('vector-store-initialize', async (event, dbPath) => {
   try {
     // MainVectorStore does mkdirSync(dbPath, {recursive:true}) and then

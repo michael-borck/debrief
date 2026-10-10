@@ -248,6 +248,29 @@ export interface ElectronAPI {
     };
 
     /**
+     * Raw pyannote speaker turns — the diarizer's actual boundaries.
+     *
+     * Distinct from transcriptSegments, whose sentence timings are interpolated
+     * estimates distributed across Whisper chunks by word count. Audio clipping
+     * must use these, or it cuts mid-word.
+     */
+    diarizationTurns: {
+      save: (
+        transcriptId: string,
+        turns: Array<{ speaker: string; start: number; end: number }>
+      ) => Promise<{ saved: number }>;
+      listByTranscript: (
+        transcriptId: string
+      ) => Promise<Array<{ turn_index: number; speaker: string; start_time: number; end_time: number }>>;
+      /** speaker -> ordered [start, end] ranges. */
+      listBySpeaker: (
+        transcriptId: string
+      ) => Promise<Record<string, Array<{ start: number; end: number }>>>;
+      deleteByTranscript: (transcriptId: string) => Promise<{ changes: number }>;
+      count: (transcriptId: string) => Promise<number>;
+    };
+
+    /**
      * Cached Topics-tab clusters (transcript_topics). Reads return raw rows
      * (chunk_ids/centroid still JSON strings); the renderer hydrates.
      */
@@ -409,6 +432,30 @@ export interface ElectronAPI {
    * Permanent delete. The main process owns both the SQLite row and the
    * vector-store embeddings so the two cannot drift apart.
    */
+  /**
+   * Per-speaker audio export. Input resolved from the DB, output chosen via a
+   * main-process save dialog — the renderer never supplies a path.
+   */
+  speakerAudio: {
+    speakers: (
+      transcriptId: string
+    ) => Promise<{
+      success: boolean;
+      speakers: Array<{ speaker: string; turns: number; seconds: number }>;
+      error?: string;
+    }>;
+    export: (
+      transcriptId: string,
+      speaker: string
+    ) => Promise<{
+      cancelled: boolean;
+      path?: string;
+      turns?: number;
+      speaker?: string;
+      error?: string;
+    }>;
+  };
+
   data: {
     purge: (payload: { transcripts?: string[]; projects?: string[] }) => Promise<{
       success: boolean;

@@ -152,9 +152,32 @@ CREATE TABLE IF NOT EXISTS transcript_segments (
     -- Metadata
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    
     FOREIGN KEY (transcript_id) REFERENCES transcripts(id) ON DELETE CASCADE
 );
+
+-- Diarization turns: the raw speaker turns produced by pyannote, in order.
+--
+-- These are NOT derivable from transcript_segments. Sentence timings there are
+-- interpolated estimates distributed across each Whisper chunk by word count;
+-- the turns below are the diarizer's actual output and carry real boundaries.
+-- Persisting them is what makes accurate per-speaker audio clipping and
+-- turn-level timestamps possible.
+CREATE TABLE IF NOT EXISTS diarization_turns (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    transcript_id TEXT NOT NULL,
+    turn_index INTEGER NOT NULL, -- position in the recording, 0-based
+    speaker TEXT NOT NULL,
+    start_time REAL NOT NULL, -- seconds from audio start
+    end_time REAL NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (transcript_id) REFERENCES transcripts(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_diarization_turns_unique
+    ON diarization_turns(transcript_id, turn_index);
+CREATE INDEX IF NOT EXISTS idx_diarization_turns_speaker
+    ON diarization_turns(transcript_id, speaker);
+
 
 -- Chat conversations
 CREATE TABLE IF NOT EXISTS chat_conversations (
@@ -329,3 +352,5 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 -- Mark this migration
 INSERT OR IGNORE INTO schema_migrations (version) VALUES (1);
+-- v2: diarization_turns (per-speaker audio clipping, turn-level timestamps)
+INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);

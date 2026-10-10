@@ -27,6 +27,17 @@ export const AudioPlayerBar: React.FC<AudioPlayerBarProps> = ({ player, filePath
     if (filePath) load(filePath);
   };
 
+  // Load on mount rather than gating seek behind a button press. Clicking a
+  // transcript line to hear it is the main interaction on this page, and every
+  // click was dead until the user knew to press "Load audio" first.
+  const loadedKeyRef = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!filePath || loadState !== 'idle') return;
+    if (loadedKeyRef.current === filePath) return;
+    loadedKeyRef.current = filePath;
+    load(filePath);
+  }, [filePath, loadState, load]);
+
   return (
     <div className="card-static p-4">
       {/* Hidden audio element — controlled via the hook ref */}

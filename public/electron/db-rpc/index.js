@@ -12,6 +12,7 @@
 //   - chat (chat_conversations + chat_messages + conversation_memory)
 //   - projectChat (project_chat_conversations + project_chat_messages)
 //   - transcriptSegments (all-versions segment read/delete)
+//   - diarizationTurns (raw pyannote speaker turns, for audio clipping)
 //   - topics (transcript_topics cache)
 //   - projectAnalysis (project_analysis cache)
 //   - modelMetadata (model_metadata cache)
@@ -23,6 +24,7 @@ const projectTranscripts = require('./projectTranscripts');
 const chat = require('./chat');
 const projectChat = require('./projectChat');
 const transcriptSegments = require('./transcriptSegments');
+const diarizationTurns = require('./diarizationTurns');
 const topics = require('./topics');
 const projectAnalysis = require('./projectAnalysis');
 const modelMetadata = require('./modelMetadata');
@@ -38,6 +40,7 @@ function registerAll(ipcMain, getDb) {
   chat.register(ipcMain, getDb);
   projectChat.register(ipcMain, getDb);
   transcriptSegments.register(ipcMain, getDb);
+  diarizationTurns.register(ipcMain, getDb);
   topics.register(ipcMain, getDb);
   projectAnalysis.register(ipcMain, getDb);
   modelMetadata.register(ipcMain, getDb);

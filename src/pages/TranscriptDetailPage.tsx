@@ -18,6 +18,7 @@ import { FillerWordsCard } from '../components/FillerWordsCard';
 import { TalkTimeCard } from '../components/TalkTimeCard';
 import { AudioPlayerBar } from '../components/AudioPlayerBar';
 import { DiarisationPanel } from '../components/DiarisationPanel';
+import { SpeakerAudioExport } from '../components/SpeakerAudioExport';
 import { TopicsTab } from '../components/TopicsTab';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { analyzeConversation } from '../services/conversationMetricsService';
@@ -909,6 +910,9 @@ export const TranscriptDetailPage: React.FC = () => {
         speakerCount={transcript.speaker_count || (transcript.speakers?.length ?? 1)}
         onRerunComplete={loadTranscript}
       />
+
+      {/* Per-speaker audio export — only renders when diarization turns exist. */}
+      <SpeakerAudioExport transcriptId={transcript.id} />
 
       {/* Speaker Analysis */}
       {transcript.speakers && transcript.speakers.length > 0 && (

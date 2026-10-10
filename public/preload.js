@@ -107,6 +107,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
       deleteByTranscript: (transcriptId) =>
         ipcRenderer.invoke('transcript-segments:delete-by-transcript', transcriptId),
     },
+    // Raw pyannote speaker turns. Distinct from transcriptSegments, whose
+    // sentence timings are interpolated estimates; these carry the diarizer's
+    // real boundaries and are what per-speaker audio is cut on.
+    diarizationTurns: {
+      save: (transcriptId, turns) =>
+        ipcRenderer.invoke('diarization-turns:save', transcriptId, turns),
+      listByTranscript: (transcriptId) =>
+        ipcRenderer.invoke('diarization-turns:list-by-transcript', transcriptId),
+      listBySpeaker: (transcriptId) =>
+        ipcRenderer.invoke('diarization-turns:list-by-speaker', transcriptId),
+      deleteByTranscript: (transcriptId) =>
+        ipcRenderer.invoke('diarization-turns:delete-by-transcript', transcriptId),
+      count: (transcriptId) => ipcRenderer.invoke('diarization-turns:count', transcriptId),
+    },
     topics: {
       listByTranscript: (transcriptId) =>
         ipcRenderer.invoke('topics:list-by-transcript', transcriptId),
@@ -200,6 +214,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // vector-store embeddings are always removed together.
   data: {
     purge: (payload) => ipcRenderer.invoke('data:purge', payload)
+  },
+
+  // Per-speaker audio export. The renderer supplies only a transcript id and a
+  // speaker name — the input file is resolved from the database and the output
+  // location comes from a save dialog shown by the main process.
+  speakerAudio: {
+    speakers: (transcriptId) => ipcRenderer.invoke('speaker-audio:speakers', transcriptId),
+    export: (transcriptId, speaker) =>
+      ipcRenderer.invoke('speaker-audio:export', { transcriptId, speaker })
   },
 
   // Embedding operations (delegated to main process)

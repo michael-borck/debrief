@@ -182,6 +182,17 @@ checkCancelled(signal);
         segments: tagged,
       });
 
+      // Replace the persisted turns too. A fresh run means every boundary moved,
+      // so keeping the old ones would clip audio on stale boundaries.
+      try {
+        await window.electronAPI.db.diarizationTurns.save(
+          transcriptId,
+          turns.map((t) => ({ speaker: t.speaker, start: t.start, end: t.end }))
+        );
+      } catch (turnErr) {
+        console.warn('[rediarisationService] failed to persist diarization turns:', turnErr);
+      }
+
       const speakers = Object.entries(speakerCounts).map(([id, segCount]) => ({
           id,
           // The preserved name where one was recovered, else the raw cluster id.

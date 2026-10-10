@@ -142,6 +142,24 @@ export class FileProcessor {
           segments: segmentCounts[name] || 0,
         }));
         console.log(`[fileProcessor] using diarisation speakers: ${uniqueSpeakers.length} found`);
+
+        // Persist the turns themselves. Sentence timings below are interpolated
+        // estimates; these are the diarizer's real boundaries, and without them
+        // there is nothing accurate to cut per-speaker audio on.
+        try {
+          await window.electronAPI.db.diarizationTurns.save(
+            transcriptId,
+            transcriptResult.speakerTurns.map((t) => ({
+              speaker: t.speaker,
+              start: t.start,
+              end: t.end,
+            }))
+          );
+        } catch (turnErr) {
+          // Non-fatal: the transcript is still usable, it just won't support
+          // per-speaker audio export until diarisation is re-run.
+          console.warn('[fileProcessor] failed to persist diarization turns:', turnErr);
+        }
       }
 
       callbacks.onProgress?.('analyzing', 75);
