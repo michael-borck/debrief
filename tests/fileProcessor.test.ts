@@ -208,3 +208,169 @@ describe('performAdvancedAnalysis', () => {
     expect(aiComplete).not.toHaveBeenCalled();
   });
 });
+
+// ============================================================
+// Long-recording behaviour (map-reduce)
+// ============================================================
+//
+// THE BUG THIS COVERS
+// Every analysis stage interpolated the ENTIRE transcript into one prompt. A
+// transcript that overflowed the model's context window produced a provider error,
+// which the stage caught and converted into empty analysis — the transcript still
+// saved as 'completed', with a blank summary and no error anywhere. Presentations
+// hit this reliably.
+//
+// These tests drive the mocked seam to fail with a context-overflow error for any
+// prompt longer than a realistic window, exactly as a provider does, and assert
+// that a long recording now still comes back analysed.
+
+/** ~24k characters of speech — about 45-60 minutes of talk. */
+const LONG_TRANSCRIPT = 'This is a sentence of ordinary spoken length. '.repeat(500);
+
+const OVERFLOW_ERROR = { ok: false, text: '', raw: '', data: null, error: 'context length exceeded' };
+
+/** Model that fails when asked to handle more than `maxChars` in one prompt. */
+function modelWithWindow(maxChars: number) {
+  return vi.fn(async (prompt: string, ...rest: unknown[]) => {
+    const transcript = String(prompt);
+    if (transcript.length > maxChars) return OVERFLOW_ERROR;
+    return ok({ summary: 'section summary', keyTopics: ['scope'], actionItems: [] }, '') as never;
+  });
+}
+
+describe('long recordings are chunked, not silently dropped', () => {
+  it('produces real analysis for a transcript larger than one prompt', async () => {
+    // 8000-char window: the old single-prompt code returned empty here.
+    vi.mocked(aiComplete).mockImplementation(modelWithWindow(8000) as never);
+
+    const result = await fileProcessor.analyzeTranscript(LONG_TRANSCRIPT);
+
+    expect(aiComplete.mock.calls.length).toBeGreaterThan(1);
+    expect(result.summary.length).toBeGreaterThan(0);
+    expect(result.keyTopics.length).toBeGreaterThan(0);
+  });
+
+  it('no single request exceeds the chunk budget', async () => {
+    vi.mocked(aiComplete).mockImplementation(modelWithWindow(8000) as never);
+    await fileProcessor.analyzeTranscript(LONG_TRANSCRIPT);
+
+    for (const [prompt] of vi.mocked(aiComplete).mock.calls) {
+      expect(String(prompt).length).toBeLessThanOrEqual(8000);
+    }
+  });
+
+  it('still makes exactly ONE call for a short transcript (no cost regression)', async () => {
+    vi.mocked(aiComplete).mockResolvedValue(
+      ok({ summary: 'A good talk', keyTopics: ['pricing'], actionItems: [] })
+    );
+
+    const result = await fileProcessor.analyzeTranscript('A short meeting about pricing.');
+
+    expect(aiComplete).toHaveBeenCalledTimes(1);
+    expect(result.summary).toBe('A good talk');
+  });
+
+  it('merges topics across chunks and dedupes repeats', async () => {
+    vi.mocked(aiComplete).mockImplementation(
+      vi.fn(async (prompt: string) => {
+        // Alternate topics per chunk so the merge has real work to do.
+        const topic = String(prompt).includes('ordinary spoken length') ? 'scope' : 'timeline';
+        return ok({ summary: 's', keyTopics: [topic, 'scope'], actionItems: [] }) as never;
+      }) as never
+    );
+
+    const result = await fileProcessor.analyzeTranscript(LONG_TRANSCRIPT);
+
+    expect(result.keyTopics).toContain('scope');
+    expect(new Set(result.keyTopics).size).toBe(result.keyTopics.length);
+  });
+
+  it('keeps analysis when SOME chunks fail', async () => {
+    let call = 0;
+    vi.mocked(aiComplete).mockImplementation((async () => {
+      call++;
+      if (call === 2) return OVERFLOW_ERROR;
+      return ok({ summary: 's', keyTopics: ['scope'], actionItems: [] }) as never;
+    }) as never);
+
+    const result = await fileProcessor.analyzeTranscript(LONG_TRANSCRIPT);
+
+    // Partial is dramatically better than empty.
+    expect(result.keyTopics).toContain('scope');
+  });
+
+  it('falls back to empty analysis only when EVERY chunk fails', async () => {
+    vi.mocked(aiComplete).mockResolvedValue(OVERFLOW_ERROR as never);
+
+    const result = await fileProcessor.analyzeTranscript(LONG_TRANSCRIPT);
+
+    expect(result).toEqual({ summary: '', keyTopics: [], actionItems: [] });
+  });
+
+  it('cancels cleanly mid-run', async () => {
+    const controller = new AbortController();
+    vi.mocked(aiComplete).mockImplementation((async () => {
+      controller.abort();
+      return ok({ summary: 's', keyTopics: [], actionItems: [] }) as never;
+    }) as never);
+
+    await expect(
+      fileProcessor.analyzeTranscript(LONG_TRANSCRIPT, undefined, controller.signal)
+    ).rejects.toThrow();
+  });
+});
+
+describe('long recordings — sentiment, emotion and research', () => {
+  it('averages sentiment across chunks and derives a consistent label', async () => {
+    const scores = [0.9, -0.5, 0.4];
+    let i = 0;
+    vi.mocked(aiComplete).mockImplementation((async () => {
+      const score = scores[i++ % scores.length];
+      return ok({ sentiment: 'positive', sentimentScore: score }) as never;
+    }) as never);
+
+    const result = await fileProcessor.performSentimentAnalysis(LONG_TRANSCRIPT);
+
+    expect(aiComplete.mock.calls.length).toBeGreaterThan(1);
+    // Mean of 0.9, -0.5, 0.4 across the chunk set -> a positive overall score,
+    // and the label must agree with it rather than echoing any single chunk.
+    expect(result.sentimentScore).toBeGreaterThan(0);
+    expect(result.sentiment).toBe(result.sentimentScore > 0.15 ? 'positive' : 'neutral');
+  });
+
+  it('averages emotion per axis across chunks', async () => {
+    let i = 0;
+    const batches = [
+      { frustration: 0.0, excitement: 1.0 },
+      { frustration: 0.0, excitement: 0.0 },
+    ];
+    vi.mocked(aiComplete).mockImplementation((async () => {
+      return ok(batches[i++ % batches.length]) as never;
+    }) as never);
+
+    const result = await fileProcessor.performEmotionAnalysis(LONG_TRANSCRIPT);
+
+    expect(aiComplete.mock.calls.length).toBeGreaterThan(1);
+    expect(result.excitement).toBe(0.5);
+    expect(result.frustration).toBe(0);
+  });
+
+  it('merges research analysis across chunks instead of losing it', async () => {
+    vi.mocked(aiComplete).mockImplementation((async () => {
+      return ok({
+        notableQuotes: [{ text: 'Ship small', relevance: 0.8 }],
+        researchThemes: [{ theme: 'Risk', confidence: 0.6, examples: ['tight deadline'] }],
+        qaPairs: [{ question: 'When?', answer: 'Friday' }],
+        conceptFrequency: { deadline: { count: 1, contexts: ['Friday'] } },
+      }) as never;
+    }) as never);
+
+    const result = await fileProcessor.performResearchAnalysis(LONG_TRANSCRIPT);
+
+    expect(aiComplete.mock.calls.length).toBeGreaterThan(1);
+    // Concept counts must be summed, not taken from one chunk.
+    expect(result.conceptFrequency.deadline.count).toBe(aiComplete.mock.calls.length);
+    expect(result.researchThemes[0].theme).toBe('Risk');
+    expect(result.qaPairs[0].question).toBe('When?');
+  });
+});

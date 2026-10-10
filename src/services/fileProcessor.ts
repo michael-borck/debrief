@@ -9,8 +9,20 @@ import {
   SentimentResultSchema,
   EmotionResultSchema,
   ResearchAnalysisSchema,
+  type BasicAnalysis,
+  type SentimentResult,
   type ResearchAnalysis,
 } from './analysisSchemas';
+import {
+  chunkTranscript,
+  mapReduce,
+  mergeNumberMaps,
+  mergeNumbers,
+  mergeStringLists,
+  sentimentLabelFor,
+  MERGE_LIMITS,
+} from './analysisMapReduce';
+import { reduceResearchAnalysis } from './researchMerge';
 import type { TranscriptionStage } from '../types';
 import { abortable, checkCancelled, isCancelled } from '../utils/cancellation';
 
@@ -324,40 +336,111 @@ export class FileProcessor {
 
       onProgress?.('analyzing', 25);
 
-      // Get configurable analysis prompt
-      const analysisPrompt = await promptService.getProcessedPrompt('analysis', 'basic_analysis', {
-        transcript: transcriptText
-      });
+      const empty = { summary: '', keyTopics: [], actionItems: [] };
+      const chunks = chunkTranscript(transcriptText);
 
-      onProgress?.('analyzing', 50);
-      checkCancelled(signal);
+      const outcome = await mapReduce(
+        chunks,
+        async (chunk, index) => {
+          onProgress?.('analyzing', 30 + Math.floor((index / chunks.length) * 20));
+          checkCancelled(signal);
 
-      // Run via the Completion module (provider/key/model resolved in main).
-      const res = await aiComplete(analysisPrompt, 'json', signal);
+          // Get configurable analysis prompt
+          const analysisPrompt = await promptService.getProcessedPrompt('analysis', 'basic_analysis', {
+            transcript: chunk
+          });
+
+          // Run via the Completion module (provider/key/model resolved in main).
+          const res = await aiComplete(analysisPrompt, 'json', signal);
+          if (!res.ok) throw new Error(res.error || 'AI service error');
+
+          // data is the tolerant JSON parse; fall back to schema-specific parsing.
+          // Validate model JSON (or the text-fallback parse) into a typed shape.
+          // The schema coerces and defaults, so this never throws and replaces the
+          // old Array.isArray(...) guards.
+          return BasicAnalysisSchema.parse(res.data ?? this.parseAnalysisText(res.raw));
+        },
+        (results) => this.reduceBasicAnalysis(results),
+        empty,
+        {
+          signal,
+          onProgress: () => onProgress?.('analyzing', 55),
+        }
+      );
 
       onProgress?.('analyzing', 75);
 
-      if (!res.ok) {
-        throw new Error(res.error || 'AI service error');
+      if (outcome.failed > 0) {
+        console.warn(
+          `[analyzeTranscript] ${outcome.failed}/${chunks.length} chunk(s) failed; ` +
+            'analysis is partial'
+        );
+      }
+      if (outcome.succeeded === 0) {
+        throw new Error('every analysis chunk failed');
       }
 
-      // data is the tolerant JSON parse; fall back to schema-specific parsing.
-      // Validate model JSON (or the text-fallback parse) into a typed shape.
-      // The schema coerces and defaults, so this never throws and replaces the
-      // old Array.isArray(...) guards.
-      const analysisData = BasicAnalysisSchema.parse(
-        res.data ?? this.parseAnalysisText(res.raw)
+      console.log(
+        'Analysis completed:',
+        outcome.value,
+        `(chunks=${chunks.length}, failed=${outcome.failed}, singlePass=${outcome.singlePass})`
       );
 
-      console.log('Analysis completed:', analysisData);
-
-      return analysisData;
-      
+      return outcome.value;
     } catch (error) {
       if (isCancelled(error)) throw error;
       console.error('Analysis error:', error);
       // Return empty analysis rather than failing the entire process
       return { summary: '', keyTopics: [], actionItems: [] };
+    }
+  }
+
+  /**
+   * Merge per-chunk basic analyses.
+   *
+   * keyTopics and actionItems merge deterministically (dedupe by normalised text,
+   * rank by how many chunks independently surfaced them, cap). The summary is the
+   * one field that cannot be merged arithmetically — concatenating ten chunk
+   * summaries is not a summary — so it gets a single synthesis call over those
+   * summaries, which are short enough to fit comfortably. If synthesis fails, the
+   * chunk summaries are returned as a bulleted list rather than being lost.
+   */
+  private async reduceBasicAnalysis(
+    results: BasicAnalysis[]
+  ): Promise<{ summary: string; keyTopics: string[]; actionItems: string[] }> {
+    const keyTopics = mergeStringLists(
+      results.map((r) => r.keyTopics),
+      MERGE_LIMITS.keyTopics
+    );
+    const actionItems = mergeStringLists(
+      results.map((r) => r.actionItems),
+      MERGE_LIMITS.actionItems
+    );
+
+    // Single chunk: nothing to synthesise, and this is the common case.
+    const summaries = results.map((r) => r.summary.trim()).filter((s) => s.length > 0);
+    if (summaries.length <= 1) {
+      return { summary: summaries[0] ?? '', keyTopics, actionItems };
+    }
+
+    const joined = summaries.map((s, i) => `[${i + 1}] ${s}`).join('\n');
+    try {
+      const res = await aiComplete(
+        `You are given summaries of consecutive sections of one longer recording. ` +
+          `Write a single coherent summary of the whole recording that preserves the ` +
+          `specific points raised (including any that appear in only one section). ` +
+          `Respond with prose only — no preamble, no bullet points, no headings.\n\n` +
+          joined,
+        'text'
+      );
+      if (res.ok && res.text.trim().length > 0) return { summary: res.text.trim(), keyTopics, actionItems };
+      throw new Error(res.error || 'synthesis returned nothing');
+    } catch (err) {
+      console.warn(
+        '[analyzeTranscript] summary synthesis failed; falling back to section summaries:',
+        err instanceof Error ? err.message : err
+      );
+      return { summary: summaries.map((s) => `- ${s}`).join('\n'), keyTopics, actionItems };
     }
   }
 
@@ -391,12 +474,36 @@ export class FileProcessor {
     sentimentScore: number;
   }> {
     try {
-      const prompt = await promptService.getProcessedPrompt('analysis', 'sentiment_analysis', {
-        transcript: transcriptText
-      });
+      const chunks = chunkTranscript(transcriptText);
+      const outcome = await mapReduce<SentimentResult, SentimentResult>(
+        chunks,
+        async (chunk) => {
+          checkCancelled(signal);
+          const prompt = await promptService.getProcessedPrompt('analysis', 'sentiment_analysis', {
+            transcript: chunk
+          });
+          const res = await aiComplete(prompt, 'json', signal);
+          if (!res.ok) throw new Error(res.error || 'AI service error');
+          return SentimentResultSchema.parse(res.data ?? {});
+        },
+        (results) => {
+          // Mean score; the label is derived from it so the two can't disagree.
+          // Averaging keeps a strongly positive section from being outweighed by
+          // several neutral ones.
+          const score = mergeNumbers(
+            results.map((r) => r.sentimentScore),
+            0
+          );
+          return { sentiment: sentimentLabelFor(score), sentimentScore: score };
+        },
+        { sentiment: 'neutral', sentimentScore: 0 },
+        { signal }
+      );
 
-      const res = await aiComplete(prompt, 'json', signal);
-      return SentimentResultSchema.parse(res.data ?? {});
+      if (outcome.succeeded === 0) {
+        throw new Error('every sentiment chunk failed');
+      }
+      return outcome.value;
     } catch (error) {
       if (isCancelled(error)) throw error;
       console.error('Sentiment analysis error:', error);
@@ -406,12 +513,27 @@ export class FileProcessor {
 
   async performEmotionAnalysis(transcriptText: string, signal?: AbortSignal): Promise<Record<string, number>> {
     try {
-      const prompt = await promptService.getProcessedPrompt('analysis', 'emotion_analysis', {
-        transcript: transcriptText
-      });
+      const chunks = chunkTranscript(transcriptText);
+      const outcome = await mapReduce<Record<string, number>, Record<string, number>>(
+        chunks,
+        async (chunk) => {
+          checkCancelled(signal);
+          const prompt = await promptService.getProcessedPrompt('analysis', 'emotion_analysis', {
+            transcript: chunk
+          });
+          const res = await aiComplete(prompt, 'json', signal);
+          if (!res.ok) throw new Error(res.error || 'AI service error');
+          return EmotionResultSchema.parse(res.data ?? {});
+        },
+        (results) => mergeNumberMaps(results),
+        {},
+        { signal }
+      );
 
-      const res = await aiComplete(prompt, 'json', signal);
-      return EmotionResultSchema.parse(res.data ?? {});
+      if (outcome.succeeded === 0) {
+        throw new Error('every emotion chunk failed');
+      }
+      return outcome.value;
     } catch (error) {
       if (isCancelled(error)) throw error;
       console.error('Emotion analysis error:', error);
@@ -491,31 +613,55 @@ export class FileProcessor {
 
       onProgress?.('analyzing', 80);
 
-      // Create research analysis prompt using configurable prompt
-      const researchPrompt = await promptService.getProcessedPrompt('analysis', 'research_analysis', {
-        transcript: transcriptText
-      });
+      const chunks = chunkTranscript(transcriptText);
 
-      onProgress?.('analyzing', 90);
+      const outcome = await mapReduce(
+        chunks,
+        async (chunk, index) => {
+          onProgress?.('analyzing', 82 + Math.floor((index / chunks.length) * 8));
+          checkCancelled(signal);
 
-      // Run via the Completion module (provider/key/model resolved in main).
-      const res = await aiComplete(researchPrompt, 'json', signal);
+          // Create research analysis prompt using configurable prompt
+          const researchPrompt = await promptService.getProcessedPrompt('analysis', 'research_analysis', {
+            transcript: chunk
+          });
+
+          // Run via the Completion module (provider/key/model resolved in main).
+          const res = await aiComplete(researchPrompt, 'json', signal);
+          if (!res.ok) throw new Error(res.error || 'AI service error');
+
+          // Validate model JSON (or the text-fallback parse) into a typed shape.
+          return ResearchAnalysisSchema.parse(
+            res.data ?? this.parseResearchAnalysisText(res.raw, chunk)
+          );
+        },
+        (results) => reduceResearchAnalysis(results),
+        { notableQuotes: [], researchThemes: [], qaPairs: [], conceptFrequency: {} },
+        {
+          signal,
+          onProgress: () => onProgress?.('analyzing', 92),
+        }
+      );
 
       onProgress?.('analyzing', 95);
 
-      if (!res.ok) {
-        throw new Error(res.error || 'AI service error');
+      if (outcome.succeeded === 0) {
+        throw new Error('every research analysis chunk failed');
+      }
+      if (outcome.failed > 0) {
+        console.warn(
+          `[performResearchAnalysis] ${outcome.failed}/${chunks.length} chunk(s) failed; ` +
+            'research analysis is partial'
+        );
       }
 
-      // Validate model JSON (or the text-fallback parse) into a typed shape.
-      const analysisData = ResearchAnalysisSchema.parse(
-        res.data ?? this.parseResearchAnalysisText(res.raw, transcriptText)
+      console.log(
+        'Research analysis completed:',
+        outcome.value,
+        `(chunks=${chunks.length}, failed=${outcome.failed})`
       );
 
-      console.log('Research analysis completed:', analysisData);
-
-      return analysisData;
-      
+      return outcome.value;
     } catch (error) {
       if (isCancelled(error)) throw error;
       console.error('Research analysis error:', error);
