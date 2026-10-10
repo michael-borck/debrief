@@ -4,6 +4,12 @@
 // and re-aligns them to the freshly computed speaker turns.
 
 import { abortable, checkCancelled, isCancelled } from '../utils/cancellation';
+import {
+  buildRenameMap,
+  preserveSpeakerLabels,
+  type NamedSpeaker,
+  type TimedSpeaker,
+} from './speakerLabelPreservation';
 
 export interface DiarisationOverrides {
   // Exact speaker count hint passed straight to pyannote. null/undefined means auto-detect.
@@ -21,6 +27,10 @@ export interface RediariseResult {
   success: boolean;
   speakerCount?: number;
   speakers?: Array<{ id: string; name: string; segments: number }>;
+  // Clusters whose speaker identity was ambiguous after re-running, so the
+  // previous user-assigned name could not be carried across safely. Surfaced so
+  // the UI can ask rather than silently mislabel.
+  needsReview?: string[];
   error?: string;
   cancelled?: boolean;
 }
@@ -120,19 +130,39 @@ export class RediarisationService {
       const turns = result.speakerTurns || [];
       const aligned = alignSpeakersToChunks(chunkLikes, turns);
 
-      checkCancelled(signal);
+checkCancelled(signal);
+
+      // Capture the user's existing speaker names BEFORE the tagged version is
+      // replaced. Re-diarisation reassigns SPEAKER_00… arbitrarily on every run,
+      // so the mapping is recovered from temporal overlap rather than from ids —
+      // see speakerLabelPreservation.
+      const [previouslyTagged, transcriptRow] = await Promise.all([
+        window.electronAPI.segments
+          .getByTranscript({ transcriptId, version: 'speaker_tagged' })
+          .catch(() => []),
+        window.electronAPI.db.transcripts.get(transcriptId).catch(() => null),
+      ]);
+      const renames = buildRenameMap(transcriptRow?.speakers as NamedSpeaker[] | undefined);
 
       // Build speaker_tagged segments. We replace the existing tagged
-      // version entirely — there's no useful merge with stale tags.
+      // version entirely — there is no useful merge of the TIMINGS with stale
+      // tags, since the whole point of re-running is new timings and new
+      // boundaries. The user's NAMES are carried across separately, below.
       await window.electronAPI.segments.deleteByTranscript({
         transcriptId,
         version: 'speaker_tagged',
       });
 
+      const { labels, needsReview } = preserveSpeakerLabels(
+        aligned as TimedSpeaker[],
+        previouslyTagged as TimedSpeaker[],
+        renames
+      );
+
       const speakerCounts: Record<string, number> = {};
       const tagged = aligned.map((c, idx) => {
-        const speaker = c.speaker || 'Unknown';
-        speakerCounts[speaker] = (speakerCounts[speaker] || 0) + 1;
+        const speaker = c.speaker ? (labels.get(c.speaker) ?? c.speaker) : 'Unknown';
+        speakerCounts[speaker] = (speakerCounts[speaker] ?? 0) + 1;
         return {
           transcriptId,
           sentenceIndex: idx,
@@ -152,11 +182,12 @@ export class RediarisationService {
         segments: tagged,
       });
 
-      const speakers = Object.entries(speakerCounts).map(([name, segCount]) => ({
-        id: name,
-        name,
-        segments: segCount,
-      }));
+      const speakers = Object.entries(speakerCounts).map(([id, segCount]) => ({
+          id,
+          // The preserved name where one was recovered, else the raw cluster id.
+          name: id,
+          segments: segCount,
+        }));
 
       // Persist on the transcript row so the rest of the UI stays in
       // sync (speaker count badge, charts, etc.).
@@ -166,10 +197,19 @@ export class RediarisationService {
         updated_at: new Date().toISOString(),
       });
 
+      if (needsReview.length > 0) {
+        console.warn(
+          '[rediarisationService] speaker identity ambiguous for ' +
+            `${needsReview.length} cluster(s) after re-diarisation; they were left unlabelled. ` +
+            'Previous names could not be assigned unambiguously — review them in Speaker Tagging.'
+        );
+      }
+
       return {
         success: true,
         speakerCount: speakers.length,
         speakers,
+        needsReview,
       };
     } catch (error) {
       if (isCancelled(error)) {

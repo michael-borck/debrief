@@ -69,7 +69,7 @@ deduping and by the synthesis pass over summaries only.
 
 ---
 
-## 2. [ ] Stop re-diarisation destroying manual speaker labels
+## 2. [x] Stop re-diarisation destroying manual speaker labels
 
 **Problem.** `rediarisationService.ts:127` deletes and rebuilds the whole
 `speaker_tagged` segment version. Every manual rename and every AI-suggested merge is
@@ -198,4 +198,5 @@ Small, independent, ship alongside the above.
 | Date | Item | Notes |
 |------|------|-------|
 | 2026-10-10 | Plan written | Follows the 2026-10-10 security audit remediation; all of that is merged on `main`. |
+| 2026-10-10 | 2 — label preservation | Shipped. `speakerLabelPreservation.ts`. Names carried across by temporal overlap (ids are reassigned every run). Merges are flagged for review; pure splits heal. 13 tests. |
 | 2026-10-10 | 1 — map-reduce | Shipped. `analysisMapReduce.ts` (chunker + generic map-reduce + merge helpers), `researchMerge.ts` (research reducer). All four stages wired: basic, sentiment, emotion, research. 58 new tests. Five of them verified to fail against the previous single-prompt implementation. |

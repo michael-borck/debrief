@@ -59,18 +59,37 @@ export const DiarisationPanel: React.FC<DiarisationPanelProps> = ({
     }
 
     const count = result.speakerCount ?? 0;
+    const review = result.needsReview ?? [];
     setLastResult({
       ok: true,
-      message: `Done — ${count} speaker${count === 1 ? '' : 's'} detected.`,
+      message:
+        review.length > 0
+          ? `Done — ${count} speakers detected, but ${review.length} could not be matched to your previous speaker names.`
+          : `Done — ${count} speaker${count === 1 ? '' : 's'} detected.`,
     });
-    showToast({
-      kind: 'success',
-      title: 'Speakers updated',
-      body: numSpeakers
-        ? `Asked for ${numSpeakers}; detected ${count}.`
-        : `Auto-detected ${count} speaker${count === 1 ? '' : 's'}.`,
-      duration: 5000,
-    });
+
+    if (review.length > 0) {
+      // A speaker whose name could not be carried across is ambiguous, not lost.
+      // Saying so is the whole point — previously every name was discarded here
+      // without a word.
+      showToast({
+        kind: 'warning',
+        title: 'Some speaker names need review',
+        body:
+          `${review.length} speaker cluster${review.length === 1 ? '' : 's'} changed enough that ` +
+          'your previous names could not be matched automatically. Re-check them in Speaker Tagging.',
+        duration: 10000,
+      });
+    } else {
+      showToast({
+        kind: 'success',
+        title: 'Speakers updated',
+        body: numSpeakers
+          ? `Asked for ${numSpeakers}; detected ${count}.`
+          : `Auto-detected ${count} speaker${count === 1 ? '' : 's'}.`,
+        duration: 5000,
+      });
+    }
     if (onRerunComplete) {
       await onRerunComplete();
     }
