@@ -90,7 +90,7 @@ names, or explicitly reports which ones it could not map.
 
 ---
 
-## 3. [ ] Speaker-attributed Q&A extraction
+## 3. [x] Speaker-attributed Q&A extraction
 
 **Problem.** `qa_pairs` already carries optional `speaker?` and `timestamp?` fields in
 `src/types/index.ts` and they are validated by `ResearchAnalysisSchema` — but **no
@@ -198,5 +198,6 @@ Small, independent, ship alongside the above.
 | Date | Item | Notes |
 |------|------|-------|
 | 2026-10-10 | Plan written | Follows the 2026-10-10 security audit remediation; all of that is merged on `main`. |
+| 2026-10-10 | 3 — Q&A attribution | Shipped. `speakerTranscript.ts`. Research analysis now receives speaker-labelled text built from diarised chunk speakers; prompt demands attribution (both copies verified in sync); `interactionPattern` inferred from talk share, not speaker count. 29 tests. |
 | 2026-10-10 | 2 — label preservation | Shipped. `speakerLabelPreservation.ts`. Names carried across by temporal overlap (ids are reassigned every run). Merges are flagged for review; pure splits heal. 13 tests. |
 | 2026-10-10 | 1 — map-reduce | Shipped. `analysisMapReduce.ts` (chunker + generic map-reduce + merge helpers), `researchMerge.ts` (research reducer). All four stages wired: basic, sentiment, emotion, research. 58 new tests. Five of them verified to fail against the previous single-prompt implementation. |

@@ -23,6 +23,7 @@ import {
   MERGE_LIMITS,
 } from './analysisMapReduce';
 import { reduceResearchAnalysis } from './researchMerge';
+import { buildSpeakerAttributedText } from './speakerTranscript';
 import type { TranscriptionStage } from '../types';
 import { abortable, checkCancelled, isCancelled } from '../utils/cancellation';
 
@@ -147,7 +148,19 @@ export class FileProcessor {
       checkCancelled(signal);
 
       // Step 4.6: Research Analysis (quotes, themes, Q&A, concepts)
-      const researchAnalysisResult = await this.performResearchAnalysis(transcriptResult.text || '', callbacks.onProgress, signal);
+      // Feed it speaker-attributed text when diarisation gave us speaker labels.
+      // The prompt asks the model to attribute quotes and Q&A pairs to a
+      // speaker, but until now it received plain prose with the labels stripped
+      // out — so qa_pairs[].speaker could never be populated. Falls back to the
+      // flat transcript when no speaker information is available.
+      const speakerAttributedText = buildSpeakerAttributedText(transcriptResult.chunkTimings);
+      const researchText = speakerAttributedText || transcriptResult.text || '';
+      if (speakerAttributedText) {
+        console.log(
+          `[fileProcessor] research analysis using speaker-attributed text (${speakerAttributedText.length} chars)`
+        );
+      }
+      const researchAnalysisResult = await this.performResearchAnalysis(researchText, callbacks.onProgress, signal);
 
       callbacks.onProgress?.('analyzing', 100);
       checkCancelled(signal);

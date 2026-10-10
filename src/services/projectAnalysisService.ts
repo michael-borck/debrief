@@ -1,5 +1,6 @@
 import { Transcript } from '../types';
 import { hydrateTranscriptRow } from '../utils/hydration';
+import { inferInteractionPattern } from './speakerTranscript';
 
 export interface ProjectAnalysisConfig {
   enableCrossTranscriptAnalysis: boolean;
@@ -610,11 +611,16 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
 
     transcripts.forEach(transcript => {
       const transcriptSpeakers: string[] = [];
-      
+      // Per-speaker segment counts, kept alongside the names so the interaction
+      // pattern can be inferred from how the floor was shared, not from how many
+      // people happened to be detected.
+      const speakerSegments = new Map<string, number>();
+
       if (transcript.speakers && Array.isArray(transcript.speakers)) {
         transcript.speakers.forEach(speaker => {
           const speakerName = speaker.name || speaker.id || 'Unknown';
           transcriptSpeakers.push(speakerName);
+          speakerSegments.set(speakerName, speaker.segments || 0);
           
           if (!speakerMap.has(speakerName)) {
             speakerMap.set(speakerName, {
@@ -649,15 +655,19 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
         });
       }
 
-      // Determine interaction pattern
+      // Determine interaction pattern.
+      //
+      // Speaker COUNT alone cannot tell a presentation with Q&A from a
+      // discussion: a talk followed by six audience questions has seven
+      // speakers and was previously classified "discussion". What actually
+      // distinguishes them is whether one person holds the floor — in a
+      // presentation a single speaker dominates and everyone else is brief;
+      // in a discussion the speaking time is spread.
+      const interaction = inferInteractionPattern(
+        transcriptSpeakers.map((name) => ({ name, segments: speakerSegments.get(name) ?? 0 }))
+      );
       let interactionPattern: 'interview' | 'discussion' | 'presentation' | 'unknown' = 'unknown';
-      if (transcriptSpeakers.length === 1) {
-        interactionPattern = 'presentation';
-      } else if (transcriptSpeakers.length === 2) {
-        interactionPattern = 'interview';
-      } else if (transcriptSpeakers.length > 2) {
-        interactionPattern = 'discussion';
-      }
+      if (interaction) interactionPattern = interaction;
 
       speakerInteractions.push({
         transcript_id: transcript.id,

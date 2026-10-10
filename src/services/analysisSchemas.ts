@@ -59,6 +59,12 @@ const ResearchThemeSchema = z.object({
 const QaPairSchema = z.object({
   question: z.string().catch(''),
   answer: z.string().catch(''),
+  // `speaker` is retained for backwards compatibility with older model output;
+  // the prompt now asks for the two roles separately because in a Q&A the
+  // questioner and the answerer are usually DIFFERENT people, and a single
+  // field has no way to say which is which.
+  questionSpeaker: z.string().optional().catch(undefined),
+  answerSpeaker: z.string().optional().catch(undefined),
   speaker: z.string().optional().catch(undefined),
   timestamp: z.coerce.number().optional().catch(undefined),
 });

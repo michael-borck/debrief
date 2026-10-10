@@ -344,12 +344,18 @@ Respond in JSON format:
 Transcript:
 {transcript}
 
+The transcript is prefixed with speaker labels in square brackets, for example
+"[SPEAKER_00]: ...". Attribute every quote and every question to the speaker whose
+labelled block it came from, copying the label exactly (e.g. "SPEAKER_00"). If a
+passage spans more than one speaker, attribute it to the one who spoke the words
+you are quoting. Do not invent speaker labels that do not appear in the text.
+
 Please format your response as JSON:
 {
   "notableQuotes": [
     {
       "text": "The exact quote text here",
-      "speaker": "Speaker 1",
+      "speaker": "SPEAKER_00",
       "relevance": 0.9
     }
   ],
@@ -364,7 +370,8 @@ Please format your response as JSON:
     {
       "question": "What do you think about...",
       "answer": "I believe that...",
-      "speaker": "Speaker 2"
+      "questionSpeaker": "SPEAKER_00",
+      "answerSpeaker": "SPEAKER_01"
     }
   ],
   "conceptFrequency": {

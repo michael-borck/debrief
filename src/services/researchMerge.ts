@@ -81,7 +81,14 @@ export function reduceResearchAnalysis(results: ResearchAnalysis[]): ResearchAna
   // --- qaPairs: dedupe by question, keep the most complete answer ---
   const pairs = new Map<
     string,
-    { question: string; answer: string; speaker?: string; timestamp?: number }
+    {
+      question: string;
+      answer: string;
+      questionSpeaker?: string;
+      answerSpeaker?: string;
+      speaker?: string;
+      timestamp?: number;
+    }
   >();
   for (const result of results) {
     for (const pair of result.qaPairs ?? []) {
@@ -94,6 +101,8 @@ export function reduceResearchAnalysis(results: ResearchAnalysis[]): ResearchAna
         pairs.set(key, {
           question,
           answer,
+          ...(pair.questionSpeaker ? { questionSpeaker: pair.questionSpeaker } : {}),
+          ...(pair.answerSpeaker ? { answerSpeaker: pair.answerSpeaker } : {}),
           ...(pair.speaker ? { speaker: pair.speaker } : {}),
           ...(pair.timestamp != null ? { timestamp: pair.timestamp } : {}),
         });
