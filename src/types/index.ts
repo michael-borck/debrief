@@ -58,6 +58,14 @@ export interface TranscriptSegment {
   emotions?: Record<string, number>;
 }
 
+export interface WordTiming {
+  word: string;
+  start: number;
+  end: number;
+  probability?: number;
+  speaker?: string | null;
+}
+
 export interface SentenceSegment {
   id: number;
   transcript_id: string;
@@ -70,8 +78,12 @@ export interface SentenceSegment {
   version: 'original' | 'corrected' | 'speaker_tagged';
   source_chunk_index?: number;
   word_count: number;
-  sentiment?: string;
-  emotions?: Record<string, number>;
+  /** How start/end were derived: 'word' = faster-whisper word alignment,
+   *  'interpolated' = distributed within the chunk by word count.
+   *  Absent on pre-v3 rows, which are interpolated. */
+  timing_source?: 'word' | 'interpolated' | string | null;
+  /** JSON-encoded WordTiming[] for word-aligned segments (schema v3+). */
+  words?: string | WordTiming[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -90,8 +102,7 @@ export type SegmentUpdate = Partial<
     | 'version'
     | 'source_chunk_index'
     | 'word_count'
-    | 'sentiment'
-    | 'emotions'
+    | 'timing_source'
   >
 >;
 
@@ -101,6 +112,11 @@ export interface ChunkTimingInfo {
   endTime: number;
   duration: number;
   text: string;
+  speaker?: string;
+  /** Mean log-probability from Whisper for this chunk, when available. */
+  avgLogprob?: number;
+  /** Word-level timings from the sidecar's /analyse-v2, when available. */
+  words?: WordTiming[];
 }
 
 export interface SegmentationStats {

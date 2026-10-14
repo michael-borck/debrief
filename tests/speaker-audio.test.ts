@@ -62,6 +62,28 @@ describe('prepareTurns', () => {
     ]);
   });
 
+  it('merges turns separated by a breath-length gap after padding', () => {
+    // 0.4s apart, padding eats 0.3s: remaining 0.1s gap is one utterance.
+    const turns = prepareTurns(
+      [{ start: 0, end: 5 }, { start: 5.4, end: 8 }, { start: 20, end: 22 }],
+      null,
+      0.15
+    );
+    expect(turns).toEqual([
+      { start: 0, end: 8.15 },
+      { start: 19.85, end: 22.15 },
+    ]);
+  });
+
+  it('sorts out-of-order turns (merged speakers interleave)', () => {
+    const turns = prepareTurns(
+      [{ start: 10, end: 12 }, { start: 0, end: 4 }],
+      null,
+      0
+    );
+    expect(turns).toEqual([{ start: 0, end: 4 }, { start: 10, end: 12 }]);
+  });
+
   it('drops non-finite turns rather than passing NaN into the filter graph', () => {
     expect(
       prepareTurns(
@@ -82,9 +104,10 @@ describe('buildFilterGraph', () => {
       { start: 1, end: 2 },
       { start: 5, end: 6 },
     ]);
+    // Each trim carries 10ms in/out fades so cuts don't click.
     expect(filterComplex).toBe(
-      '[0:a]atrim=start=1.000:end=2.000,asetpts=PTS-STARTPTS[a0];' +
-        '[0:a]atrim=start=5.000:end=6.000,asetpts=PTS-STARTPTS[a1];' +
+      '[0:a]atrim=start=1.000:end=2.000,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.01,afade=t=out:st=0.990:d=0.01[a0];' +
+        '[0:a]atrim=start=5.000:end=6.000,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.01,afade=t=out:st=0.990:d=0.01[a1];' +
         '[a0][a1]concat=n=2:v=0:a=1[out]'
     );
     expect(outputLabel).toBe('[out]');
@@ -350,5 +373,96 @@ describe('makeSpeakerAudio.speakers', () => {
       showSaveDialog: async () => null,
     });
     expect(service.speakers('t1')).toEqual([]);
+  });
+
+  // --- v3 identity healing (2026-10-14 audit, P0-2) ---
+
+  it('resolves raw cluster ids to display names via transcripts.speakers', () => {
+    // Turns stored before renames reached the turns table still hold
+    // SPEAKER_00; the audio panel must show the name the transcript shows.
+    const renamed = {
+      ...transcript,
+      speakers: JSON.stringify([{ id: 'SPEAKER_00', name: 'Alice', segments: 2 }]),
+    };
+    const service = makeSpeakerAudio({
+      getDb: () => makeDb(renamed, [{ speaker: 'SPEAKER_00', start: 0, end: 5 }]),
+      ffmpegPath: '/ffmpeg',
+      runFfmpeg: async () => {},
+      getMediaDuration: async () => null,
+      showSaveDialog: async () => null,
+    });
+    expect(service.speakers('t1')).toEqual([{ speaker: 'Alice', turns: 1, seconds: 5 }]);
+  });
+
+  it('combines clusters the user merged into one display speaker', () => {
+    const merged = {
+      ...transcript,
+      speakers: JSON.stringify([
+        { id: 'SPEAKER_00', name: 'Alice', segments: 1 },
+        { id: 'SPEAKER_02', name: 'Alice', segments: 1 },
+      ]),
+    };
+    const service = makeSpeakerAudio({
+      getDb: () =>
+        makeDb(merged, [
+          { speaker: 'SPEAKER_00', start: 0, end: 5 },
+          { speaker: 'SPEAKER_02', start: 8, end: 10 },
+        ]),
+      ffmpegPath: '/ffmpeg',
+      runFfmpeg: async () => {},
+      getMediaDuration: async () => null,
+      showSaveDialog: async () => null,
+    });
+    expect(service.speakers('t1')).toEqual([{ speaker: 'Alice', turns: 2, seconds: 7 }]);
+  });
+});
+
+describe('makeSpeakerAudio.exportAllSpeakers', () => {
+  it('exports every speaker into the chosen folder', async () => {
+    const calls: string[][] = [];
+    const service = makeSpeakerAudio({
+      getDb: () =>
+        makeDb(transcript, [
+          { speaker: 'Alice', start: 0, end: 5 },
+          { speaker: 'Bob', start: 5, end: 9 },
+        ]),
+      ffmpegPath: '/ffmpeg',
+      runFfmpeg: async (args: string[]) => { calls.push(args); },
+      getMediaDuration: async () => 20,
+      showSaveDialog: async () => null,
+      showFolderDialog: async () => '/out/folder',
+    });
+    const result = await service.exportAllSpeakers({ transcriptId: 't1' });
+    expect(result.cancelled).toBe(false);
+    expect(result.results.map((r) => r.speaker).sort()).toEqual(['Alice', 'Bob']);
+    expect(calls).toHaveLength(2);
+    expect(calls.every((a) => String(a.at(-1)).startsWith('/out/folder/'))).toBe(true);
+  });
+
+  it('is cancelled cleanly when the folder dialog is dismissed', async () => {
+    const service = makeSpeakerAudio({
+      getDb: () => makeDb(transcript, [{ speaker: 'Alice', start: 0, end: 5 }]),
+      ffmpegPath: '/ffmpeg',
+      runFfmpeg: async () => {},
+      getMediaDuration: async () => null,
+      showSaveDialog: async () => null,
+      showFolderDialog: async () => null,
+    });
+    await expect(service.exportAllSpeakers({ transcriptId: 't1' })).resolves.toEqual({
+      cancelled: true,
+    });
+  });
+
+  it('uses the AAC codec for .m4a targets and PCM for .wav', async () => {
+    const calls: string[][] = [];
+    const service = makeSpeakerAudio({
+      getDb: () => makeDb(transcript, [{ speaker: 'Alice', start: 0, end: 5 }]),
+      ffmpegPath: '/ffmpeg',
+      runFfmpeg: async (args: string[]) => { calls.push(args); },
+      getMediaDuration: async () => null,
+      showSaveDialog: async () => '/out/clip.m4a',
+    });
+    await service.exportSpeaker({ transcriptId: 't1', speaker: 'Alice' });
+    expect(calls[0]).toEqual(expect.arrayContaining(['-c:a', 'aac']));
   });
 });

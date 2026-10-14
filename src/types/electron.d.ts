@@ -257,15 +257,32 @@ export interface ElectronAPI {
     diarizationTurns: {
       save: (
         transcriptId: string,
-        turns: Array<{ speaker: string; start: number; end: number }>
+        turns: Array<{
+          speaker: string;
+          speakerId?: string;
+          start: number;
+          end: number;
+          source?: 'pyannote' | 'segment-derived' | null;
+        }>
       ) => Promise<{ saved: number }>;
       listByTranscript: (
         transcriptId: string
-      ) => Promise<Array<{ turn_index: number; speaker: string; start_time: number; end_time: number }>>;
+      ) => Promise<Array<{
+        turn_index: number;
+        speaker: string;
+        speaker_id: string | null;
+        start_time: number;
+        end_time: number;
+        source: string | null;
+      }>>;
       /** speaker -> ordered [start, end] ranges. */
       listBySpeaker: (
         transcriptId: string
       ) => Promise<Record<string, Array<{ start: number; end: number }>>>;
+      rename: (
+        transcriptId: string,
+        renames: Record<string, string>
+      ) => Promise<{ changes: number }>;
       deleteByTranscript: (transcriptId: string) => Promise<{ changes: number }>;
       count: (transcriptId: string) => Promise<number>;
     };
@@ -450,8 +467,23 @@ export interface ElectronAPI {
     ) => Promise<{
       cancelled: boolean;
       path?: string;
+      transcriptPath?: string | null;
       turns?: number;
       speaker?: string;
+      error?: string;
+    }>;
+    exportAll: (
+      transcriptId: string
+    ) => Promise<{
+      cancelled: boolean;
+      folder?: string;
+      results?: Array<{
+        speaker: string;
+        path?: string;
+        transcriptPath?: string | null;
+        turns?: number;
+        error?: string;
+      }>;
       error?: string;
     }>;
   };
@@ -537,7 +569,7 @@ export interface ElectronAPI {
       text?: string;
       error?: string;
       chunkTimings?: Array<ChunkTimingInfo & { speaker?: string }>;
-      speakerTurns?: Array<{ start: number; end: number; speaker: string }>;
+      speakerTurns?: Array<{ start: number; end: number; speaker: string; speakerId?: string; source?: 'pyannote' | 'segment-derived' | null }>;
     }>;
     rediarise: (
       audioPath: string,
@@ -550,7 +582,7 @@ export interface ElectronAPI {
       }
     ) => Promise<{
       success: boolean;
-      speakerTurns?: Array<{ start: number; end: number; speaker: string }>;
+      speakerTurns?: Array<{ start: number; end: number; speaker: string; speakerId?: string; source?: 'pyannote' | 'segment-derived' | null }>;
       audioDurationSeconds?: number;
       error?: string;
     }>;
@@ -582,7 +614,7 @@ export interface ElectronAPI {
     }>;
     createFromChunks: (data: {
       transcriptId: string;
-      chunkTimings: any[];
+      chunkTimings: ChunkTimingInfo[];
       version?: string;
     }) => Promise<{ success: boolean; segmentCount?: number; error?: string }>;
   };

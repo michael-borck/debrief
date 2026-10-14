@@ -62,6 +62,7 @@ import tempfile
 from pathlib import Path as _Path
 
 from embedder import Embedder
+from word_alignment import build_segments
 
 VERSION = "0.0.1-spike"
 
@@ -186,7 +187,7 @@ class _EmbedRequest(BaseModel):
     texts: list[str] = Field(..., max_length=MAX_EMBED_TEXTS)
     normalize: bool = True
 
-    @Field_validator("texts")
+    @field_validator("texts")
     @classmethod
     def _cap_text_length(cls, values: list[str]) -> list[str]:
         for v in values:
@@ -247,6 +248,123 @@ async def rediarise(
             speakers=[_RediariseTurn(start=t.start, end=t.end, speaker=t.speaker) for t in turns],
             num_speakers_used=num_speakers,
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=_safe_error(e))
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+# --- /analyse-v2: word timestamps + raw diarization turns ------------------
+#
+# WHY A SECOND ANALYSE ENDPOINT
+# Upstream speech-analyser transcribes with word_timestamps=False and its
+# Segment dataclass has no words field, so /analyse cannot emit word timings
+# at all — and it also discards the raw pyannote turns after using them to
+# label segments. Debrief needs both (exact sentence times; real turn
+# boundaries for audio clipping). The long-term fix is an upstream PR
+# (SPEAKER_INSIGHTS_PLAN.md item 6); this endpoint is the Debrief-owned
+# interim the plan sanctions, built from upstream's public building blocks.
+#
+# COUPLING, DELIBERATE AND CONTAINED
+# To avoid loading a second WhisperModel (hundreds of MB), this reaches the
+# model cached by speech_analyser.app via its _get_lens accessor and the
+# analyser's _transcriber. Those are private names: if an upstream release
+# renames them, _whisper_model raises, this endpoint returns 501, and the
+# Electron client falls back to /analyse. Failure mode is "older behaviour",
+# never a crash mid-import.
+
+
+def _whisper_model(model_size: str):
+    from speech_analyser.app import _get_lens
+
+    analyser = _get_lens(model_size)
+    return analyser._transcriber._load()
+
+
+class _WordTiming(BaseModel):
+    word: str
+    start: float
+    end: float
+    probability: float | None = None
+    speaker: str | None = None
+
+
+class _V2Segment(BaseModel):
+    start: float
+    end: float
+    text: str
+    speaker: str | None = None
+    avg_logprob: float | None = None
+    words: list[_WordTiming] = []
+
+
+class _AnalyseV2Response(BaseModel):
+    transcript: str
+    language: str
+    duration: float
+    segments: list[_V2Segment]
+    # The diarizer's actual turns, in recording order. /analyse never
+    # exposes these; persisting them is what makes per-speaker audio
+    # clipping exact instead of Whisper-segment-derived.
+    turns: list[_RediariseTurn] = []
+    diarization_available: bool = False
+
+
+@app.post("/analyse-v2", response_model=_AnalyseV2Response)
+async def analyse_v2(
+    file: UploadFile = File(..., description="Audio file to analyse"),
+    model: str | None = Form(default=None, description="Whisper model size"),
+    diarize: bool = Form(default=False, description="Run speaker diarization"),
+) -> _AnalyseV2Response:
+    """Transcribe with word-level alignment, optionally diarized.
+
+    Response is a superset of what the Electron client reads from /analyse
+    (transcript/duration/segments), plus per-word timings with per-word
+    speaker attribution and the raw diarization turns.
+    """
+    import os as _os
+
+    from speech_analyser.transcriber import SUPPORTED_MODELS
+
+    model_size = model if model is not None else _os.getenv("AUDIO_LENS_MODEL", "base")
+    if model_size not in SUPPORTED_MODELS:
+        raise HTTPException(status_code=400, detail=f"Invalid model '{model_size}'")
+    if not diarize:
+        diarize = _os.getenv("AUDIO_LENS_DIARIZE", "false").lower() == "true"
+
+    suffix = _safe_suffix(file.filename)
+    tmp_path = await _spool_upload(file, suffix)
+    try:
+        try:
+            whisper = _whisper_model(model_size)
+        except Exception as e:  # upstream private-API drift: fail soft
+            print(f"analyse-v2 unavailable: {e!r}", file=sys.stderr, flush=True)
+            raise HTTPException(status_code=501, detail="analyse-v2 unavailable")
+
+        raw_segments, info = whisper.transcribe(str(tmp_path), word_timestamps=True)
+        raw_segments = list(raw_segments)
+
+        turns: list[dict] = []
+        diarization_available = False
+        if diarize:
+            diarized = _diarizer.diarize(tmp_path)
+            turns = [
+                {"start": t.start, "end": t.end, "speaker": t.speaker}
+                for t in diarized
+            ]
+            diarization_available = True
+
+        segments = build_segments(raw_segments, turns)
+        return _AnalyseV2Response(
+            transcript=" ".join(s["text"] for s in segments if s["text"]).strip(),
+            language=info.language,
+            duration=float(info.duration),
+            segments=[_V2Segment(**s) for s in segments],
+            turns=[_RediariseTurn(**t) for t in turns],
+            diarization_available=diarization_available,
+        )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=_safe_error(e))
     finally:

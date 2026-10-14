@@ -189,11 +189,32 @@ describe('precision labelling', () => {
     expect(precisionNote('turn')).not.toMatch(/estimate/i);
   });
 
-  it('defaults to the conservative claim unless turns are known to exist', () => {
-    // The safe default: sentence segments carry no marker of how they were
-    // timed, so claiming precision we cannot prove is worse than admitting a
-    // drift we can quantify.
-    expect(precisionFor([], false)).toBe('interpolated');
-    expect(precisionFor([], true)).toBe('turn');
+  it('never claims turn precision for sentence segments', () => {
+    // Regression (2026-10-14 audit): precisionFor used to return 'turn'
+    // whenever diarization turns existed for the transcript, while the
+    // emitted numbers were still interpolated sentence estimates.
+    expect(precisionFor([])).toBe('interpolated');
+    expect(
+      precisionFor([seg({ start_time: 0, end_time: 1, timing_source: 'interpolated' })])
+    ).toBe('interpolated');
+    expect(precisionFor([seg({ start_time: 0, end_time: 1 })])).toBe('interpolated');
+  });
+
+  it('claims word precision only when every timed segment is word-aligned', () => {
+    const timed = { start_time: 0, end_time: 1 };
+    expect(precisionNote('word')).toMatch(/word-level/i);
+    expect(
+      precisionFor([
+        seg({ ...timed, timing_source: 'word' }),
+        seg({ ...timed, timing_source: 'word' }),
+      ])
+    ).toBe('word');
+    // Mixed provenance gets the conservative label.
+    expect(
+      precisionFor([
+        seg({ ...timed, timing_source: 'word' }),
+        seg({ ...timed, timing_source: 'interpolated' }),
+      ])
+    ).toBe('interpolated');
   });
 });

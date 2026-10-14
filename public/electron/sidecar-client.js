@@ -41,9 +41,15 @@ function authHeader() {
   return { Authorization: `Bearer ${sidecar.token}` };
 }
 
-// POST /analyse with the audio file. Returns the parsed JSON response from
-// speech-analyser: { transcript, language, duration, segments[], speakers[],
-// talk_time, speech_metrics, diarization_available, file_path, file_size }.
+// POST the audio file to the sidecar's analyse endpoint.
+//
+// Prefers Debrief's own /analyse-v2 (server.py): word-level timestamps with
+// per-word speaker attribution, plus the diarizer's RAW turns, which the
+// upstream /analyse computes and then discards. Falls back to upstream
+// /analyse ({ transcript, language, duration, segments[], speakers[], … })
+// when talking to an older sidecar build, or when v2 declares itself
+// unavailable (501: upstream private-API drift). Both shapes feed
+// segmentsToChunkTimings; v2 additionally carries `words` and `turns`.
 async function analyse({ audioPath, diarize = true, model = 'base' }) {
   ensureReady();
   if (!fs.existsSync(audioPath)) {
@@ -52,21 +58,28 @@ async function analyse({ audioPath, diarize = true, model = 'base' }) {
 
   const fileBuffer = fs.readFileSync(audioPath);
   const filename = path.basename(audioPath);
+  const makeForm = () => {
+    const form = new FormData();
+    form.append('file', new Blob([fileBuffer]), filename);
+    form.append('diarize', diarize ? 'true' : 'false');
+    if (model) form.append('model', model);
+    return form;
+  };
+  const post = (route) =>
+    fetch(`${baseUrl()}${route}`, {
+      method: 'POST',
+      headers: authHeader(),
+      body: makeForm(),
+      dispatcher: localhostAgent,
+    });
 
-  const form = new FormData();
-  form.append('file', new Blob([fileBuffer]), filename);
-  form.append('diarize', diarize ? 'true' : 'false');
-  if (model) form.append('model', model);
-
-  const res = await fetch(`${baseUrl()}/analyse`, {
-    method: 'POST',
-    headers: authHeader(),
-    body: form,
-    dispatcher: localhostAgent,
-  });
+  let res = await post('/analyse-v2');
+  if (res.status === 404 || res.status === 405 || res.status === 501) {
+    res = await post('/analyse');
+  }
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`/analyse returned ${res.status}: ${body || res.statusText}`);
+    throw new Error(`analyse returned ${res.status}: ${body || res.statusText}`);
   }
   return await res.json();
 }
@@ -124,6 +137,9 @@ async function embed(texts, { normalize = true } = {}) {
 
 // Map speech-analyser segments to the ChunkTimingInfo shape the renderer
 // expects (sentenceSegmentsService.createSegmentsFromChunks consumes this).
+// `words`/`avgLogprob` are present only from /analyse-v2; they pass through
+// untouched so segment construction can use exact word times when available
+// and interpolate otherwise.
 function segmentsToChunkTimings(segments) {
   return (segments || []).map((s, i) => ({
     chunkIndex: i,
@@ -132,11 +148,36 @@ function segmentsToChunkTimings(segments) {
     duration: Math.max(0, (s.end ?? 0) - (s.start ?? 0)),
     text: (s.text || '').trim(),
     speaker: s.speaker || undefined,
+    avgLogprob: typeof s.avg_logprob === 'number' ? s.avg_logprob : undefined,
+    words: Array.isArray(s.words) && s.words.length > 0 ? s.words : undefined,
   }));
+}
+
+// The speaker turns to persist for a result. /analyse-v2 returns pyannote's
+// raw turns — always prefer those. The legacy path derives turns by
+// collapsing Whisper segments, which quantizes boundaries to segment edges;
+// such turns are labelled 'segment-derived' so downstream consumers know
+// their precision (they were previously stored as if they were the real
+// thing).
+function resultToSpeakerTurns(result) {
+  if (result?.turns?.length > 0) {
+    const raw = result.turns;
+    return raw
+      .filter((t) => t?.speaker && Number.isFinite(t.start) && Number.isFinite(t.end))
+      .map((t) => ({
+        start: t.start,
+        end: t.end,
+        speaker: t.speaker,
+        speakerId: t.speaker,
+        source: 'pyannote',
+      }));
+  }
+  return segmentsToSpeakerTurns(result?.segments);
 }
 
 // Collapse consecutive same-speaker segments into speaker turns. Threshold
 // of 1.0s of silence between segments before we split into a new turn.
+// Fallback only — see resultToSpeakerTurns.
 function segmentsToSpeakerTurns(segments) {
   const turns = [];
   for (const seg of segments || []) {
@@ -145,7 +186,13 @@ function segmentsToSpeakerTurns(segments) {
     if (last && last.speaker === seg.speaker && seg.start - last.end < 1.0) {
       last.end = seg.end;
     } else {
-      turns.push({ start: seg.start, end: seg.end, speaker: seg.speaker });
+      turns.push({
+        start: seg.start,
+        end: seg.end,
+        speaker: seg.speaker,
+        speakerId: seg.speaker,
+        source: 'segment-derived',
+      });
     }
   }
   return turns;
@@ -158,4 +205,5 @@ module.exports = {
   embed,
   segmentsToChunkTimings,
   segmentsToSpeakerTurns,
+  resultToSpeakerTurns,
 };

@@ -84,7 +84,12 @@ export class FileProcessor {
 
       const transcriptResult = await this.transcribeAudio(audioPath, callbacks.onProgress, signal);
 
-      console.log('Transcription result:', transcriptResult);
+      // Lengths/counts only — never log transcript content (privacy-first).
+      console.log('[fileProcessor] transcription complete:', {
+        textLength: transcriptResult.text?.length ?? 0,
+        chunks: transcriptResult.chunkTimings?.length ?? 0,
+        turns: transcriptResult.speakerTurns?.length ?? 0,
+      });
 
       if (!transcriptResult.success) {
         throw new Error(transcriptResult.error || 'Failed to transcribe audio');
@@ -143,16 +148,20 @@ export class FileProcessor {
         }));
         console.log(`[fileProcessor] using diarisation speakers: ${uniqueSpeakers.length} found`);
 
-        // Persist the turns themselves. Sentence timings below are interpolated
-        // estimates; these are the diarizer's real boundaries, and without them
-        // there is nothing accurate to cut per-speaker audio on.
+        // Persist the turns themselves, with provenance: from /analyse-v2
+        // these are pyannote's raw boundaries; from an older sidecar they
+        // are collapsed from Whisper segments and arrive labelled
+        // 'segment-derived'. Without them there is nothing accurate to cut
+        // per-speaker audio on.
         try {
           await window.electronAPI.db.diarizationTurns.save(
             transcriptId,
             transcriptResult.speakerTurns.map((t) => ({
               speaker: t.speaker,
+              speakerId: t.speakerId ?? t.speaker,
               start: t.start,
               end: t.end,
+              source: t.source ?? null,
             }))
           );
         } catch (turnErr) {
@@ -318,7 +327,13 @@ export class FileProcessor {
       text: string;
       speaker?: string;
     }>;
-    speakerTurns?: Array<{ start: number; end: number; speaker: string }>;
+    speakerTurns?: Array<{
+      start: number;
+      end: number;
+      speaker: string;
+      speakerId?: string;
+      source?: 'pyannote' | 'segment-derived' | null;
+    }>;
   }> {
     try {
       // Read the chosen local Whisper model from settings (defaults to tiny.en)

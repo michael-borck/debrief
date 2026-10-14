@@ -183,11 +183,22 @@ checkCancelled(signal);
       });
 
       // Replace the persisted turns too. A fresh run means every boundary moved,
-      // so keeping the old ones would clip audio on stale boundaries.
+      // so keeping the old ones would clip audio on stale boundaries. The
+      // DISPLAY name (the preserved user name where one was recovered) goes
+      // in `speaker` so turns agree with the segments written above; the raw
+      // cluster id is kept in speakerId. Before this, turns were saved with
+      // raw SPEAKER_00 labels while segments carried "Alice", so per-speaker
+      // audio export listed different people than the transcript showed.
       try {
         await window.electronAPI.db.diarizationTurns.save(
           transcriptId,
-          turns.map((t) => ({ speaker: t.speaker, start: t.start, end: t.end }))
+          turns.map((t) => ({
+            speaker: labels.get(t.speaker) ?? t.speaker,
+            speakerId: t.speaker,
+            start: t.start,
+            end: t.end,
+            source: 'pyannote' as const,
+          }))
         );
       } catch (turnErr) {
         console.warn('[rediarisationService] failed to persist diarization turns:', turnErr);

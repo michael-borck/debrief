@@ -117,6 +117,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('diarization-turns:list-by-transcript', transcriptId),
       listBySpeaker: (transcriptId) =>
         ipcRenderer.invoke('diarization-turns:list-by-speaker', transcriptId),
+      rename: (transcriptId, renames) =>
+        ipcRenderer.invoke('diarization-turns:rename', transcriptId, renames),
       deleteByTranscript: (transcriptId) =>
         ipcRenderer.invoke('diarization-turns:delete-by-transcript', transcriptId),
       count: (transcriptId) => ipcRenderer.invoke('diarization-turns:count', transcriptId),
@@ -222,7 +224,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   speakerAudio: {
     speakers: (transcriptId) => ipcRenderer.invoke('speaker-audio:speakers', transcriptId),
     export: (transcriptId, speaker) =>
-      ipcRenderer.invoke('speaker-audio:export', { transcriptId, speaker })
+      ipcRenderer.invoke('speaker-audio:export', { transcriptId, speaker }),
+    exportAll: (transcriptId) => ipcRenderer.invoke('speaker-audio:export-all', transcriptId)
   },
 
   // Embedding operations (delegated to main process)

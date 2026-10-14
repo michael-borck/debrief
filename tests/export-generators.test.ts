@@ -208,6 +208,30 @@ describe('generateCSVExport', () => {
     });
     expect(generateCSVExport(data)).toContain(`"'=cmd"`);
   });
+
+  it('includes summary, insights, speakers and patterns sections', () => {
+    // Plan item 7: CSV used to end after concept frequency, silently
+    // dropping three sections the UI claimed to include.
+    const data = baseData({
+      analysis: {
+        ...baseData().analysis,
+        speakerAnalysis: {
+          totalSpeakers: 2,
+          speakerDistribution: {
+            Alice: { transcriptCount: 3, totalSegments: 40, themes: ['Velocity'] },
+          },
+        },
+        crossTranscriptPatterns: [
+          { description: 'Recurring blockers', type: 'theme', strength: 0.8, evidence: [], insights: [] },
+        ],
+      },
+    });
+    const csv = generateCSVExport(data);
+    expect(csv).toContain('The team agreed on scope.');
+    expect(csv).toContain('Follow-ups were assigned.');
+    expect(csv).toContain('"Alice","3","40"');
+    expect(csv).toContain('Recurring blockers');
+  });
 });
 
 describe('generateMarkdownExport', () => {

@@ -17,6 +17,7 @@ const { SidecarManager } = require('./electron/sidecar-manager');
 const sidecarClient = require('./electron/sidecar-client');
 const { makePurgeService } = require('./electron/purge-service');
 const logger = require('./electron/logger');
+const { createSentenceSegmentsFromChunks } = require('./electron/sentence-segments');
 
 // Isolate dev's userData dir from packaged so they don't share a single
 // `~/Library/Application Support/debrief/` and poison each other's venv
@@ -270,7 +271,7 @@ async function initDatabase() {
 // NOT EXISTS statements are no-ops, every column the new build added is found
 // already present, and the old build carries on against a schema it does not
 // understand. A column the newer version DROPPED would never be noticed.
-const CURRENT_SCHEMA_VERSION = 2;
+const CURRENT_SCHEMA_VERSION = 3;
 
 function readSchemaVersion() {
   try {
@@ -380,8 +381,8 @@ function runMigrationsUnsafe() {
           version TEXT DEFAULT 'original',
           source_chunk_index INTEGER,
           word_count INTEGER,
-          sentiment TEXT,
-          emotions TEXT,
+          timing_source TEXT,
+          words TEXT,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           FOREIGN KEY (transcript_id) REFERENCES transcripts(id) ON DELETE CASCADE
@@ -469,6 +470,38 @@ function runMigrationsUnsafe() {
       }
     }
     
+    // v3 additive columns (shape-detected like the rest): word-timing
+    // provenance on segments, cluster-id provenance on diarization turns.
+    // The old segment sentiment/emotions columns are NOT dropped from
+    // existing databases (additive-only rule); new databases simply never
+    // create them — see database/schema.sql.
+    const addColumnsIfMissing = (table, defs) => {
+      const existing = db.prepare(`PRAGMA table_info(${table})`).all();
+      if (existing.length === 0) return; // table created fresh from schema.sql already
+      const names = new Set(existing.map((c) => c.name));
+      for (const [name, sql] of defs) {
+        if (!names.has(name)) {
+          logger.log(`Adding missing column: ${table}.${name}`);
+          db.exec(sql);
+        }
+      }
+    };
+    addColumnsIfMissing('transcript_segments', [
+      ['timing_source', 'ALTER TABLE transcript_segments ADD COLUMN timing_source TEXT'],
+      ['words', 'ALTER TABLE transcript_segments ADD COLUMN words TEXT'],
+    ]);
+    addColumnsIfMissing('diarization_turns', [
+      ['speaker_id', 'ALTER TABLE diarization_turns ADD COLUMN speaker_id TEXT'],
+      ['source', 'ALTER TABLE diarization_turns ADD COLUMN source TEXT'],
+    ]);
+    // Backfill speaker_id for pre-v3 turns: their `speaker` IS the raw
+    // cluster id (renames never reached this table before v3).
+    try {
+      db.prepare(
+        'UPDATE diarization_turns SET speaker_id = speaker WHERE speaker_id IS NULL'
+      ).run();
+    } catch { /* diarization_turns absent on very old DBs until schema.sql ran — it has, so ignore */ }
+
     // Always try to initialize default prompts (in case they're missing)
     initializeDefaultPrompts();
   }
@@ -1665,7 +1698,9 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
     console.log(`[local-transcription] analysed ${audioSeconds.toFixed(2)}s of audio in ${totalMs} ms (${realtimeFactor.toFixed(2)}x realtime)`);
 
     const chunkTimings = sidecarClient.segmentsToChunkTimings(result.segments);
-    const speakerTurns = sidecarClient.segmentsToSpeakerTurns(result.segments);
+    // Raw pyannote turns from /analyse-v2 when available (source:'pyannote'),
+    // else Whisper-segment-derived approximations (source:'segment-derived').
+    const speakerTurns = sidecarClient.resultToSpeakerTurns(result);
 
     return {
       success: true,
@@ -1710,6 +1745,7 @@ ipcMain.handle('local-transcription-rediarise', async (event, { audioPath, overr
     const result = await sidecarClient.rediarise({ audioPath, numSpeakers });
     const speakerTurns = (result.speakers || []).map(t => ({
       start: t.start, end: t.end, speaker: t.speaker,
+      speakerId: t.speaker, source: 'pyannote',
     }));
     console.log(`[local-transcription] rediarise: ${speakerTurns.length} turns in ${Date.now() - t0} ms`);
 
@@ -1823,109 +1859,10 @@ app.on('activate', () => {
 });
 
 // Helper function for sentence segmentation
-function createSentenceSegmentsFromChunks(transcriptId, chunkTimings, version = 'original') {
-  console.log('createSentenceSegmentsFromChunks called with:', { 
-    transcriptId, 
-    chunkTimingsLength: chunkTimings?.length, 
-    version 
-  });
-
-  if (!transcriptId) {
-    console.error('No transcriptId provided');
-    return [];
-  }
-
-  if (!chunkTimings || !Array.isArray(chunkTimings) || chunkTimings.length === 0) {
-    console.error('Invalid or empty chunkTimings:', chunkTimings);
-    return [];
-  }
-
-  const segments = [];
-  let globalSentenceIndex = 0;
-
-  for (let i = 0; i < chunkTimings.length; i++) {
-    const chunk = chunkTimings[i];
-    console.log(`Processing chunk ${i}:`, {
-      chunkIndex: chunk.chunkIndex,
-      startTime: chunk.startTime, 
-      endTime: chunk.endTime,
-      textLength: chunk.text?.length,
-      textPreview: `${chunk.text?.substring(0, 50)}...`
-    });
-    const sentences = splitIntoSentences(chunk.text);
-    const chunkDuration = chunk.duration || 0;
-    const totalWords = countWordsInText(chunk.text);
-    const wordsPerSecond = totalWords > 0 && chunkDuration > 0 ? totalWords / chunkDuration : 0;
-
-    let currentTime = chunk.startTime || 0;
-
-    for (const sentence of sentences) {
-      const wordCount = countWords(sentence);
-      const estimatedDuration = wordsPerSecond > 0 ? wordCount / wordsPerSecond : 1;
-      const endTime = currentTime + estimatedDuration;
-
-      segments.push({
-        transcriptId,
-        sentenceIndex: globalSentenceIndex,
-        text: sentence,
-        startTime: currentTime,
-        endTime: Math.min(endTime, chunk.endTime || currentTime + estimatedDuration),
-        speaker: chunk.speaker || null,
-        confidence: calculateConfidence(sentence, wordCount, estimatedDuration),
-        version,
-        sourceChunkIndex: chunk.chunkIndex,
-        wordCount,
-      });
-
-      currentTime = endTime;
-      globalSentenceIndex++;
-    }
-  }
-
-  return segments;
-}
-
-function splitIntoSentences(text) {
-  if (!text?.trim()) return [];
-
-  // Simple sentence splitting
-  const sentences = text
-    .split(/[.!?]+/)
-    .map(s => s.trim())
-    .filter(s => s.length > 0 && countWords(s) >= 2);
-
-  return sentences;
-}
-
-function countWords(text) {
-  return text.trim().split(/\s+/).filter(word => word.length > 0).length;
-}
-
-function countWordsInText(text) {
-  const matches = text.match(/\b\w+\b/g);
-  return matches ? matches.length : 0;
-}
-
-function calculateConfidence(sentence, wordCount, estimatedDuration) {
-  let confidence = 0.5; // Base confidence
-
-  // Boost confidence for well-formed sentences
-  if (/^[A-Z]/.test(sentence) && /[.!?]\s*$/.test(sentence)) {
-    confidence += 0.2;
-  }
-
-  // Boost confidence for reasonable word count
-  if (wordCount >= 5 && wordCount <= 30) {
-    confidence += 0.2;
-  }
-
-  // Boost confidence for reasonable duration (1-10 seconds per sentence)
-  if (estimatedDuration >= 1 && estimatedDuration <= 10) {
-    confidence += 0.1;
-  }
-
-  return Math.max(0, Math.min(1, confidence));
-}
+// Sentence-segment construction lives in ./electron/sentence-segments.js
+// (extracted 2026-10-14): word-aligned timing when the sidecar supplies
+// word timestamps, interpolated otherwise — one tested implementation
+// instead of inline copies here. Imported at the top of this file.
 
 // Helper function to get FFmpeg path
 function getFFmpegPath() {
@@ -2135,6 +2072,12 @@ const speakerAudio = makeSpeakerAudio({
     });
     return result.canceled ? null : result.filePath || null;
   },
+  showFolderDialog: async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    return result.canceled ? null : result.filePaths?.[0] || null;
+  },
 });
 
 // What the UI can offer for this transcript: which speakers have turns, and how
@@ -2158,6 +2101,20 @@ ipcMain.handle('speaker-audio:export', async (_event, { transcriptId, speaker })
     return result;
   } catch (error) {
     logger.error('[speaker-audio] export failed:', error);
+    return { cancelled: false, error: error.message };
+  }
+});
+
+ipcMain.handle('speaker-audio:export-all', async (_event, transcriptId) => {
+  try {
+    const result = await speakerAudio.exportAllSpeakers({ transcriptId });
+    if (!result.cancelled) {
+      const ok = result.results.filter((r) => !r.error).length;
+      logger.log(`[speaker-audio] exported ${ok}/${result.results.length} speaker(s) to ${result.folder}`);
+    }
+    return result;
+  } catch (error) {
+    logger.error('[speaker-audio] export-all failed:', error);
     return { cancelled: false, error: error.message };
   }
 });
@@ -2308,8 +2265,8 @@ ipcMain.handle('segments-create', async (event, { transcriptId, segments }) => {
     const insertStmt = db.prepare(`
       INSERT INTO transcript_segments
       (transcript_id, sentence_index, text, start_time, end_time, speaker,
-       confidence, version, source_chunk_index, word_count, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       confidence, version, source_chunk_index, word_count, timing_source, words, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     // One transaction for the whole set. Without it, a failure at segment 400
@@ -2330,6 +2287,9 @@ ipcMain.handle('segments-create', async (event, { transcriptId, segments }) => {
           segment.version,
           segment.sourceChunkIndex,
           segment.wordCount,
+          segment.timingSource ?? null,
+          typeof segment.words === 'string' ? segment.words
+            : Array.isArray(segment.words) ? JSON.stringify(segment.words) : null,
           now,
           now
         );
@@ -2337,7 +2297,7 @@ ipcMain.handle('segments-create', async (event, { transcriptId, segments }) => {
     });
     insertAll(segments);
 
-    console.log(`Created ${segments.length} sentence segments for transcript ${transcriptId}`);
+    logger.log(`[segments] stored ${segments.length} segments for ${transcriptId}`);
     return { success: true };
   } catch (error) {
     console.error('Error creating sentence segments:', error);
@@ -2375,7 +2335,7 @@ ipcMain.handle('segments-get-by-transcript', async (event, { transcriptId, versi
 const SEGMENT_UPDATABLE_COLUMNS = new Set([
   'text', 'start_time', 'end_time', 'speaker', 'confidence',
   'version', 'source_chunk_index', 'word_count',
-  'sentiment', 'emotions',
+  'timing_source',
 ]);
 
 ipcMain.handle('segments-update', async (event, { segmentId, updates }) => {
@@ -2434,30 +2394,15 @@ ipcMain.handle('segments-delete-by-transcript', async (event, { transcriptId, ve
 
 ipcMain.handle('segments-create-from-chunks', async (event, { transcriptId, chunkTimings, version = 'original' }) => {
   try {
-    console.log('=== CREATING SENTENCE SEGMENTS ===');
-    console.log('Input data:', { 
-      transcriptId, 
-      chunkCount: chunkTimings?.length, 
-      version,
-      chunkTimings: chunkTimings?.map(c => ({
-        chunkIndex: c.chunkIndex, 
-        startTime: c.startTime, 
-        endTime: c.endTime, 
-        textLength: c.text?.length 
-      }))
-    });
-
-    // For now, implement the segmentation logic directly here
-    // Later, we can improve this by compiling the TS service or using a different approach
     const segments = createSentenceSegmentsFromChunks(transcriptId, chunkTimings, version);
-    console.log(`Segmentation created ${segments.length} segments`);
+    logger.log(`[segments] created ${segments.length} sentence segments from ${chunkTimings?.length ?? 0} chunks (${version}) for ${transcriptId}`);
 
     // Insert into database
     const insertStmt = db.prepare(`
-      INSERT INTO transcript_segments 
-      (transcript_id, sentence_index, text, start_time, end_time, speaker, 
-       confidence, version, source_chunk_index, word_count, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO transcript_segments
+      (transcript_id, sentence_index, text, start_time, end_time, speaker,
+       confidence, version, source_chunk_index, word_count, timing_source, words, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const now = new Date().toISOString();
@@ -2474,6 +2419,9 @@ ipcMain.handle('segments-create-from-chunks', async (event, { transcriptId, chun
           segment.version,
           segment.sourceChunkIndex,
           segment.wordCount,
+          segment.timingSource ?? null,
+          typeof segment.words === 'string' ? segment.words
+            : Array.isArray(segment.words) ? JSON.stringify(segment.words) : null,
           now,
           now
         );
@@ -2481,7 +2429,7 @@ ipcMain.handle('segments-create-from-chunks', async (event, { transcriptId, chun
     });
     insertAll(segments);
 
-    console.log(`Created ${segments.length} sentence segments from ${chunkTimings.length} chunks for transcript ${transcriptId}`);
+    logger.log(`[segments] stored ${segments.length} segments for ${transcriptId}`);
     return { success: true, segmentCount: segments.length };
   } catch (error) {
     console.error('Error creating sentence segments from chunks:', error);

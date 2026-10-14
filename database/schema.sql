@@ -144,10 +144,14 @@ CREATE TABLE IF NOT EXISTS transcript_segments (
     version TEXT DEFAULT 'original', -- 'original', 'corrected', 'speaker_tagged'
     source_chunk_index INTEGER, -- Which audio chunk this came from
     word_count INTEGER, -- Number of words in this sentence
-    
-    -- Analysis fields
-    sentiment TEXT, -- 'positive', 'negative', 'neutral' for this segment
-    emotions TEXT, -- JSON object with emotion scores for this segment
+    -- v3: how start_time/end_time were derived ('word' = faster-whisper
+    -- word alignment via /analyse-v2; 'interpolated' = distributed within
+    -- the chunk by word count) and the word timings themselves as JSON.
+    -- The old per-segment sentiment/emotions columns were removed for new
+    -- databases in v3: no code path ever wrote them. Existing databases
+    -- keep the (always-NULL) columns harmlessly.
+    timing_source TEXT,
+    words TEXT, -- JSON array of {word,start,end,probability,speaker}
     
     -- Metadata
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -166,9 +170,19 @@ CREATE TABLE IF NOT EXISTS diarization_turns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     transcript_id TEXT NOT NULL,
     turn_index INTEGER NOT NULL, -- position in the recording, 0-based
+    -- `speaker` is the DISPLAY name and follows user renames/merges, matching
+    -- the convention in transcript_segments.speaker. `speaker_id` (v3) keeps
+    -- the diarizer's raw cluster id (SPEAKER_00…) for provenance, so a rename
+    -- can always be traced back and legacy rows healed by re-applying the
+    -- transcripts.speakers rename map at read time.
     speaker TEXT NOT NULL,
+    speaker_id TEXT, -- raw diarization cluster id
     start_time REAL NOT NULL, -- seconds from audio start
     end_time REAL NOT NULL,
+    -- v3 provenance: 'pyannote' = the diarizer's actual turn boundaries;
+    -- 'segment-derived' = collapsed from Whisper segment boundaries (the
+    -- pre-v3 import path, kept only as a fallback for older sidecars).
+    source TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (transcript_id) REFERENCES transcripts(id) ON DELETE CASCADE
 );
@@ -354,3 +368,5 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 INSERT OR IGNORE INTO schema_migrations (version) VALUES (1);
 -- v2: diarization_turns (per-speaker audio clipping, turn-level timestamps)
 INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);
+-- v3: diarization_turns.speaker_id/source; transcript_segments.timing_source/words
+INSERT OR IGNORE INTO schema_migrations (version) VALUES (3);

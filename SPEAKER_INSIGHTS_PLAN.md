@@ -32,7 +32,7 @@ together, and several correctness bugs actively work against it.
 
 ### Execution order
 
-Items 1–3 are done. The remaining work runs **4 → 5 → 6 → 7**.
+Items 1–5 and 7 are done; item 6 has a shipped Debrief-side interim (see its section), with the upstream PR still the long-term path.
 
 This ordering was revised after an initial dependency analysis turned out to be
 wrong about word timestamps (item 6). They were treated as a blocker for audio
@@ -174,7 +174,7 @@ format; the export states whether timestamps are exact or estimated.
 
 ---
 
-## 6. [ ] Word-level timestamps (upstream contribution)
+## 6. [~] Word-level timestamps (upstream contribution; Debrief interim shipped 2026-10-14)
 
 **Problem.** Sentence timings are interpolated, so click-to-seek can land
 mid-sentence and any fine-grained cutting would be inaccurate.
@@ -216,19 +216,34 @@ clips stop labelling their timings as estimated.
 
 ---
 
-## 7. [ ] Correctness and honesty fixes
+
+**Interim delivered (2026-10-14).** Debrief's own sidecar now serves
+`POST /analyse-v2` (`embedded-server/server.py` + `word_alignment.py`): it
+runs faster-whisper with `word_timestamps=True` reusing upstream's cached
+model instance, attaches a speaker to every word, and returns pyannote's raw
+turns. If upstream's private names drift, the endpoint answers 501 and the
+Electron client falls back to `/analyse`. Schema v3 stores
+`transcript_segments.timing_source`/`words` and
+`diarization_turns.speaker_id`/`source`; sentence construction
+(`public/electron/sentence-segments.js`) builds word-aligned sentences and
+splits at speaker changes mid-chunk. The upstream PR remains the right
+long-term home — when it lands, `/analyse-v2` can be deleted and nothing
+else changes shape. Existing transcripts keep interpolated timings (honestly
+labelled) until re-imported.
+
+## 7. [x] Correctness and honesty fixes
 
 Small, independent, ship alongside the above.
 
-- [ ] `projectAnalysisService.ts` — `themeEvolution[].themes[].strength` is
+- [x] `projectAnalysisService.ts` — `themeEvolution[].themes[].strength` is
       `Math.random() * 0.5 + 0.5`, commented "Placeholder". Placeholder data is
       being presented as analysis. Either implement it or remove it from the UI.
-- [ ] `transcript_segments.sentiment` / `.emotions` are declared in
+- [x] `transcript_segments.sentiment` / `.emotions` are declared in
       `database/schema.sql` and **never written** by any code path. Either populate
       them per-segment or drop the columns.
-- [ ] `ProjectAnalysisExport`'s "pdf" option writes `.html`. Rename the label or
+- [x] `ProjectAnalysisExport`'s "pdf" option writes `.html`. Rename the label or
       produce a real PDF.
-- [ ] `ProjectAnalysisExport` CSV omits speakers, insights and patterns.
+- [x] `ProjectAnalysisExport` CSV omits speakers, insights and patterns.
 
 ---
 
@@ -255,3 +270,6 @@ Small, independent, ship alongside the above.
 | 2026-10-10 | 5 — timestamped export | Shipped. `timestamped-export.ts` (SRT/VTT/speaker text formatters + precision labelling), ExportModal gains srt/vtt/timestamped-txt with a per-speaker filter. Exports state whether timings are diarization turns or estimates. 32 tests. |
 | 2026-10-10 | 4 — audio clips | Shipped. `speaker-audio.js` (turn prep, filter graph, batching), `db-rpc/diarizationTurns.js`, `SpeakerAudioExport.tsx`. Schema v2 adds `diarization_turns` — turns were computed at import and then thrown away. Turns are now persisted at import and on re-diarisation. Auto-load audio. 30 tests. |
 | 2026-10-10 | Reorder | Items 6→5→4. The original plan treated word timestamps as a blocker for audio clips, but clips cut at turn level where pyannote timings are real, so it never was one. Word timestamps moved last as a precision improvement. |
+| 2026-10-14 | 6 — word timestamps (interim) | Shipped Debrief-side. `/analyse-v2`, `word_alignment.py` (+11 Python tests), schema v3 timing provenance, word-mode sentence construction with mid-chunk speaker splits. Upstream PR still pending as the long-term home. |
+| 2026-10-14 | 7 — honesty fixes | Shipped. Theme strength computed as share of the month's transcripts; dead segment sentiment/emotions columns removed for new DBs; project export 'pdf' option renamed to HTML; CSV gains summary/insights/speakers/patterns. |
+| 2026-10-14 | Audit P0 regressions | The 2026-10-14 audit found three regressions in the shipped items, all fixed same day: timestamped export mixed all segment versions (duplicated cues); segment exports claimed 'turn' precision for interpolated numbers; renames never reached `diarization_turns` (and re-diarisation saved raw ids while segments saved display names), so audio and text disagreed on speaker names. Turns now store display name + cluster id, renames rewrite turns, and reads heal legacy rows via the rename map. |

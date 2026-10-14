@@ -65,7 +65,9 @@ describe('diarizationTurns', () => {
 
     const rows = api.listByTranscript('t1');
     expect(rows).toHaveLength(3);
-    expect(rows[0]).toEqual({ turn_index: 0, speaker: 'A', start_time: 0, end_time: 10 });
+    expect(rows[0]).toEqual({
+      turn_index: 0, speaker: 'A', speaker_id: 'A', start_time: 0, end_time: 10, source: null,
+    });
     expect(rows[2].turn_index).toBe(2);
   });
 
@@ -128,5 +130,53 @@ describe('diarizationTurns', () => {
     api.save('t1', [T('A', 0, 10)]);
     expect(api.deleteByTranscript('t1').changes).toBe(1);
     expect(api.count('t1')).toBe(0);
+  });
+
+  // --- v3: identity + provenance (2026-10-14 audit, P0-2/P0-4) ---
+
+  it('persists speaker_id and source provenance', () => {
+    api.save('t1', [
+      { speaker: 'Alice', speakerId: 'SPEAKER_00', start: 0, end: 5, source: 'pyannote' },
+      { speaker: 'SPEAKER_01', start: 5, end: 9, source: 'segment-derived' },
+    ]);
+    const rows = api.listByTranscript('t1');
+    expect(rows[0].speaker).toBe('Alice');
+    expect(rows[0].speaker_id).toBe('SPEAKER_00');
+    expect(rows[0].source).toBe('pyannote');
+    // speakerId defaults to the label when not supplied.
+    expect(rows[1].speaker_id).toBe('SPEAKER_01');
+    expect(rows[1].source).toBe('segment-derived');
+  });
+
+  it('rejects unknown source values rather than storing them', () => {
+    api.save('t1', [{ speaker: 'A', start: 0, end: 5, source: 'made-up' }]);
+    expect(api.listByTranscript('t1')[0].source).toBeNull();
+  });
+
+  it('rename updates the display name but never the cluster id', () => {
+    api.save('t1', [T('SPEAKER_00', 0, 5), T('SPEAKER_01', 5, 9)]);
+    const { changes } = api.rename('t1', { SPEAKER_00: 'Alice' });
+    expect(changes).toBe(1);
+    const rows = api.listByTranscript('t1');
+    expect(rows[0].speaker).toBe('Alice');
+    expect(rows[0].speaker_id).toBe('SPEAKER_00');
+    expect(rows[1].speaker).toBe('SPEAKER_01');
+    expect(api.listBySpeaker('t1')).toHaveProperty('Alice');
+  });
+
+  it('rename can merge two clusters into one speaker', () => {
+    api.save('t1', [T('SPEAKER_00', 0, 5), T('SPEAKER_02', 5, 9)]);
+    api.rename('t1', { SPEAKER_00: 'Alice', SPEAKER_02: 'Alice' });
+    const bySpeaker = api.listBySpeaker('t1');
+    expect(Object.keys(bySpeaker)).toEqual(['Alice']);
+    expect(bySpeaker.Alice).toHaveLength(2);
+  });
+
+  it('rename does not chain when a target name is itself renamed away', () => {
+    api.save('t1', [T('A', 0, 5), T('B', 5, 9)]);
+    api.rename('t1', { A: 'B', B: 'C' });
+    const rows = api.listByTranscript('t1');
+    expect(rows[0].speaker).toBe('B');
+    expect(rows[1].speaker).toBe('C');
   });
 });

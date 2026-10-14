@@ -19,7 +19,7 @@
 
 import type { SentenceSegment } from '../types';
 
-export type TimePrecision = 'turn' | 'interpolated';
+export type TimePrecision = 'turn' | 'word' | 'interpolated';
 
 export interface TimedLine {
   speaker?: string | null;
@@ -173,6 +173,9 @@ export function toSpeakerText(lines: TimedLine[]): string {
 
 const PRECISION_NOTE: Record<TimePrecision, string> = {
   turn: 'Timestamps come from speaker diarization turns.',
+  word:
+    'Timestamps come from word-level alignment of the transcription, ' +
+    'so sentence boundaries land on actual speech.',
   interpolated:
     'Timestamps are estimates: sentence positions are distributed within each ' +
     'transcribed chunk by word count, so they can drift by a second or two.',
@@ -191,11 +194,23 @@ export function precisionNote(precision: TimePrecision): string {
 /**
  * Derive the precision to advertise for a set of segments.
  *
- * Segments carry no marker of whether they were aligned to real word timings or
- * interpolated, so the honest default is 'interpolated' — the conservative claim.
- * When diarization turns exist for the transcript, the caller may pass
- * `turnsAvailable` to advertise the stronger guarantee for turn-derived exports.
+ * Sentence segments NEVER carry turn precision: their times are either
+ * word-aligned (`timing_source === 'word'`, schema v3+, from the sidecar's
+ * /analyse-v2) or interpolated within each Whisper chunk. An earlier version
+ * advertised 'turn' whenever diarization turns existed for the transcript,
+ * while still emitting the interpolated numbers — a stronger claim than the
+ * data supported. 'turn' remains in the type for genuinely turn-derived
+ * exports, but segment-based exports must not claim it.
+ *
+ * The claim is 'word' only when every timed segment is word-aligned; a
+ * mixed set gets the conservative label.
  */
-export function precisionFor(_segments: SentenceSegment[], turnsAvailable = false): TimePrecision {
-  return turnsAvailable ? 'turn' : 'interpolated';
+export function precisionFor(segments: SentenceSegment[]): TimePrecision {
+  const timed = (segments ?? []).filter(
+    (s) => typeof s?.start_time === 'number' && typeof s?.end_time === 'number'
+  );
+  if (timed.length > 0 && timed.every((s) => s.timing_source === 'word')) {
+    return 'word';
+  }
+  return 'interpolated';
 }

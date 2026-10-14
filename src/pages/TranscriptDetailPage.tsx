@@ -23,6 +23,7 @@ import { TopicsTab } from '../components/TopicsTab';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { analyzeConversation } from '../services/conversationMetricsService';
 import { sentenceSegmentsService } from '../services/sentenceSegmentsService';
+import { formatClock } from '../utils/timestamped-export';
 
 type TabType = 'overview' | 'transcript' | 'analysis' | 'topics' | 'conversations' | 'notes';
 
@@ -122,6 +123,16 @@ export const TranscriptDetailPage: React.FC = () => {
       let segs = await sentenceSegmentsService.getSegments(transcript.id, version);
       if (segs.length === 0 && version !== 'original') {
         segs = await sentenceSegmentsService.getSegments(transcript.id, 'original');
+      }
+      // Older corrected rows carry no speaker label (the writer dropped it),
+      // which would blank every per-speaker tab. Fall back to whichever
+      // other version actually has speaker attribution.
+      if (segs.length > 0 && !segs.some(s => s.speaker)) {
+        for (const alt of ['speaker_tagged', 'original'] as const) {
+          if (alt === version) continue;
+          const altSegs = await sentenceSegmentsService.getSegments(transcript.id, alt);
+          if (altSegs.some(s => s.speaker)) { segs = altSegs; break; }
+        }
       }
       if (isMountedRef.current) setPageSegments(segs);
     };
@@ -257,15 +268,36 @@ export const TranscriptDetailPage: React.FC = () => {
 
   const handleSpeakerTaggingSave = async (taggedText: string, speakers: Array<{ id: string; name: string; segments: number }>) => {
     if (!transcript) return;
-    
+
     try {
       const success = await updateTranscript(transcript.id, {
         processed_text: taggedText,
         speakers: speakers,
         speaker_count: speakers.length
       });
-      
+
       if (success) {
+        // Keep stored diarization turns in step with the rename/merge, so
+        // per-speaker audio export cuts by the same names the transcript
+        // now shows. Keys cover both the raw cluster id and the previous
+        // display name for that cluster (turns may hold either).
+        try {
+          const renames: Record<string, string> = {};
+          for (const speaker of speakers) {
+            if (speaker.id && speaker.name && speaker.id !== speaker.name) {
+              renames[speaker.id] = speaker.name;
+            }
+            const previous = (transcript.speakers ?? []).find((s) => s.id === speaker.id);
+            if (previous?.name && speaker.name && previous.name !== speaker.name) {
+              renames[previous.name] = speaker.name;
+            }
+          }
+          if (Object.keys(renames).length > 0) {
+            await window.electronAPI.db.diarizationTurns.rename(transcript.id, renames);
+          }
+        } catch (renameErr) {
+          console.warn('Failed to rename diarization turns:', renameErr);
+        }
         await loadTranscript();
       }
     } catch (error) {
@@ -277,70 +309,6 @@ export const TranscriptDetailPage: React.FC = () => {
   const getAnonymizedSpeakerName = (speaker: { id: string; name: string }) => {
     // Always show real speaker names since anonymize toggle was removed
     return speaker.name;
-  };
-
-  // Extract speaker text from transcript using enhanced pattern matching
-  const extractSpeakerText = (text: string, speakerName: string): string[] => {
-    if (!text) return [];
-    
-    console.log('Extracting speaker text for:', speakerName);
-    console.log('From text (first 200 chars):', text.substring(0, 200));
-    console.log('Text source type:', text === transcript?.processed_text ? 'processed_text (tagged)' : 
-                                    text === transcript?.validated_text ? 'validated_text' : 'full_text (original)');
-    
-    // Escape special regex characters in speaker name
-    const escapedName = speakerName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    console.log('Escaped speaker name:', escapedName);
-    
-    // Enhanced patterns to match different speaker tagging formats
-    const patterns = [
-      // [Speaker Name]: text (bracket with colon format)
-      new RegExp(`\\[${escapedName}\\]\\s*:\\s*([^\\n]*(?:\\n(?!\\[[^\\]]+\\]\\s*:)[^\\n]*)*)`, 'gi'),
-      // Speaker Name: text (simple colon format - used by manual tagging)
-      new RegExp(`^${escapedName}\\s*:\\s*([^\\n]*(?:\\n(?!^[A-Za-z0-9\\s]+\\s*:)[^\\n]*)*)`, 'gim'),
-      // Multi-line Speaker Name: format
-      new RegExp(`${escapedName}\\s*:\\s*([^\\n]*(?:\\n(?!^[A-Za-z0-9\\s]+\\s*:)[^\\n]*)*)`, 'gi'),
-      // [Speaker Name] text (bracket without colon)
-      new RegExp(`\\[${escapedName}\\]\\s*([^\\n]*(?:\\n(?!\\[[^\\]]+\\])[^\\n]*)*)`, 'gi'),
-      // SPEAKER NAME: text (uppercase)
-      new RegExp(`^${escapedName.toUpperCase()}\\s*:\\s*([^\\n]*(?:\\n(?!^[A-Z][^:]*:)[^\\n]*)*)`, 'gim')
-    ];
-    
-    const segments: string[] = [];
-    
-    patterns.forEach((pattern, idx) => {
-      console.log(`Testing pattern ${idx + 1}:`, pattern.toString());
-      // Reset regex lastIndex to avoid conflicts
-      pattern.lastIndex = 0;
-      let match: RegExpExecArray | null = pattern.exec(text);
-      let matchCount = 0;
-      while (match !== null) {
-        matchCount++;
-        const segment = match[1]?.trim();
-        console.log(`Pattern ${idx + 1} match ${matchCount}:`, `${segment?.substring(0, 50)}...`);
-        if (segment && segment.length > 10) { // Minimum segment length
-          segments.push(segment);
-        }
-        match = pattern.exec(text);
-      }
-      console.log(`Pattern ${idx + 1} found ${matchCount} matches`);
-    });
-    
-    // Remove duplicates and merge very similar segments
-    const uniqueSegments = segments.filter((seg, idx) => {
-      // Check if this segment is substantially different from previous ones
-      return !segments.slice(0, idx).some(prev => 
-        prev.length > 50 && seg.length > 50 && 
-        prev.substring(0, 50) === seg.substring(0, 50)
-      );
-    });
-    
-    console.log(`Total unique segments found for ${speakerName}:`, uniqueSegments.length);
-    uniqueSegments.forEach((seg, idx) => {
-      console.log(`Segment ${idx + 1}:`, `${seg.substring(0, 50)}...`);
-    });
-    
-    return uniqueSegments;
   };
 
   // Get speaker colors consistently
@@ -576,10 +544,6 @@ export const TranscriptDetailPage: React.FC = () => {
     const currentText = transcript.validated_text || transcript.full_text;
     const speakers = transcript.speakers || [];
     
-    // For speaker extraction, prioritize processed_text (contains speaker tags)
-    // If not available, use original full_text (validated text might not have speaker tags)
-    const textForSpeakerExtraction = transcript.processed_text || transcript.full_text;
-    
     // Create sub-tabs: Include original and corrected versions when available
     const transcriptSubTabs = [
       {
@@ -765,10 +729,15 @@ export const TranscriptDetailPage: React.FC = () => {
                   );
                 })()
               ) : (
-                // Individual speaker view
+                // Individual speaker view — built from stored sentence
+                // segments (speaker + timings), not regex-scraped from
+                // processed_text as before (2026-10-14 audit, P1-5). A
+                // segment belongs to this speaker when its label matches
+                // either the display name (speaker_tagged rows) or the raw
+                // diarization cluster id (original rows after a rename).
                 (() => {
                   const selectedSubTab = transcriptSubTabs.find(tab => tab.id === activeTranscriptSubTab);
-                  if (!selectedSubTab?.speaker || !selectedSubTab?.color || !currentText) {
+                  if (!selectedSubTab?.speaker || !selectedSubTab?.color) {
                     return (
                       <div className="text-center py-8 text-surface-500">
                         <p>No text found for this speaker.</p>
@@ -776,7 +745,11 @@ export const TranscriptDetailPage: React.FC = () => {
                     );
                   }
 
-                  const speakerSegments = extractSpeakerText(textForSpeakerExtraction || '', selectedSubTab.speaker.name);
+                  const { id: speakerId, name: speakerName } = selectedSubTab.speaker;
+                  const speakerSegments = pageSegments
+                    .filter(seg => seg.speaker === speakerName || seg.speaker === speakerId)
+                    .sort((a, b) => (a.start_time ?? a.sentence_index) - (b.start_time ?? b.sentence_index));
+                  const speakerTexts = speakerSegments.map(seg => seg.text);
                   const color = selectedSubTab.color;
 
                   return (
@@ -791,7 +764,7 @@ export const TranscriptDetailPage: React.FC = () => {
                             </h4>
                           </div>
                           <div className={`text-sm ${color.text}`}>
-                            {speakerSegments.length} segments • {speakerSegments.join(' ').split(' ').length} words
+                            {speakerSegments.length} segments • {speakerTexts.join(' ').split(/\s+/).filter(Boolean).length} words
                           </div>
                         </div>
                       </div>
@@ -800,15 +773,26 @@ export const TranscriptDetailPage: React.FC = () => {
                       {speakerSegments.length > 0 ? (
                         <div className="space-y-4">
                           {speakerSegments.map((segment, idx) => (
-                            <div key={idx} className={`${color.bg} ${color.border} border rounded-lg p-4`}>
+                            <div key={segment.id ?? idx} className={`${color.bg} ${color.border} border rounded-lg p-4`}>
                               <div className="flex items-start space-x-3">
                                 <div className={`w-2 h-2 rounded-full ${color.accent} mt-2 flex-shrink-0`}></div>
                                 <div className="flex-1">
                                   <div className={`text-sm ${color.text} leading-relaxed`}>
-                                    {segment}
+                                    {segment.text}
                                   </div>
-                                  <div className={`text-xs ${color.text} opacity-75 mt-2`}>
-                                    Segment {idx + 1} • {segment.split(' ').length} words
+                                  <div className={`text-xs ${color.text} opacity-75 mt-2 flex items-center gap-2`}>
+                                    {typeof segment.start_time === 'number' && (
+                                      <button
+                                        type="button"
+                                        disabled={audioPlayer.loadState !== 'ready'}
+                                        onClick={() => audioPlayer.seek(segment.start_time as number)}
+                                        className="underline decoration-dotted underline-offset-2 hover:opacity-100 disabled:no-underline disabled:cursor-default"
+                                        title={audioPlayer.loadState === 'ready' ? 'Play from here' : undefined}
+                                      >
+                                        {formatClock(segment.start_time)}
+                                      </button>
+                                    )}
+                                    <span>Segment {idx + 1} • {segment.word_count || segment.text.split(/\s+/).filter(Boolean).length} words</span>
                                   </div>
                                 </div>
                               </div>
@@ -820,8 +804,8 @@ export const TranscriptDetailPage: React.FC = () => {
                           <div className={`${color.text}`}>
                             <p className="text-lg font-medium mb-2">No segments found</p>
                             <p className="text-sm opacity-75">
-                              This speaker may not have clearly marked dialogue in the transcript, 
-                              or the transcript may need speaker tagging.
+                              No stored sentence segments carry this speaker&apos;s label.
+                              Re-run diarisation (or speaker tagging) to populate them.
                             </p>
                             <button
                               onClick={() => setShowSpeakerTagging(true)}

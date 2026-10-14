@@ -138,7 +138,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
    */
   const buildTimestampedExport = (format: 'srt' | 'vtt' | 'timestamped-txt'): string => {
     const segments = selectSegments(timestampedSegments, speakerFilter || null);
-    const precision: TimePrecision = precisionFor(segments, turnsAvailable);
+    const precision: TimePrecision = precisionFor(segments);
     const note = precisionNote(precision);
 
     if (format === 'srt') return toSrt(toTimedLines(segments, precision));
@@ -248,11 +248,14 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     return content;
   };
 
-  // Which speakers exist in the stored segments, and whether diarization turns
-  // were kept for this transcript (they are only stored from schema v2 onward).
+  // Segments for timestamped exports. Exactly ONE version must be used:
+  // fetching without a version returns original+corrected+speaker_tagged
+  // interleaved by sentence_index, duplicating every cue (found in the
+  // 2026-10-14 audit). Preference order: speaker_tagged (display speaker
+  // names) → original (diarization cluster labels) → corrected (no speaker
+  // data, last resort for timings only).
   const [segmentSpeakers, setSegmentSpeakers] = useState<string[]>([]);
   const [timestampedSegments, setTimestampedSegments] = useState<SentenceSegment[]>([]);
-  const [turnsAvailable, setTurnsAvailable] = useState(false);
   const [speakerFilter, setSpeakerFilter] = useState<string>('');
 
   useEffect(() => {
@@ -260,21 +263,27 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     let cancelled = false;
     (async () => {
       try {
-        const [segments, turns] = await Promise.all([
-          window.electronAPI.segments.getByTranscript({ transcriptId: transcript.id }),
-          window.electronAPI.db.diarizationTurns.count(transcript.id),
-        ]);
+        let segments: SentenceSegment[] = [];
+        for (const version of ['speaker_tagged', 'original', 'corrected'] as const) {
+          const rows = await window.electronAPI.segments.getByTranscript({
+            transcriptId: transcript.id,
+            version,
+          });
+          if (Array.isArray(rows) && rows.length > 0) {
+            segments = rows as SentenceSegment[];
+            break;
+          }
+        }
         if (cancelled) return;
         const names = [
           ...new Set(
-            (segments as Array<{ speaker?: string | null }>)
+            segments
               .map((s) => s.speaker?.trim())
               .filter((s): s is string => !!s)
           ),
         ];
-        setTimestampedSegments(segments as SentenceSegment[]);
+        setTimestampedSegments(segments);
         setSegmentSpeakers(names);
-        setTurnsAvailable(turns > 0);
       } catch (error) {
         logger.error('Failed to load segments for export:', error);
       }
@@ -443,7 +452,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-surface-500 mt-1.5">{precisionNote(precisionFor(timestampedSegments, turnsAvailable))}</p>
+              <p className="text-xs text-surface-500 mt-1.5">{precisionNote(precisionFor(timestampedSegments))}</p>
             </div>
           )}
 

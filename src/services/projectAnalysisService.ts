@@ -719,11 +719,13 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
       end: sortedTranscripts[sortedTranscripts.length - 1].created_at
     };
 
-    // Group by month
+    // Group by month. Themes are COUNTS (transcripts mentioning the theme
+    // that month), not a bare set: the evolution timeline's strength is
+    // derived from them below, and a count cannot be recovered from a Set.
     const monthlyData = new Map<string, {
       count: number;
       totalDuration: number;
-      themes: Set<string>;
+      themes: Map<string, number>;
       sentiments: number[];
     }>();
 
@@ -734,7 +736,7 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
         monthlyData.set(month, {
           count: 0,
           totalDuration: 0,
-          themes: new Set(),
+          themes: new Map(),
           sentiments: []
         });
       }
@@ -743,12 +745,12 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
       monthData.count += 1;
       monthData.totalDuration += transcript.duration || 0;
       
-      // Add themes
+      // Add themes (once per transcript, even if listed twice)
       if (transcript.key_topics) {
         const topics = typeof transcript.key_topics === 'string' ? JSON.parse(transcript.key_topics) : transcript.key_topics;
-        topics.forEach((topic: string) => {
-          monthData.themes.add(topic);
-        });
+        for (const topic of new Set<string>(topics)) {
+          monthData.themes.set(topic, (monthData.themes.get(topic) ?? 0) + 1);
+        }
       }
       
       // Add sentiment
@@ -757,12 +759,15 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
       }
     });
 
-    // Convert to timeline format
+    // Convert to timeline format (themes ordered by frequency that month)
     const transcriptsByPeriod = Array.from(monthlyData.entries()).map(([period, data]) => ({
       period,
       count: data.count,
       totalDuration: data.totalDuration,
-      themes: Array.from(data.themes).slice(0, 5)
+      themes: [...data.themes.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([theme]) => theme)
     }));
 
     const sentimentTrend = Array.from(monthlyData.entries())
@@ -773,13 +778,19 @@ The project contains ${aggregatedData.allActionItems.length} action items and co
         transcriptCount: data.count
       }));
 
-    // Theme evolution timeline (simplified)
+    // Theme evolution timeline. Strength is the share of that month's
+    // transcripts mentioning the theme (0–1) — a real measurement of the
+    // data on hand. (It was previously Math.random() placeholder data
+    // presented as analysis; see SPEAKER_INSIGHTS_PLAN.md item 7.)
     const themeEvolutionTimeline = Array.from(monthlyData.entries()).map(([date, data]) => ({
       date,
-      themes: Array.from(data.themes).slice(0, 3).map(theme => ({
-        theme,
-        strength: Math.random() * 0.5 + 0.5 // Placeholder - would need more sophisticated analysis
-      }))
+      themes: [...data.themes.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([theme, mentions]) => ({
+          theme,
+          strength: data.count > 0 ? mentions / data.count : 0
+        }))
     }));
 
     return {

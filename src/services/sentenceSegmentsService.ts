@@ -1,4 +1,5 @@
 import { SentenceSegment, SegmentUpdate, ChunkTimingInfo, Transcript } from '../types';
+import { logger } from '../utils/logger';
 
 // Payload pushed to segments.create when synthesising segments from text.
 interface SegmentCreateInput {
@@ -7,10 +8,12 @@ interface SegmentCreateInput {
   text: string;
   startTime: number | null | undefined;
   endTime: number | null | undefined;
+  speaker?: string;
   confidence: number;
   version: string;
   sourceChunkIndex: number | null | undefined;
   wordCount: number;
+  timingSource?: string;
 }
 
 export class SentenceSegmentsService {
@@ -50,33 +53,19 @@ export class SentenceSegmentsService {
     version: 'original' | 'corrected' | 'speaker_tagged' = 'original'
   ): Promise<boolean> {
     try {
-      console.log('Creating segments from chunks:', { 
-        transcriptId, 
-        chunkCount: chunkTimings.length, 
-        version,
-        chunkTimings: chunkTimings.map(c => ({
-          chunkIndex: c.chunkIndex,
-          startTime: c.startTime,
-          endTime: c.endTime,
-          textLength: c.text.length
-        }))
-      });
-      
       const result = await window.electronAPI.segments.createFromChunks({
         transcriptId,
         chunkTimings,
         version
       });
-      
-      console.log('Segment creation result:', result);
-      
+
       if (!result.success) {
-        console.error('Segment creation failed:', result.error);
+        logger.error('Segment creation failed:', result.error);
       }
-      
+
       return result.success;
     } catch (error) {
-      console.error('Error creating segments from chunks:', error);
+      logger.error('Error creating segments from chunks:', error);
       return false;
     }
   }
@@ -213,6 +202,11 @@ export class SentenceSegmentsService {
           text: correctedSentences[i],
           startTime: originalSegment.start_time,
           endTime: originalSegment.end_time,
+          // Carry the original segment's speaker/timing provenance: corrected
+          // text is the same utterance, and dropping the speaker here used
+          // to strip per-speaker views of every corrected transcript.
+          speaker: originalSegment.speaker ?? undefined,
+          timingSource: originalSegment.timing_source ?? undefined,
           confidence: 0.9, // High confidence for corrected text
           version: 'corrected',
           sourceChunkIndex: originalSegment.source_chunk_index,
@@ -237,15 +231,15 @@ export class SentenceSegmentsService {
   }
 
   /**
-   * Simple sentence splitting
+   * Sentence splitting — MUST mirror public/electron/sentence-segments.js
+   * (the main process cannot import this TS module): terminal punctuation
+   * is kept and one-word sentences ("Yes.") survive.
    */
   private splitIntoSentences(text: string): string[] {
     if (!text?.trim()) return [];
 
-    return text
-      .split(/[.!?]+/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0 && this.countWords(s) >= 2);
+    const parts = text.match(/[^.!?…]+(?:[.!?…]+["'”’)\]]*)?/g) ?? [];
+    return parts.map(s => s.trim()).filter(s => s.length > 0);
   }
 
   /**

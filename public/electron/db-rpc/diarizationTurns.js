@@ -12,6 +12,16 @@
 // the diarizer's actual boundary. Per-speaker audio clipping needs the real thing:
 // cutting on estimated sentence boundaries clips mid-word and drifts audibly.
 //
+// SPEAKER IDENTITY (schema v3)
+// `speaker` is the DISPLAY name and follows user renames/merges, matching the
+// convention in transcript_segments.speaker — so per-speaker text and audio
+// exports join on the same value. `speaker_id` keeps the diarizer's raw
+// cluster id permanently, so provenance is never lost to a rename and legacy
+// rows can be healed by re-applying the transcripts.speakers rename map.
+// `source` records whether the boundaries are pyannote's own ('pyannote') or
+// were collapsed from Whisper segment boundaries by an older import path
+// ('segment-derived').
+//
 // All values are bound; the only interpolated SQL is a placeholder count.
 
 function assertId(id) {
@@ -38,7 +48,16 @@ function assertTurn(turn, index) {
   if (end <= start) {
     throw new Error(`${at} ends (${end}) at or before it starts (${start})`);
   }
-  return { speaker: turn.speaker, start, end };
+  // v3 provenance fields are optional so older callers keep working:
+  // speakerId defaults to the speaker label itself (it IS the cluster id on
+  // the import path), source defaults to null (unknown).
+  const speakerId =
+    typeof turn.speakerId === 'string' && turn.speakerId.length > 0
+      ? turn.speakerId
+      : turn.speaker;
+  const source =
+    turn.source === 'pyannote' || turn.source === 'segment-derived' ? turn.source : null;
+  return { speaker: turn.speaker, speakerId, start, end, source };
 }
 
 function makeDiarizationTurns(getDb) {
@@ -60,14 +79,18 @@ function makeDiarizationTurns(getDb) {
 
       const db = getDb();
       const insert = db.prepare(
-        `INSERT INTO diarization_turns (transcript_id, turn_index, speaker, start_time, end_time)
-         VALUES (?, ?, ?, ?, ?)`
+        `INSERT INTO diarization_turns
+           (transcript_id, turn_index, speaker, speaker_id, start_time, end_time, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`
       );
 
       const writeAll = db.transaction((rows) => {
         db.prepare('DELETE FROM diarization_turns WHERE transcript_id = ?').run(transcriptId);
         for (let i = 0; i < rows.length; i++) {
-          insert.run(transcriptId, i, rows[i].speaker, rows[i].start, rows[i].end);
+          insert.run(
+            transcriptId, i, rows[i].speaker, rows[i].speakerId,
+            rows[i].start, rows[i].end, rows[i].source
+          );
         }
       });
       writeAll(normalised);
@@ -80,7 +103,7 @@ function makeDiarizationTurns(getDb) {
       assertId(transcriptId);
       return getDb()
         .prepare(
-          `SELECT turn_index, speaker, start_time, end_time
+          `SELECT turn_index, speaker, speaker_id, start_time, end_time, source
            FROM diarization_turns WHERE transcript_id = ? ORDER BY turn_index`
         )
         .all(transcriptId);
@@ -102,6 +125,49 @@ function makeDiarizationTurns(getDb) {
         else bySpeaker.set(turn.speaker, [{ start: turn.start_time, end: turn.end_time }]);
       }
       return Object.fromEntries(bySpeaker);
+    },
+
+    /**
+     * Apply speaker renames/merges to stored turns.
+     *
+     * `renames` maps an existing `speaker` value (a raw cluster id or a
+     * previous display name) to its new display name. Two old values may map
+     * to one new name — that is a merge, and the combined turns are exactly
+     * what a later per-speaker audio export should cut. Identity renames
+     * (old === new) are skipped. speaker_id is never touched: it is the
+     * permanent record of which diarization cluster a turn came from.
+     */
+    rename(transcriptId, renames) {
+      assertId(transcriptId);
+      if (!renames || typeof renames !== 'object' || Array.isArray(renames)) {
+        throw new Error('rename requires a {oldName: newName} object');
+      }
+      const pairs = Object.entries(renames).filter(
+        ([oldName, newName]) =>
+          typeof oldName === 'string' && oldName.length > 0 &&
+          typeof newName === 'string' && newName.length > 0 &&
+          oldName !== newName
+      );
+      if (pairs.length === 0) return { changes: 0 };
+
+      const db = getDb();
+      const update = db.prepare(
+        'UPDATE diarization_turns SET speaker = ? WHERE transcript_id = ? AND speaker = ?'
+      );
+      // A rename onto a name that itself is being renamed away (A→B, B→C)
+      // must not chain. Apply through a temp marker per pair so each update
+      // only touches rows that held the original value.
+      let changes = 0;
+      const applyAll = db.transaction(() => {
+        for (let i = 0; i < pairs.length; i++) {
+          changes += update.run(`rename:${i}`, transcriptId, pairs[i][0]).changes;
+        }
+        for (let i = 0; i < pairs.length; i++) {
+          update.run(pairs[i][1], transcriptId, `rename:${i}`);
+        }
+      });
+      applyAll();
+      return { changes };
     },
 
     deleteByTranscript(transcriptId) {
@@ -132,6 +198,9 @@ function register(ipcMain, getDb) {
   );
   ipcMain.handle('diarization-turns:list-by-speaker', (_e, transcriptId) =>
     api.listBySpeaker(transcriptId)
+  );
+  ipcMain.handle('diarization-turns:rename', (_e, transcriptId, renames) =>
+    api.rename(transcriptId, renames)
   );
   ipcMain.handle('diarization-turns:delete-by-transcript', (_e, transcriptId) =>
     api.deleteByTranscript(transcriptId)

@@ -43,3 +43,9 @@ jobs:
 
       - name: Tests
         run: npx vitest run
+
+      # Sidecar pure-logic tests (stdlib only — word/speaker alignment for
+      # /analyse-v2). The ML stack itself is exercised by the packaged-app
+      # smoke test, not here.
+      - name: Sidecar unit tests
+        run: python3 -m unittest discover -s embedded-server -p 'test_*.py' -v

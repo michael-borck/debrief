@@ -131,7 +131,10 @@ describe('ExportModal timestamped formats', () => {
     expect(text).toMatch(/drift/i);
   });
 
-  it('claims diarization precision when turns exist', async () => {
+  it('does not claim turn precision for interpolated segment timings, even when turns exist', async () => {
+    // Regression (2026-10-14 audit): sentence cue times are interpolated
+    // regardless of whether diarization turns are stored, so the export
+    // must keep the estimates label.
     const api = mockApi({ turns: 3 });
     await openModal(api);
 
@@ -142,8 +145,54 @@ describe('ExportModal timestamped formats', () => {
     const blob = (URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls[0][0] as Blob;
     const text = await blob.text();
 
-    expect(text).toMatch(/diarization turns/i);
-    expect(text).not.toMatch(/estimates/i);
+    expect(text).toMatch(/estimates/i);
+  });
+
+  it('uses exactly one segment version, preferring speaker_tagged', async () => {
+    // Regression (2026-10-14 audit): the modal fetched segments with no
+    // version, so the handler returned every version interleaved and SRT
+    // cues were duplicated.
+    const api = mockApi({});
+    api.segments.getByTranscript = vi.fn(async ({ version }: { version?: string }) => {
+      if (version === 'speaker_tagged') return segments.map((s) => ({ ...s, version }));
+      return segments.map((s) => ({ ...s, text: `DUPLICATE-${version}` }));
+    });
+    await openModal(api);
+
+    fireEvent.change(screen.getByDisplayValue(/Markdown/i), { target: { value: 'srt' } });
+    fireEvent.click(screen.getByRole('button', { name: /export/i }));
+
+    await vi.waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+    const blob = (URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls[0][0] as Blob;
+    const text = await blob.text();
+
+    expect(api.segments.getByTranscript).toHaveBeenCalledTimes(1);
+    expect(api.segments.getByTranscript).toHaveBeenCalledWith(
+      expect.objectContaining({ version: 'speaker_tagged' })
+    );
+    expect(text).toContain('Alice speaks.');
+    expect(text).not.toContain('DUPLICATE');
+  });
+
+  it('falls back to the original version when nothing is speaker-tagged', async () => {
+    const api = mockApi({});
+    api.segments.getByTranscript = vi.fn(async ({ version }: { version?: string }) =>
+      version === 'original' ? segments : []
+    );
+    await openModal(api);
+
+    fireEvent.change(screen.getByDisplayValue(/Markdown/i), { target: { value: 'srt' } });
+    fireEvent.click(screen.getByRole('button', { name: /export/i }));
+
+    await vi.waitFor(() => expect(URL.createObjectURL).toHaveBeenCalled());
+    const blob = (URL.createObjectURL as ReturnType<typeof vi.fn>).mock.calls[0][0] as Blob;
+    const text = await blob.text();
+
+    expect(text).toContain('Alice speaks.');
+    const calls = (api.segments.getByTranscript as ReturnType<typeof vi.fn>).mock.calls.map(
+      (c) => c[0].version
+    );
+    expect(calls).toEqual(['speaker_tagged', 'original']);
   });
 
   it('hides the metadata toggles for subtitle formats', async () => {

@@ -18,7 +18,7 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
   project, 
   onClose 
 }) => {
-  const [exportFormat, setExportFormat] = useState<'json' | 'csv' | 'markdown' | 'pdf'>('json');
+  const [exportFormat, setExportFormat] = useState<'json' | 'csv' | 'markdown' | 'html'>('json');
   const [exportSections, setExportSections] = useState({
     overview: true,
     themes: true,
@@ -112,8 +112,9 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
           mimeType = 'text/markdown';
           break;
           
-        case 'pdf':
-          // For PDF, we'll generate HTML and let the browser handle PDF generation
+        case 'html':
+          // A printable HTML report; users print-to-PDF from the browser.
+          // (This option used to be labelled 'pdf' while writing .html.)
           content = generateHTMLExport(exportData, { exportFormat, exportSections });
           filename = `${project.name}_analysis.html`;
           mimeType = 'text/html';
@@ -154,13 +155,13 @@ export const ProjectAnalysisExport: React.FC<ProjectAnalysisExportProps> = ({
           </label>
           <select
             value={exportFormat}
-            onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv' | 'markdown' | 'pdf')}
+            onChange={(e) => setExportFormat(e.target.value as 'json' | 'csv' | 'markdown' | 'html')}
             className="input"
           >
             <option value="json">JSON (Complete Data)</option>
             <option value="csv">CSV (Tabular Data)</option>
             <option value="markdown">Markdown (Readable Report)</option>
-            <option value="pdf">HTML (For PDF Print)</option>
+            <option value="html">HTML (Printable Report)</option>
           </select>
         </div>
         

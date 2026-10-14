@@ -121,6 +121,48 @@ export function generateCSVExport(data: ProjectExportData): string {
         `${csvCell(concept)},${csvCell(conceptData.totalCount)},${csvCell(conceptData.transcriptCount)},${csvCell(conceptData.avgFrequency.toFixed(1))},${csvCell(conceptData.trend)}`
       );
     }
+    lines.push('');
+  }
+
+  // Summary + key insights (previously only in markdown/HTML, so a CSV
+  // export silently dropped the analysis narrative the user asked for).
+  if (data.analysis.summary) {
+    lines.push(`Summary,${csvCell(data.analysis.summary)}`);
+    lines.push('');
+  }
+  if (data.analysis.key_insights && data.analysis.key_insights.length > 0) {
+    lines.push('Key Insights');
+    for (const insight of data.analysis.key_insights) {
+      lines.push(csvCell(insight));
+    }
+    lines.push('');
+  }
+
+  // Speakers
+  if (data.analysis.speakerAnalysis) {
+    lines.push('Speakers');
+    lines.push(`Total Speakers,${csvCell(data.analysis.speakerAnalysis.totalSpeakers)}`);
+    lines.push('Speaker,Transcript Count,Total Segments,Themes');
+    for (const [speaker, dist] of Object.entries(
+      data.analysis.speakerAnalysis.speakerDistribution
+    )) {
+      lines.push(
+        `${csvCell(speaker)},${csvCell(dist.transcriptCount)},${csvCell(dist.totalSegments)},${csvCell(dist.themes.join('; '))}`
+      );
+    }
+    lines.push('');
+  }
+
+  // Cross-transcript patterns
+  if (data.analysis.crossTranscriptPatterns && data.analysis.crossTranscriptPatterns.length > 0) {
+    lines.push('Cross-Transcript Patterns');
+    lines.push('Type,Description,Strength');
+    for (const pattern of data.analysis.crossTranscriptPatterns) {
+      lines.push(
+        `${csvCell(pattern.type)},${csvCell(pattern.description)},${csvCell(pattern.strength)}`
+      );
+    }
+    lines.push('');
   }
 
   return lines.join('\n');
