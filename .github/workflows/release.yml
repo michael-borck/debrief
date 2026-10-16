@@ -54,7 +54,7 @@ jobs:
           python -m venv /tmp/audit-venv
           /tmp/audit-venv/bin/pip install --quiet --upgrade pip
           /tmp/audit-venv/bin/pip install --quiet \
-            'speech-analyser[diarization]>=0.2.0' \
+            'speech-analyser[diarization]>=0.8.1' \
             'sentence-transformers>=2.7,<6'
           /tmp/audit-venv/bin/pip install --quiet pip-audit
           # CVE-2025-3000 (torch, no fixed release as of Jun 2026): local-only

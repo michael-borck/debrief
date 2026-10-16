@@ -51,7 +51,13 @@ os.environ.setdefault("AUDIO_LENS_MODE", "desktop")
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
 
-from speech_analyser.app import app
+# speech-analyser renamed its HTTP module app -> api after 0.2.x. The venv
+# sync now tracks the latest release (see setup-venv.py), so import from
+# the new location and fall back to the old one for not-yet-upgraded venvs.
+try:
+    from speech_analyser.api import app
+except ImportError:  # speech-analyser <= 0.2.x
+    from speech_analyser.app import app
 from speech_analyser.diarizer import Diarizer
 from fastapi import HTTPException, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse
@@ -275,7 +281,10 @@ async def rediarise(
 
 
 def _whisper_model(model_size: str):
-    from speech_analyser.app import _get_lens
+    try:
+        from speech_analyser.api import _get_lens
+    except ImportError:  # speech-analyser <= 0.2.x
+        from speech_analyser.app import _get_lens
 
     analyser = _get_lens(model_size)
     return analyser._transcriber._load()

@@ -13,11 +13,20 @@ import tarfile
 from datetime import datetime
 from pathlib import Path
 
-# Pip specs installed into the user-data venv on first launch.
+# Pip specs installed into the user-data venv, synced on every launch.
 #   - speech-analyser[diarization] for transcription + speaker diarisation
 #   - sentence-transformers for the /embed endpoint (chat RAG retrieval).
+#
+# speech-analyser intentionally tracks the LATEST release: the floor names
+# the oldest version this sidecar's imports understand (0.8.1 = api module
+# layout + torchcodec-free waveform diarization), and the sync below runs
+# pip with --upgrade so an existing venv moves forward instead of freezing
+# at whatever was latest on the day it was created (which is how installs
+# silently stayed on 0.2.3). server.py keeps import fallbacks for the old
+# layout, and a failed sync on an existing venv is non-fatal (offline
+# launches keep working with the previously installed version).
 INSTALL_SPECS = [
-    "speech-analyser[diarization]>=0.2.0",
+    "speech-analyser[diarization]>=0.8.1",
     "sentence-transformers>=2.7,<6",
 ]
 
@@ -81,7 +90,8 @@ def fail(message: str, code: int = 1) -> "None":
     sys.exit(code)
 
 
-def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None) -> None:
+def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None,
+             fatal: bool = True) -> bool:
     """Run a subprocess, capturing stdout+stderr. On failure, surface the last
     chunk of captured output in the renderer-visible ERROR so we never
     silently lose 'why did it fail'."""
@@ -99,6 +109,7 @@ def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None) -> None
             _log(f"stdout:\n{result.stdout}")
         if result.stderr:
             _log(f"stderr:\n{result.stderr}")
+        return True
     except subprocess.CalledProcessError as e:
         if e.stdout:
             _log(f"stdout:\n{e.stdout}")
@@ -125,6 +136,9 @@ def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None) -> None
             parts.append(hint)
         if _log_path:
             parts.append(f"Full log: {_log_path}")
+        if not fatal:
+            _log(" | ".join(parts) + " (continuing with existing install)")
+            return False
         fail(" | ".join(parts), e.returncode)
     except FileNotFoundError as e:
         msg = f"{label} failed: {e}"
@@ -132,7 +146,11 @@ def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None) -> None
             msg += f" | {hint}"
         if _log_path:
             msg += f" | Full log: {_log_path}"
+        if not fatal:
+            _log(msg + " (continuing with existing install)")
+            return False
         fail(msg, 1)
+    return True
 
 
 def main() -> int:
@@ -171,10 +189,16 @@ def main() -> int:
     else:
         emit("Syncing dependencies")
 
+    # --upgrade so an existing venv tracks the latest release satisfying
+    # the specs (without it, pip no-ops once any satisfying version is
+    # installed and the venv freezes at first-launch versions forever).
+    # On an existing venv a failed sync (offline, PyPI outage) is not
+    # fatal: the verification import below is the real gate.
     run_step(
         "pip install",
-        [str(py), "-m", "pip", "install", "--quiet", *INSTALL_SPECS],
+        [str(py), "-m", "pip", "install", "--quiet", "--upgrade", *INSTALL_SPECS],
         hint="Common causes: corporate proxy, antivirus blocking, or a temporary PyPI outage.",
+        fatal=fresh_install,
     )
 
     # Extract the bundled HF model cache into <userData>/hf-cache. The
