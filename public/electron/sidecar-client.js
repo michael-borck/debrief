@@ -41,45 +41,32 @@ function authHeader() {
   return { Authorization: `Bearer ${sidecar.token}` };
 }
 
-// POST the audio file to the sidecar's analyse endpoint.
-//
-// Prefers Debrief's own /analyse-v2 (server.py): word-level timestamps with
-// per-word speaker attribution, plus the diarizer's RAW turns, which the
-// upstream /analyse computes and then discards. Falls back to upstream
-// /analyse ({ transcript, language, duration, segments[], speakers[], … })
-// when talking to an older sidecar build, or when v2 declares itself
-// unavailable (501: upstream private-API drift). Both shapes feed
-// segmentsToChunkTimings; v2 additionally carries `words` and `turns`.
+// POST the audio file to speech-analyser's /analyse endpoint.
+// Returns { transcript, language, duration, segments[], turns[], speakers[],
+// ... } — since speech-analyser 0.9.0 segments carry per-word timings with
+// per-word speaker labels and `turns` holds pyannote's raw diarization
+// turns. (Debrief's interim /analyse-v2 supplied these before they were
+// upstreamed; it was deleted once 0.9.0 shipped.)
 async function analyse({ audioPath, diarize = true, model = 'base' }) {
   ensureReady();
   if (!fs.existsSync(audioPath)) {
     throw new Error(`Audio file not found: ${audioPath}`);
   }
 
-  const fileBuffer = fs.readFileSync(audioPath);
-  const filename = path.basename(audioPath);
-  const makeForm = () => {
-    const form = new FormData();
-    form.append('file', new Blob([fileBuffer]), filename);
-    form.append('diarize', diarize ? 'true' : 'false');
-    if (model) form.append('model', model);
-    return form;
-  };
-  const post = (route) =>
-    fetch(`${baseUrl()}${route}`, {
-      method: 'POST',
-      headers: authHeader(),
-      body: makeForm(),
-      dispatcher: localhostAgent,
-    });
+  const form = new FormData();
+  form.append('file', new Blob([fs.readFileSync(audioPath)]), path.basename(audioPath));
+  form.append('diarize', diarize ? 'true' : 'false');
+  if (model) form.append('model', model);
 
-  let res = await post('/analyse-v2');
-  if (res.status === 404 || res.status === 405 || res.status === 501) {
-    res = await post('/analyse');
-  }
+  const res = await fetch(`${baseUrl()}/analyse`, {
+    method: 'POST',
+    headers: authHeader(),
+    body: form,
+    dispatcher: localhostAgent,
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`analyse returned ${res.status}: ${body || res.statusText}`);
+    throw new Error(`/analyse returned ${res.status}: ${body || res.statusText}`);
   }
   return await res.json();
 }
@@ -137,9 +124,8 @@ async function embed(texts, { normalize = true } = {}) {
 
 // Map speech-analyser segments to the ChunkTimingInfo shape the renderer
 // expects (sentenceSegmentsService.createSegmentsFromChunks consumes this).
-// `words`/`avgLogprob` are present only from /analyse-v2; they pass through
-// untouched so segment construction can use exact word times when available
-// and interpolate otherwise.
+// `words` (with per-word speakers when diarized) pass through untouched so
+// segment construction can use exact word times.
 function segmentsToChunkTimings(segments) {
   return (segments || []).map((s, i) => ({
     chunkIndex: i,
@@ -153,12 +139,11 @@ function segmentsToChunkTimings(segments) {
   }));
 }
 
-// The speaker turns to persist for a result. /analyse-v2 returns pyannote's
-// raw turns — always prefer those. The legacy path derives turns by
-// collapsing Whisper segments, which quantizes boundaries to segment edges;
-// such turns are labelled 'segment-derived' so downstream consumers know
-// their precision (they were previously stored as if they were the real
-// thing).
+// The speaker turns to persist for a result. Since speech-analyser 0.9.0,
+// /analyse returns pyannote's raw turns in `turns` — always prefer those.
+// The fallback derives turns by collapsing Whisper segments, which
+// quantizes boundaries to segment edges; such turns are labelled
+// 'segment-derived' so downstream consumers know their precision.
 function resultToSpeakerTurns(result) {
   if (result?.turns?.length > 0) {
     const raw = result.turns;

@@ -148,8 +148,8 @@ export class FileProcessor {
         }));
         console.log(`[fileProcessor] using diarisation speakers: ${uniqueSpeakers.length} found`);
 
-        // Persist the turns themselves, with provenance: from /analyse-v2
-        // these are pyannote's raw boundaries; from an older sidecar they
+        // Persist the turns themselves, with provenance: from /analyse
+        // these are pyannote's raw boundaries; when diarisation produced none they
         // are collapsed from Whisper segments and arrive labelled
         // 'segment-derived'. Without them there is nothing accurate to cut
         // per-speaker audio on.

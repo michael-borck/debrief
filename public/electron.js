@@ -1698,7 +1698,7 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
     console.log(`[local-transcription] analysed ${audioSeconds.toFixed(2)}s of audio in ${totalMs} ms (${realtimeFactor.toFixed(2)}x realtime)`);
 
     const chunkTimings = sidecarClient.segmentsToChunkTimings(result.segments);
-    // Raw pyannote turns from /analyse-v2 when available (source:'pyannote'),
+    // Raw pyannote turns from /analyse (source:'pyannote'),
     // else Whisper-segment-derived approximations (source:'segment-derived').
     const speakerTurns = sidecarClient.resultToSpeakerTurns(result);
 

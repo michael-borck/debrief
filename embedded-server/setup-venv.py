@@ -18,15 +18,14 @@ from pathlib import Path
 #   - sentence-transformers for the /embed endpoint (chat RAG retrieval).
 #
 # speech-analyser intentionally tracks the LATEST release: the floor names
-# the oldest version this sidecar's imports understand (0.8.1 = api module
-# layout + torchcodec-free waveform diarization), and the sync below runs
+# the oldest version this sidecar's imports understand (0.9.0 = api module layout, raw turns +
+# per-word speakers from /analyse, torchcodec-free waveform diarization), and the sync below runs
 # pip with --upgrade so an existing venv moves forward instead of freezing
 # at whatever was latest on the day it was created (which is how installs
-# silently stayed on 0.2.3). server.py keeps import fallbacks for the old
-# layout, and a failed sync on an existing venv is non-fatal (offline
+# silently stayed on 0.2.3). A failed sync on an existing venv is non-fatal (offline
 # launches keep working with the previously installed version).
 INSTALL_SPECS = [
-    "speech-analyser[diarization]>=0.8.1",
+    "speech-analyser[diarization]>=0.9.0",
     "sentence-transformers>=2.7,<6",
 ]
 

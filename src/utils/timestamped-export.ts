@@ -195,8 +195,7 @@ export function precisionNote(precision: TimePrecision): string {
  * Derive the precision to advertise for a set of segments.
  *
  * Sentence segments NEVER carry turn precision: their times are either
- * word-aligned (`timing_source === 'word'`, schema v3+, from the sidecar's
- * /analyse-v2) or interpolated within each Whisper chunk. An earlier version
+ * word-aligned (`timing_source === 'word'`, schema v3+) or interpolated within each Whisper chunk. An earlier version
  * advertised 'turn' whenever diarization turns existed for the transcript,
  * while still emitting the interpolated numbers — a stronger claim than the
  * data supported. 'turn' remains in the type for genuinely turn-derived

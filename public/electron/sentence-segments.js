@@ -5,7 +5,7 @@
 // place that decides what a sentence's start/end mean.
 //
 // TWO TIMING MODES
-// - Word-aligned (chunk.words present, from the sidecar's /analyse-v2):
+// - Word-aligned (chunk.words present, from speech-analyser /analyse):
 //   sentences are built from the words themselves, flushed at sentence
 //   punctuation OR at a speaker change, with start/end taken from the
 //   first/last word. timing_source='word'. A speaker change mid-chunk

@@ -115,7 +115,7 @@ export interface ChunkTimingInfo {
   speaker?: string;
   /** Mean log-probability from Whisper for this chunk, when available. */
   avgLogprob?: number;
-  /** Word-level timings from the sidecar's /analyse-v2, when available. */
+  /** Word-level timings from speech-analyser's /analyse (0.9.0+). */
   words?: WordTiming[];
 }
 

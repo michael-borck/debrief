@@ -32,7 +32,7 @@ together, and several correctness bugs actively work against it.
 
 ### Execution order
 
-Items 1–5 and 7 are done; item 6 has a shipped Debrief-side interim (see its section), with the upstream PR still the long-term path.
+All items 1–7 are done. Item 6 landed upstream in speech-analyser 0.9.0 (raw turns + per-word speakers from analyse()); Debrief's interim /analyse-v2 was deleted the same day.
 
 This ordering was revised after an initial dependency analysis turned out to be
 wrong about word timestamps (item 6). They were treated as a blocker for audio
@@ -174,7 +174,7 @@ format; the export states whether timestamps are exact or estimated.
 
 ---
 
-## 6. [~] Word-level timestamps (upstream contribution; Debrief interim shipped 2026-10-14)
+## 6. [x] Word-level timestamps (upstreamed in speech-analyser 0.9.0; interim deleted 2026-10-16)
 
 **Problem.** Sentence timings are interpolated, so click-to-seek can land
 mid-sentence and any fine-grained cutting would be inaccurate.
@@ -231,6 +231,14 @@ long-term home — when it lands, `/analyse-v2` can be deleted and nothing
 else changes shape. Existing transcripts keep interpolated timings (honestly
 labelled) until re-imported.
 
+
+**Upstreamed and interim deleted (2026-10-16).** speech-analyser 0.9.0's
+`analyse()` returns pyannote's raw `turns` and a `speaker` on every word;
+0.8.1 also made diarization torchcodec-free by feeding pyannote a
+pre-decoded waveform. Debrief deleted `/analyse-v2` + `word_alignment.py`,
+raised its sidecar floor to `speech-analyser>=0.9.0`, and consumes the
+upstream response directly. Verified live end-to-end on the upgraded venv.
+
 ## 7. [x] Correctness and honesty fixes
 
 Small, independent, ship alongside the above.
@@ -273,3 +281,4 @@ Small, independent, ship alongside the above.
 | 2026-10-14 | 6 — word timestamps (interim) | Shipped Debrief-side. `/analyse-v2`, `word_alignment.py` (+11 Python tests), schema v3 timing provenance, word-mode sentence construction with mid-chunk speaker splits. Upstream PR still pending as the long-term home. |
 | 2026-10-14 | 7 — honesty fixes | Shipped. Theme strength computed as share of the month's transcripts; dead segment sentiment/emotions columns removed for new DBs; project export 'pdf' option renamed to HTML; CSV gains summary/insights/speakers/patterns. |
 | 2026-10-14 | Audit P0 regressions | The 2026-10-14 audit found three regressions in the shipped items, all fixed same day: timestamped export mixed all segment versions (duplicated cues); segment exports claimed 'turn' precision for interpolated numbers; renames never reached `diarization_turns` (and re-diarisation saved raw ids while segments saved display names), so audio and text disagreed on speaker names. Turns now store display name + cluster id, renames rewrite turns, and reads heal legacy rows via the rename map. |
+| 2026-10-16 | 6 — upstreamed | speech-analyser 0.9.0 exposes raw turns + per-word speakers from analyse() (0.8.1: waveform-fed pyannote). Debrief deleted /analyse-v2 and word_alignment.py, floor raised to >=0.9.0, venv sync now --upgrades with non-fatal offline failure. Item closed. |
