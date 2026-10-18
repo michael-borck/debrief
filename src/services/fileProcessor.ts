@@ -24,6 +24,7 @@ import {
 } from './analysisMapReduce';
 import { reduceResearchAnalysis } from './researchMerge';
 import { buildSpeakerAttributedText } from './speakerTranscript';
+import { persistSpeakerEmbeddings } from './speakerIdentityService';
 import type { TranscriptionStage } from '../types';
 import { abortable, checkCancelled, isCancelled } from '../utils/cancellation';
 
@@ -168,6 +169,18 @@ export class FileProcessor {
           // Non-fatal: the transcript is still usable, it just won't support
           // per-speaker audio export until diarisation is re-run.
           console.warn('[fileProcessor] failed to persist diarization turns:', turnErr);
+        }
+
+        // Voiceprints for cross-recording identity matching. No-ops unless
+        // the user opted in (Settings > voiceprint recognition).
+        try {
+          await persistSpeakerEmbeddings(
+            transcriptId,
+            transcriptResult.speakerEmbeddings,
+            transcriptResult.speakerTurns
+          );
+        } catch (embErr) {
+          console.warn('[fileProcessor] failed to persist speaker embeddings:', embErr);
         }
       }
 
@@ -334,6 +347,7 @@ export class FileProcessor {
       speakerId?: string;
       source?: 'pyannote' | 'segment-derived' | null;
     }>;
+    speakerEmbeddings?: Record<string, number[]>;
   }> {
     try {
       // Read the chosen local Whisper model from settings (defaults to tiny.en)

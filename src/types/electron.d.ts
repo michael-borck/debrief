@@ -286,6 +286,31 @@ export interface ElectronAPI {
       deleteByTranscript: (transcriptId: string) => Promise<{ changes: number }>;
       count: (transcriptId: string) => Promise<number>;
     };
+    speakerIdentities: {
+      list: () => Promise<Array<{
+        id: string; name: string; created_at: string; updated_at: string;
+        embedding_count: number;
+      }>>;
+      create: (name: string) => Promise<{ id: string; name: string }>;
+      rename: (id: string, name: string) => Promise<{ changes: number }>;
+      delete: (id: string) => Promise<{ changes: number }>;
+      saveEmbedding: (payload: {
+        transcriptId: string; clusterId: string;
+        embedding: number[]; talkSeconds: number;
+      }) => Promise<{ saved: boolean }>;
+      listEmbeddings: () => Promise<Array<{
+        transcript_id: string; cluster_id: string; identity_id: string | null;
+        embedding: string; talk_seconds: number;
+      }>>;
+      listEmbeddingsByTranscript: (transcriptId: string) => Promise<Array<{
+        transcript_id: string; cluster_id: string; identity_id: string | null;
+        embedding: string; talk_seconds: number;
+      }>>;
+      assign: (payload: {
+        transcriptId: string; clusterId: string; identityId: string | null;
+      }) => Promise<{ changes: number }>;
+      deleteAllVoiceprints: () => Promise<{ embeddings: number; identities: number }>;
+    };
 
     /**
      * Cached Topics-tab clusters (transcript_topics). Reads return raw rows
@@ -570,6 +595,7 @@ export interface ElectronAPI {
       error?: string;
       chunkTimings?: Array<ChunkTimingInfo & { speaker?: string }>;
       speakerTurns?: Array<{ start: number; end: number; speaker: string; speakerId?: string; source?: 'pyannote' | 'segment-derived' | null }>;
+      speakerEmbeddings?: Record<string, number[]>;
     }>;
     rediarise: (
       audioPath: string,
@@ -583,6 +609,7 @@ export interface ElectronAPI {
     ) => Promise<{
       success: boolean;
       speakerTurns?: Array<{ start: number; end: number; speaker: string; speakerId?: string; source?: 'pyannote' | 'segment-derived' | null }>;
+      speakerEmbeddings?: Record<string, number[]>;
       audioDurationSeconds?: number;
       error?: string;
     }>;

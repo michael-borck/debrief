@@ -123,6 +123,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.invoke('diarization-turns:delete-by-transcript', transcriptId),
       count: (transcriptId) => ipcRenderer.invoke('diarization-turns:count', transcriptId),
     },
+    // Speaker identities across recordings + voiceprint embeddings (v4).
+    speakerIdentities: {
+      list: () => ipcRenderer.invoke('speaker-identities:list'),
+      create: (name) => ipcRenderer.invoke('speaker-identities:create', name),
+      rename: (id, name) => ipcRenderer.invoke('speaker-identities:rename', id, name),
+      delete: (id) => ipcRenderer.invoke('speaker-identities:delete', id),
+      saveEmbedding: (payload) =>
+        ipcRenderer.invoke('speaker-identities:save-embedding', payload),
+      listEmbeddings: () => ipcRenderer.invoke('speaker-identities:list-embeddings'),
+      listEmbeddingsByTranscript: (transcriptId) =>
+        ipcRenderer.invoke('speaker-identities:list-embeddings-by-transcript', transcriptId),
+      assign: (payload) => ipcRenderer.invoke('speaker-identities:assign', payload),
+      deleteAllVoiceprints: () =>
+        ipcRenderer.invoke('speaker-identities:delete-all-voiceprints'),
+    },
     topics: {
       listByTranscript: (transcriptId) =>
         ipcRenderer.invoke('topics:list-by-transcript', transcriptId),

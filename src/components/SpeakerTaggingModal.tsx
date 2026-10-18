@@ -28,6 +28,8 @@ interface SpeakerTaggingModalProps {
   transcriptText: string;
   existingSpeakers?: Array<{ id: string; name: string; segments: number }>;
   onSave: (taggedText: string, speakers: Array<{ id: string; name: string; segments: number }>) => void;
+  /** Voiceprint identity suggestions keyed by speaker id (opt-in feature). */
+  identitySuggestions?: Record<string, { name: string; score: number }>;
 }
 
 const SPEAKER_COLORS = [
@@ -39,7 +41,8 @@ export const SpeakerTaggingModal: React.FC<SpeakerTaggingModalProps> = ({
   onClose,
   transcriptText,
   existingSpeakers = [],
-  onSave
+  onSave,
+  identitySuggestions = {}
 }) => {
   const [speakers, setSpeakers] = useState<Speaker[]>([]);
   const [segments, setSegments] = useState<TextSegment[]>([]);
@@ -645,6 +648,26 @@ etc.`;
                         <div>
                           <span className="font-medium text-sm">{speaker.name}</span>
                           <div className="text-xs text-surface-500">{segmentCount} segments</div>
+                          {identitySuggestions[speaker.id] &&
+                            identitySuggestions[speaker.id].name !== speaker.name && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSpeakers((prev) =>
+                                    prev.map((s) =>
+                                      s.id === speaker.id
+                                        ? { ...s, name: identitySuggestions[speaker.id].name }
+                                        : s
+                                    )
+                                  );
+                                }}
+                                className="text-xs text-primary-700 underline decoration-dotted underline-offset-2"
+                                title="Voiceprint similarity to a speaker you named in another recording"
+                              >
+                                Sounds like {identitySuggestions[speaker.id].name} (
+                                {identitySuggestions[speaker.id].score.toFixed(2)}) — use this name
+                              </button>
+                            )}
                         </div>
                       </div>
                       {speakers.length > 2 && (

@@ -192,6 +192,34 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_diarization_turns_unique
 CREATE INDEX IF NOT EXISTS idx_diarization_turns_speaker
     ON diarization_turns(transcript_id, speaker);
 
+-- Speaker identities across recordings (v4, voiceprints). An identity is a
+-- person the user has named; per-transcript cluster embeddings link to it
+-- once the user confirms a match (or names the speaker). Embeddings are
+-- biometric data: stored only locally, only when the user opts in
+-- (Settings > voiceprint recognition); deleting an identity nulls links.
+CREATE TABLE IF NOT EXISTS speaker_identities (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS transcript_speaker_embeddings (
+    transcript_id TEXT NOT NULL,
+    cluster_id TEXT NOT NULL,
+    identity_id TEXT,
+    embedding TEXT NOT NULL,
+    talk_seconds REAL NOT NULL DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (transcript_id, cluster_id),
+    FOREIGN KEY (transcript_id) REFERENCES transcripts(id) ON DELETE CASCADE,
+    FOREIGN KEY (identity_id) REFERENCES speaker_identities(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_speaker_embeddings_identity
+    ON transcript_speaker_embeddings(identity_id);
+
 
 -- Chat conversations
 CREATE TABLE IF NOT EXISTS chat_conversations (
@@ -370,3 +398,5 @@ INSERT OR IGNORE INTO schema_migrations (version) VALUES (1);
 INSERT OR IGNORE INTO schema_migrations (version) VALUES (2);
 -- v3: diarization_turns.speaker_id/source; transcript_segments.timing_source/words
 INSERT OR IGNORE INTO schema_migrations (version) VALUES (3);
+-- v4: speaker_identities + transcript_speaker_embeddings (voiceprints)
+INSERT OR IGNORE INTO schema_migrations (version) VALUES (4);

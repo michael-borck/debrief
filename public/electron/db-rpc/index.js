@@ -25,6 +25,7 @@ const chat = require('./chat');
 const projectChat = require('./projectChat');
 const transcriptSegments = require('./transcriptSegments');
 const diarizationTurns = require('./diarizationTurns');
+const speakerIdentities = require('./speakerIdentities');
 const topics = require('./topics');
 const projectAnalysis = require('./projectAnalysis');
 const modelMetadata = require('./modelMetadata');
@@ -41,6 +42,7 @@ function registerAll(ipcMain, getDb) {
   projectChat.register(ipcMain, getDb);
   transcriptSegments.register(ipcMain, getDb);
   diarizationTurns.register(ipcMain, getDb);
+  speakerIdentities.register(ipcMain, getDb);
   topics.register(ipcMain, getDb);
   projectAnalysis.register(ipcMain, getDb);
   modelMetadata.register(ipcMain, getDb);

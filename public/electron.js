@@ -271,7 +271,7 @@ async function initDatabase() {
 // NOT EXISTS statements are no-ops, every column the new build added is found
 // already present, and the old build carries on against a schema it does not
 // understand. A column the newer version DROPPED would never be noticed.
-const CURRENT_SCHEMA_VERSION = 3;
+const CURRENT_SCHEMA_VERSION = 4;
 
 function readSchemaVersion() {
   try {
@@ -1707,6 +1707,9 @@ ipcMain.handle('local-transcription-transcribe', async (event, { audioPath, mode
       text: (result.transcript || '').trim(),
       chunkTimings,
       speakerTurns,
+      // Voiceprint embedding per cluster (speech-analyser 0.10.0+); the
+      // renderer persists these only when the user has opted in.
+      speakerEmbeddings: result.speaker_embeddings || {},
     };
   } catch (error) {
     console.error('[local-transcription] error:', error);
@@ -1752,6 +1755,7 @@ ipcMain.handle('local-transcription-rediarise', async (event, { audioPath, overr
     return {
       success: true,
       speakerTurns,
+      speakerEmbeddings: result.speaker_embeddings || {},
       audioDurationSeconds: 0,
     };
   } catch (error) {

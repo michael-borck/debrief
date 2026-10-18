@@ -3,6 +3,7 @@ import { Mic, Cog, MessageCircle, Bot, Settings, Database } from 'lucide-react';
 import { ServiceContext } from '../contexts/ServiceContext';
 import { formatFileSize } from '../utils/helpers';
 import { PromptsSettings } from '../components/PromptsSettings';
+import { SpeakerIdentitiesSettings } from '../components/SpeakerIdentitiesSettings';
 import { Collapsible } from '../components/Collapsible';
 import { chatService } from '../services/chatService';
 import { useToast } from '../contexts/ToastContext';
@@ -921,6 +922,7 @@ export const SettingsPage: React.FC = () => {
                   <p className="text-xs text-surface-500 ml-6">
                     Identifies who is speaking using voice fingerprints — much more accurate than guessing from text. Adds about 1× the audio length to processing time. Turn off for single-speaker recordings to save time.
                   </p>
+                  <SpeakerIdentitiesSettings />
 
                   {enableSpeakerDiarisation && (
                     <div className="ml-6 mt-3">

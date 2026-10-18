@@ -10,6 +10,7 @@ import {
   type NamedSpeaker,
   type TimedSpeaker,
 } from './speakerLabelPreservation';
+import { persistSpeakerEmbeddings } from './speakerIdentityService';
 
 export interface DiarisationOverrides {
   // Exact speaker count hint passed straight to pyannote. null/undefined means auto-detect.
@@ -202,6 +203,15 @@ checkCancelled(signal);
         );
       } catch (turnErr) {
         console.warn('[rediarisationService] failed to persist diarization turns:', turnErr);
+      }
+
+      // Refresh voiceprints for the new clusters (no-op unless the user
+      // opted in). Saving clears stale identity links for this transcript,
+      // since cluster ids are reassigned every run.
+      try {
+        await persistSpeakerEmbeddings(transcriptId, result.speakerEmbeddings, turns);
+      } catch (embErr) {
+        console.warn('[rediarisationService] failed to persist speaker embeddings:', embErr);
       }
 
       const speakers = Object.entries(speakerCounts).map(([id, segCount]) => ({

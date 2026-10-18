@@ -227,6 +227,9 @@ class _RediariseTurn(BaseModel):
 class _RediariseResponse(BaseModel):
     speakers: list[_RediariseTurn]
     num_speakers_used: int | None
+    # Voiceprint embedding per cluster label (speech-analyser 0.10.0+),
+    # for cross-recording speaker identity matching in Debrief.
+    speaker_embeddings: dict[str, list[float]] = {}
 
 
 @app.post("/rediarise", response_model=_RediariseResponse)
@@ -242,10 +245,13 @@ async def rediarise(
     suffix = _safe_suffix(file.filename)
     tmp_path = await _spool_upload(file, suffix)
     try:
-        turns = _diarizer.diarize(tmp_path, num_speakers=num_speakers)
+        turns, embeddings = _diarizer.diarize_with_embeddings(
+            tmp_path, num_speakers=num_speakers
+        )
         return _RediariseResponse(
             speakers=[_RediariseTurn(start=t.start, end=t.end, speaker=t.speaker) for t in turns],
             num_speakers_used=num_speakers,
+            speaker_embeddings=embeddings,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=_safe_error(e))

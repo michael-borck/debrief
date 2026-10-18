@@ -19,6 +19,12 @@ import { TalkTimeCard } from '../components/TalkTimeCard';
 import { AudioPlayerBar } from '../components/AudioPlayerBar';
 import { DiarisationPanel } from '../components/DiarisationPanel';
 import { SpeakerAudioExport } from '../components/SpeakerAudioExport';
+import { ConversationDynamics } from '../components/ConversationDynamics';
+import {
+  enrolNamedSpeakers,
+  suggestIdentitiesForTranscript,
+  type IdentityMatch,
+} from '../services/speakerIdentityService';
 import { TopicsTab } from '../components/TopicsTab';
 import { useAudioPlayer } from '../hooks/useAudioPlayer';
 import { analyzeConversation } from '../services/conversationMetricsService';
@@ -37,6 +43,39 @@ export const TranscriptDetailPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedTitle, setEditedTitle] = useState('');
   const [showSpeakerTagging, setShowSpeakerTagging] = useState(false);
+  const [identitySuggestions, setIdentitySuggestions] = useState<
+    Record<string, { name: string; score: number }>
+  >({});
+
+  // Voiceprint suggestions for the tagging modal, keyed by the speaker-row
+  // id the modal uses. Suggestions come back keyed by diarization cluster;
+  // rows key by cluster on fresh imports but by display name after
+  // re-diarisation, so translate through the stored turns.
+  useEffect(() => {
+    if (!showSpeakerTagging || !transcript?.id) return;
+    let cancelled = false;
+    (async () => {
+      const byCluster = await suggestIdentitiesForTranscript(transcript.id);
+      if (cancelled || Object.keys(byCluster).length === 0) {
+        if (!cancelled) setIdentitySuggestions({});
+        return;
+      }
+      const mapped: Record<string, IdentityMatch> = { ...byCluster };
+      try {
+        const turns = await window.electronAPI.db.diarizationTurns.listByTranscript(
+          transcript.id
+        );
+        for (const t of turns) {
+          const match = t.speaker_id ? byCluster[t.speaker_id] : undefined;
+          if (match && t.speaker && t.speaker !== t.speaker_id) {
+            mapped[t.speaker] = match;
+          }
+        }
+      } catch { /* cluster-keyed suggestions still apply on fresh imports */ }
+      if (!cancelled) setIdentitySuggestions(mapped);
+    })();
+    return () => { cancelled = true; };
+  }, [showSpeakerTagging, transcript?.id]);
   const [showChatModal, setShowChatModal] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showTranscriptEditor, setShowTranscriptEditor] = useState(false);
@@ -298,6 +337,9 @@ export const TranscriptDetailPage: React.FC = () => {
         } catch (renameErr) {
           console.warn('Failed to rename diarization turns:', renameErr);
         }
+        // Enrol named speakers as voiceprint identities (opt-in only;
+        // no-op when voiceprints are off or no embeddings are stored).
+        await enrolNamedSpeakers(transcript.id, speakers);
         await loadTranscript();
       }
     } catch (error) {
@@ -898,6 +940,13 @@ export const TranscriptDetailPage: React.FC = () => {
       {/* Per-speaker audio export — only renders when diarization turns exist. */}
       <SpeakerAudioExport transcriptId={transcript.id} />
 
+      {/* Conversation dynamics from diarization turns (prosody phase 1). */}
+      <ConversationDynamics
+        transcriptId={transcript.id}
+        segments={pageSegments}
+        durationSeconds={transcript.duration}
+      />
+
       {/* Speaker Analysis */}
       {transcript.speakers && transcript.speakers.length > 0 && (
         <div className="bg-white rounded-lg border border-surface-200 p-6">
@@ -1298,6 +1347,7 @@ export const TranscriptDetailPage: React.FC = () => {
         transcriptText={transcript.processed_text || transcript.full_text || ''}
         existingSpeakers={transcript.speakers}
         onSave={handleSpeakerTaggingSave}
+        identitySuggestions={identitySuggestions}
       />
 
       <TranscriptChatModal

@@ -258,12 +258,51 @@ Small, independent, ship alongside the above.
 ## Out of scope (deliberately)
 
 - **Cloud sync / multi-user.** Conflicts with the local-first constraint.
-- **Speaker identity across recordings** (voiceprints). Useful, but a much larger
-  piece of work and a different privacy conversation.
-- **Prosody analysis** (pauses, overlap, interruptions, backchannels). Genuinely
-  interesting for Q&A detection, but out of scope until the above lands.
 - **Real vector-search over analysis.** RAG already exists for Chat and is working;
   extending it to analysis is unnecessary once map-reduce is in place.
+
+(Speaker identity across recordings and prosody analysis were out of scope
+until items 1–7 landed; they are items 8–9 below, approved 2026-10-16.)
+
+---
+
+## Plan: speaker identity across recordings (voiceprints) + prosody/overlap
+
+## Goal
+
+Recognise the same person across different recordings (suggest “this sounds like Alice from last week”, confirmed by you, never auto-assigned), and surface conversation dynamics — overlap, interruptions, pauses, backchannels — from data Debrief already stores.
+
+## Success Criteria
+
+- Importing a recording with a previously named speaker suggests the existing identity with a visible similarity score; accepting it applies the name everywhere a rename does today.
+- A per-transcript “dynamics” view shows overlap/interruption/pause/backchannel measures that are computed, labelled with their derivation, and reproducible from stored turns + words.
+- Everything stays local; voiceprint storage is opt-in, inspectable, and deletable per identity.
+
+## Approach
+
+Reuse what exists. pyannote's diarization already computes speaker embeddings internally using the wespeaker model that is already in your bundled model cache, so voiceprints need no new model download — only plumbing to expose a per-speaker embedding from speech-analyser and a place to store and compare them in Debrief. Prosody phase 1 is pure arithmetic over stored turns and word timings (no new audio analysis): overlap exists in raw pyannote turns, pauses are turn/word gaps, interruptions and backchannels are turn-pattern heuristics. Acoustic features (energy, pitch) are a later, optional phase reusing the waveform the diarizer now decodes. Alternatives rejected: a separate speaker-embedding library (new dependency and model when pyannote's is already bundled), and cloud identity services (violates local-first).
+
+## Steps
+
+1. **Spike (speech-analyser):** confirm how installed pyannote 4.x exposes cluster embeddings (pipeline return value vs its embedding component) on the two-speaker fixture; record vector dimension and stability across two recordings of the same synthetic voice. Gate: if embeddings are not cleanly obtainable, stop and re-plan around running the wespeaker model directly on turn audio.
+2. **speech-analyser 0.10.0:** additive `speaker_embeddings: {speaker_id: [floats]}` in `analyse()` (and a `Diarizer.diarize(..., return_embeddings=True)` path), tests with mocked pipeline, PyPI release following the 0.8/0.9 pattern.
+3. **Debrief storage (schema v4, additive):** `speaker_identities` (id, name, created) and per-transcript speaker embeddings (transcript, cluster id, identity id nullable, embedding blob/JSON, talk seconds). Persist on import/re-diarise behind a Settings opt-in, default off.
+4. **Matching UX:** cosine similarity against identity centroids; above a threshold (tuned on the spike, shown in the UI) the rename flow suggests an existing identity; accepting writes through the existing rename path so segments, turns, and exports stay consistent. Identities view to rename/merge/delete voiceprints.
+5. **Prosody phase 1 (Debrief, renderer-side computation):** from `diarization_turns` + segment words — overlap seconds and % (intersecting turns), interruption candidates (turn starts <300 ms after/before prior turn ends while cutting it short), pause distribution between turns, backchannel candidates (turns ≤1 s / ≤3 words inside another's stretch), per-speaker rate and turn-length stats. Display in a “Dynamics” section with definitions shown, no ML claims.
+6. **Prosody phase 2 (optional, only if phase 1 proves useful):** acoustic energy (RMS per turn) computed in the sidecar from the already-decoded waveform; pitch only if a bundled-dependency route exists without new downloads.
+
+## Validation Plan
+
+- Spike evidence: same-voice vs different-voice cosine scores on generated two-voice fixtures (Samantha/Daniel from earlier sessions), printed before any UI work.
+- speech-analyser: unit tests for embedding exposure (mocked), live CLI run on the MP4 fixture showing embeddings per speaker; full pytest green.
+- Debrief: unit tests for matching thresholds and each prosody measure against hand-computed fixtures; live import of two recordings sharing a voice showing the identity suggestion; full Vitest suite + sidecar live check as before.
+
+## Risks / Open Questions
+
+- Voiceprints are biometric data even locally: opt-in default-off, stored only in the local DB, deletable — but you should confirm you are comfortable storing them at all before step 3.
+- Synthetic-voice fixtures overstate match reliability; real-world thresholds will need your own recordings to calibrate, and false matches must always be a suggestion, never silent.
+- Overlap/interruption heuristics will mislabel some natural turn-taking; labelling them as candidates with definitions is deliberate.
+- None for cloud sync: explicitly a non-goal, unchanged.
 
 ---
 
@@ -282,3 +321,5 @@ Small, independent, ship alongside the above.
 | 2026-10-14 | 7 — honesty fixes | Shipped. Theme strength computed as share of the month's transcripts; dead segment sentiment/emotions columns removed for new DBs; project export 'pdf' option renamed to HTML; CSV gains summary/insights/speakers/patterns. |
 | 2026-10-14 | Audit P0 regressions | The 2026-10-14 audit found three regressions in the shipped items, all fixed same day: timestamped export mixed all segment versions (duplicated cues); segment exports claimed 'turn' precision for interpolated numbers; renames never reached `diarization_turns` (and re-diarisation saved raw ids while segments saved display names), so audio and text disagreed on speaker names. Turns now store display name + cluster id, renames rewrite turns, and reads heal legacy rows via the rename map. |
 | 2026-10-16 | 6 — upstreamed | speech-analyser 0.9.0 exposes raw turns + per-word speakers from analyse() (0.8.1: waveform-fed pyannote). Debrief deleted /analyse-v2 and word_alignment.py, floor raised to >=0.9.0, venv sync now --upgrades with non-fatal offline failure. Item closed. |
+| 2026-10-16 | 8 — voiceprints | Shipped. speech-analyser 0.10.0 exposes speaker_embeddings (pyannote DiarizeOutput, 256-dim). Debrief schema v4 (speaker_identities + transcript_speaker_embeddings), opt-in Settings toggle (default off, off wipes all voiceprints), enrolment on naming, scored suggestions in the tagging modal (threshold 0.5, spike: same-voice 0.62–0.83 vs cross ≤0.31). Identities rename/delete in Settings. |
+| 2026-10-16 | 9 — prosody phase 1 | Shipped. src/utils/prosody.ts + ConversationDynamics card: overlap, pauses, interruption/backchannel candidates, per-speaker rate — all computed from stored turns/words with definitions shown. Phase 2 (acoustic energy/pitch) not started. |
