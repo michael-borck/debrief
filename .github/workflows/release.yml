@@ -55,7 +55,7 @@ jobs:
           /tmp/audit-venv/bin/pip install --quiet --upgrade pip
           /tmp/audit-venv/bin/pip install --quiet \
             'speech-analyser[diarization]>=0.10.0' \
-            'sentence-transformers>=2.7,<6'
+            'sentence-transformers>=5.7'
           /tmp/audit-venv/bin/pip install --quiet pip-audit
           # CVE-2025-3000 (torch, no fixed release as of Jun 2026): local-only
           # memory-corruption crash in torch.jit.script with list attributes,

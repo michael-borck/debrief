@@ -31,10 +31,14 @@ from pathlib import Path
 # compatible FFmpeg (none installed, or Homebrew's FFmpeg is newer than
 # torchcodec supports) its RuntimeError crashes the import. 5.7 catches it.
 # The floor also forces venvs frozen on a broken version forward even if an
-# --upgrade sync is skipped.
+# --upgrade sync is skipped. No upper cap: like speech-analyser it tracks
+# latest. We only use SentenceTransformer(id).encode(), which is stable
+# across majors (verified on 6.2.0). Add a cap only for a known break.
+#
+# Keep in sync with the pip-audit step in .github/workflows/release.yml.
 INSTALL_SPECS = [
     "speech-analyser[diarization]>=0.10.0",
-    "sentence-transformers>=5.7,<6",
+    "sentence-transformers>=5.7",
 ]
 
 

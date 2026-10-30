@@ -32,7 +32,7 @@ class Embedder:
             raise RuntimeError(
                 "sentence-transformers is not installed in the sidecar venv. "
                 "Re-run npm run build:sidecar to bootstrap, or pip install "
-                "'sentence-transformers>=2.7' into ~/Library/Application Support/debrief/venv/."
+                "'sentence-transformers>=5.7' into ~/Library/Application Support/debrief/venv/."
             ) from e
 
         try:
