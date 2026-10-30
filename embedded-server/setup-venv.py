@@ -25,9 +25,16 @@ from pathlib import Path
 # at whatever was latest on the day it was created (which is how installs
 # silently stayed on 0.2.3). A failed sync on an existing venv is non-fatal (offline
 # launches keep working with the previously installed version).
+#
+# sentence-transformers floor is 5.7: 5.4–5.5 import torchcodec at module load
+# and only catch ImportError/OSError, so when torchcodec can't find a
+# compatible FFmpeg (none installed, or Homebrew's FFmpeg is newer than
+# torchcodec supports) its RuntimeError crashes the import. 5.7 catches it.
+# The floor also forces venvs frozen on a broken version forward even if an
+# --upgrade sync is skipped.
 INSTALL_SPECS = [
     "speech-analyser[diarization]>=0.10.0",
-    "sentence-transformers>=2.7,<6",
+    "sentence-transformers>=5.7,<6",
 ]
 
 
@@ -90,11 +97,15 @@ def fail(message: str, code: int = 1) -> "None":
     sys.exit(code)
 
 
-def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None,
+def run_step(label: str, cmd: list, *, hint="", env: dict = None,
              fatal: bool = True) -> bool:
     """Run a subprocess, capturing stdout+stderr. On failure, surface the last
     chunk of captured output in the renderer-visible ERROR so we never
-    silently lose 'why did it fail'."""
+    silently lose 'why did it fail'.
+
+    `hint` is either a fixed string or a callable taking the combined
+    stderr+stdout and returning a string, for steps whose likely cause
+    depends on what the output says."""
     _log(f"\n--- {label} ---")
     _log("$ " + " ".join(repr(c) if " " in str(c) else str(c) for c in cmd))
     try:
@@ -121,6 +132,8 @@ def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None,
         # the log file. Pick the most diagnostic single line from stderr
         # to include in the user-facing message.
         combined = (e.stderr or "") + ("\n" + (e.stdout or ""))
+        if callable(hint):
+            hint = hint(combined)
         last_line = next(
             (ln for ln in reversed(combined.strip().splitlines()) if ln.strip()),
             "",
@@ -142,6 +155,8 @@ def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None,
         fail(" | ".join(parts), e.returncode)
     except FileNotFoundError as e:
         msg = f"{label} failed: {e}"
+        if callable(hint):
+            hint = hint(str(e))
         if hint:
             msg += f" | {hint}"
         if _log_path:
@@ -151,6 +166,29 @@ def run_step(label: str, cmd: list, *, hint: str = "", env: dict = None,
             return False
         fail(msg, 1)
     return True
+
+
+def verification_hint(output: str) -> str:
+    """Pick the most likely cause of a failed verification import from its
+    output, rather than always blaming the hardened runtime."""
+    if "libtorchcodec" in output and "@rpath/libav" in output:
+        return (
+            "torchcodec could not find compatible FFmpeg libraries (it supports "
+            "FFmpeg 4–8; a newer Homebrew FFmpeg or none at all both trigger "
+            "this). A Python package imported torchcodec without tolerating "
+            "that — see logs/setup.log for which one."
+        )
+    if "dlopen" in output or "Library not loaded" in output:
+        return (
+            "A native library failed to load — see logs/setup.log for the "
+            "dlopen error (on macOS this can be the hardened runtime "
+            "rejecting an unsigned library). Try deleting the venv folder "
+            "and relaunching."
+        )
+    return (
+        "A required package failed to import — see logs/setup.log for the "
+        "traceback. Try deleting the venv folder and relaunching."
+    )
 
 
 def main() -> int:
@@ -243,11 +281,7 @@ def main() -> int:
             "from sentence_transformers import SentenceTransformer; "
             "print('OK')",
         ],
-        hint=(
-            "This usually means a native library refused to load under macOS "
-            "hardened runtime — see logs/setup.log for the dlopen error. "
-            "Try deleting the venv folder and relaunching."
-        ),
+        hint=verification_hint,
     )
 
     emit("DONE")
