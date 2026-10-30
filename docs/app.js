@@ -43,7 +43,7 @@ async function loadRelease() {
 /**
  * Pick the installer for a platform. Asset names come from
  * electron-builder.json: Debrief-{version}-arm64.dmg,
- * Debrief.Setup.{version}.exe, Debrief-{version}.AppImage,
+ * Debrief-Setup-{version}.exe, Debrief-{version}.AppImage,
  * debrief_{version}_amd64.deb. Browsers can't reliably distinguish Apple
  * Silicon from Intel, so macOS defaults to the arm64 DMG (the common case on
  * current hardware); an Intel DMG is offered as the alternative if one is
