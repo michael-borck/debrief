@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      skip_security_audit:
+        description: Skip the npm audit gate for a signing test
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -42,6 +47,7 @@ jobs:
           fi
 
       - name: npm audit (production deps only, high+)
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_security_audit) }}
         run: |
           npm ci --ignore-scripts
           npm audit --omit=dev --audit-level=high
