@@ -71,7 +71,7 @@ jobs:
       fail-fast: false  # one platform failing must not cancel the others
       matrix:
         include:
-          - os: macos-14
+          - os: macos-15
             platform: mac
             arch: arm64
           - os: ubuntu-latest
@@ -129,10 +129,10 @@ jobs:
         run: npm run build
 
       - name: Import macOS signing certificate
-        if: matrix.os == 'macos-14'
+        if: matrix.os == 'macos-15'
         env:
-          CERT_B64: ${{ secrets.CSC_LINK }}
-          CERT_PWD: ${{ secrets.CSC_KEY_PASSWORD }}
+          CERT_B64: ${{ secrets.APPLE_CERTIFICATE || secrets.CSC_LINK }}
+          CERT_PWD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || secrets.CSC_KEY_PASSWORD }}
         run: |
           echo "$CERT_B64" | base64 --decode > certificate.p12
           security create-keychain -p actions build.keychain
@@ -142,13 +142,31 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions build.keychain
           rm certificate.p12
 
-      - name: Build Electron app (macOS)
-        if: matrix.os == 'macos-14'
+      - name: Prepare App Store Connect API key
+        if: matrix.os == 'macos-15'
         env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
-          # Renamed from APPLE_* so electron-builder doesn't auto-fire its
-          # own (buggy) notarize wrapper alongside our scripts/notarize.js
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+        run: |
+          if [ -n "$APPLE_API_KEY_CONTENT" ] && [ -n "$APPLE_API_KEY" ]; then
+            mkdir -p "$RUNNER_TEMP/apple-api"
+            KEY_PATH="$RUNNER_TEMP/apple-api/AuthKey_${APPLE_API_KEY}.p8"
+            printf '%s' "$APPLE_API_KEY_CONTENT" | openssl base64 -d -A > "$KEY_PATH"
+            chmod 600 "$KEY_PATH"
+            echo "APPLE_API_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
+          else
+            echo "No API key secrets; notarization will fall back to Apple ID"
+          fi
+
+      - name: Build Electron app (macOS)
+        if: matrix.os == 'macos-15'
+        env:
+          CSC_LINK: ${{ secrets.APPLE_CERTIFICATE || secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD || secrets.CSC_KEY_PASSWORD }}
+          APPLE_API_KEY: ${{ secrets.APPLE_API_KEY }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_CONTENT: ${{ secrets.APPLE_API_KEY_CONTENT }}
+          # Legacy fallback; scripts/notarize.js prefers the API key path.
           NOTARIZE_APPLE_ID: ${{ secrets.APPLE_ID }}
           NOTARIZE_APPLE_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
           NOTARIZE_APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
